@@ -1,0 +1,11 @@
+{
+  "name": "scau-ufm",
+  "version-string": "0.1.0",
+  "dependencies": [
+    {
+      "name": "gtest",
+      "version>=": "1.14.0"
+    }
+  ],
+  "builtin-baseline": "99a97de2cb371449d4fb9dc970f2ac562d689ec2"
+}
