@@ -1,0 +1,231 @@
+{
+  "nodes": [
+    {
+      "id": "N0",
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "id": "N1",
+      "x": 1.0,
+      "y": 0.0
+    },
+    {
+      "id": "N2",
+      "x": 2.0,
+      "y": 0.0
+    },
+    {
+      "id": "N3",
+      "x": 0.0,
+      "y": 1.0
+    },
+    {
+      "id": "N4",
+      "x": 1.0,
+      "y": 1.0
+    },
+    {
+      "id": "N5",
+      "x": 2.0,
+      "y": 1.0
+    }
+  ],
+  "cells": [
+    {
+      "id": "C0",
+      "cell_type": "quadrilateral",
+      "node_ids": [
+        "N0",
+        "N1",
+        "N4",
+        "N3"
+      ],
+      "node_count": 4,
+      "edge_count": 4,
+      "area": 1.0,
+      "center": [
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "id": "C1",
+      "cell_type": "triangle",
+      "node_ids": [
+        "N1",
+        "N2",
+        "N4"
+      ],
+      "node_count": 3,
+      "edge_count": 3,
+      "area": 0.5,
+      "center": [
+        1.3333333333333333,
+        0.3333333333333333
+      ]
+    },
+    {
+      "id": "C2",
+      "cell_type": "triangle",
+      "node_ids": [
+        "N2",
+        "N5",
+        "N4"
+      ],
+      "node_count": 3,
+      "edge_count": 3,
+      "area": 0.5,
+      "center": [
+        1.6666666666666667,
+        0.6666666666666666
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "E0",
+      "node_ids": [
+        "N0",
+        "N1"
+      ],
+      "left_cell": null,
+      "right_cell": "C0",
+      "normal": [
+        -0.0,
+        1.0
+      ],
+      "length": 1.0,
+      "midpoint": [
+        0.5,
+        0.0
+      ]
+    },
+    {
+      "id": "E1",
+      "node_ids": [
+        "N1",
+        "N4"
+      ],
+      "left_cell": "C0",
+      "right_cell": "C1",
+      "normal": [
+        1.0,
+        -0.0
+      ],
+      "length": 1.0,
+      "midpoint": [
+        1.0,
+        0.5
+      ]
+    },
+    {
+      "id": "E2",
+      "node_ids": [
+        "N1",
+        "N2"
+      ],
+      "left_cell": null,
+      "right_cell": "C1",
+      "normal": [
+        -0.0,
+        1.0
+      ],
+      "length": 1.0,
+      "midpoint": [
+        1.5,
+        0.0
+      ]
+    },
+    {
+      "id": "E3",
+      "node_ids": [
+        "N2",
+        "N4"
+      ],
+      "left_cell": "C1",
+      "right_cell": "C2",
+      "normal": [
+        0.7071067811865475,
+        0.7071067811865475
+      ],
+      "length": 1.4142135623730951,
+      "midpoint": [
+        1.5,
+        0.5
+      ]
+    },
+    {
+      "id": "E4",
+      "node_ids": [
+        "N4",
+        "N3"
+      ],
+      "left_cell": "C0",
+      "right_cell": null,
+      "normal": [
+        0.0,
+        1.0
+      ],
+      "length": 1.0,
+      "midpoint": [
+        0.5,
+        1.0
+      ]
+    },
+    {
+      "id": "E5",
+      "node_ids": [
+        "N0",
+        "N3"
+      ],
+      "left_cell": null,
+      "right_cell": "C0",
+      "normal": [
+        1.0,
+        -0.0
+      ],
+      "length": 1.0,
+      "midpoint": [
+        0.0,
+        0.5
+      ]
+    },
+    {
+      "id": "E6",
+      "node_ids": [
+        "N2",
+        "N5"
+      ],
+      "left_cell": null,
+      "right_cell": "C2",
+      "normal": [
+        -1.0,
+        0.0
+      ],
+      "length": 1.0,
+      "midpoint": [
+        2.0,
+        0.5
+      ]
+    },
+    {
+      "id": "E7",
+      "node_ids": [
+        "N5",
+        "N4"
+      ],
+      "left_cell": "C2",
+      "right_cell": null,
+      "normal": [
+        0.0,
+        1.0
+      ],
+      "length": 1.0,
+      "midpoint": [
+        1.5,
+        1.0
+      ]
+    }
+  ]
+}

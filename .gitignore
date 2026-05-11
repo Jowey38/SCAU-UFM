@@ -10,6 +10,10 @@ cmake-build-*/
 *.zip
 *.7z
 
+# Python cache
+__pycache__/
+*.py[cod]
+
 # Local editor and OS files
 .vscode/
 .idea/
