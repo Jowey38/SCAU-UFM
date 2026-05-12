@@ -16,4 +16,6 @@ include(ScauWarnings)
 enable_testing()
 
 add_subdirectory(libs/core)
+add_subdirectory(libs/mesh)
+add_subdirectory(libs/surface2d)
 add_subdirectory(tests)
