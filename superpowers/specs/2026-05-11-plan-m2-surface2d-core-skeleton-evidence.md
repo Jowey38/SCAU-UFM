@@ -12,7 +12,7 @@
 | mesh 拒绝非法 cell / edge specs | 已完成 | `tests/unit/mesh/test_mesh_validation.cpp` 覆盖错误拓扑、重复 ID、缺失/额外边、反向 left-cell。 |
 | `libs/surface2d/` 只提供状态与 CPU 空推进骨架 | 已完成 | `tests/unit/surface2d/test_surface_state.cpp` 与 `tests/unit/surface2d/test_step.cpp` 通过；未实现正式 DPM/HLLC/source terms。 |
 | 本地 Windows preset 构建和测试通过 | 已通过 | `PATH="/d/Program Files/CMake/bin:$PATH" cmake --build --preset windows-msvc` 与 `PATH="/d/Program Files/CMake/bin:$PATH" ctest --preset windows-msvc` 通过，6/6 tests passed，总测试耗时 2.52 sec。 |
-| GitHub Actions matrix 通过 | 待回填 | 推送后回填 run URL、Windows/Linux job 状态与耗时。 |
+| GitHub Actions matrix 通过 | 已通过 | CI run `25725318038` 通过，run URL: https://github.com/Jowey38/SCAU-UFM/actions/runs/25725318038；`windows-msvc` success，142 sec；`linux-gcc` success，54 sec；总耗时 146 sec。 |
 
 ## 2. 本地验证记录
 
@@ -44,7 +44,19 @@ test_surface_state     Passed
 test_surface_step      Passed
 ```
 
-## 3. 范围约束
+## 3. GitHub Actions 验证记录
+
+- Commit: `2fe6f8d1cce49c7df42a838c721e358113ee3d51`
+- Workflow: `CI`
+- Run URL: https://github.com/Jowey38/SCAU-UFM/actions/runs/25725318038
+- Run status: `completed`, conclusion: `success`
+- Run started: `2026-05-12T09:19:15Z`
+- Run updated: `2026-05-12T09:21:41Z`
+- Total duration: 146 sec
+- `windows-msvc`: `success`, `2026-05-12T09:19:18Z` → `2026-05-12T09:21:40Z`, 142 sec
+- `linux-gcc`: `success`, `2026-05-12T09:19:25Z` → `2026-05-12T09:20:19Z`, 54 sec
+
+## 4. 范围约束
 
 - 本 M2 不引入 SWMM、D-Flow FM 或任何 1D engine ABI。
 - 本 M2 不正式实现 `libs/surface2d/dpm/`、`libs/surface2d/riemann/`、`libs/surface2d/source_terms/`，等待 sandbox B 完整退出。
