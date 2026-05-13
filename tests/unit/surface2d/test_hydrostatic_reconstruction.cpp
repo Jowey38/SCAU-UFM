@@ -18,3 +18,17 @@ TEST(HydrostaticReconstruction, EqualEtaZeroVelocityPreservesDepth) {
     EXPECT_EQ(pair.left.eta, 1.0);
     EXPECT_EQ(pair.right.eta, 1.0);
 }
+
+TEST(HydrostaticReconstruction, PreservesVelocityWhenDepthIsClipped) {
+    const scau::surface2d::CellState left{.conserved = {.h = 2.0, .hu = 4.0, .hv = -2.0}, .eta = 2.0};
+    const scau::surface2d::CellState right{.conserved = {.h = 1.0, .hu = 0.5, .hv = 0.25}, .eta = 1.0};
+
+    const auto pair = scau::surface2d::reconstruct_hydrostatic_pair(left, right);
+
+    EXPECT_DOUBLE_EQ(pair.left.conserved.h, 1.0);
+    EXPECT_DOUBLE_EQ(pair.left.conserved.hu, 2.0);
+    EXPECT_DOUBLE_EQ(pair.left.conserved.hv, -1.0);
+    EXPECT_DOUBLE_EQ(pair.right.conserved.h, 1.0);
+    EXPECT_DOUBLE_EQ(pair.right.conserved.hu, 0.5);
+    EXPECT_DOUBLE_EQ(pair.right.conserved.hv, 0.25);
+}

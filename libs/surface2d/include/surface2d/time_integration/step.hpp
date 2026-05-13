@@ -24,11 +24,16 @@ struct EdgeStepDiagnostics {
     core::Real residual{0.0};
 };
 
+struct CellStepDiagnostics {
+    core::Real mass_residual{0.0};
+};
+
 struct StepDiagnostics {
     std::size_t cell_count{0U};
     std::size_t edge_count{0U};
     core::Real max_cell_cfl{0.0};
     bool rollback_required{false};
+    std::vector<CellStepDiagnostics> cells;
     std::vector<EdgeStepDiagnostics> edges;
 };
 

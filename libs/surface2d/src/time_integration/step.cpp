@@ -57,6 +57,20 @@ core::Real raw_cell_cfl(const mesh::Mesh& mesh, const SurfaceState& state, const
     return max_cfl;
 }
 
+void apply_depth_update(
+    const mesh::Mesh& mesh,
+    SurfaceState& state,
+    const StepConfig& config,
+    const std::vector<CellStepDiagnostics>& cells) {
+    const auto nodes = mesh::node_lookup(mesh.nodes);
+    for (std::size_t cell_index = 0; cell_index < mesh.cells.size(); ++cell_index) {
+        const core::Real area = mesh::cell_area(mesh.cells[cell_index], nodes);
+        if (area > 0.0) {
+            state.cells[cell_index].conserved.h += config.dt * cells[cell_index].mass_residual / area;
+        }
+    }
+}
+
 EdgeStepDiagnostics edge_step_diagnostics(
     const mesh::Edge& edge,
     const SurfaceState& state,
@@ -101,6 +115,7 @@ StepDiagnostics base_diagnostics(const mesh::Mesh& mesh, const SurfaceState& sta
         .edge_count = mesh.edges.size(),
         .max_cell_cfl = max_cell_cfl,
         .rollback_required = max_cell_cfl > config.c_rollback,
+        .cells = std::vector<CellStepDiagnostics>(mesh.cells.size()),
     };
 }
 
@@ -123,8 +138,19 @@ StepDiagnostics advance_one_step_cpu(
     diagnostics.edges.reserve(mesh.edges.size());
     const auto cell_indices = cell_indices_by_id(mesh);
     for (std::size_t edge_index = 0; edge_index < mesh.edges.size(); ++edge_index) {
-        diagnostics.edges.push_back(edge_step_diagnostics(mesh.edges[edge_index], state, dpm_fields, cell_indices, edge_index));
+        const auto& edge = mesh.edges[edge_index];
+        const auto edge_diagnostics = edge_step_diagnostics(edge, state, dpm_fields, cell_indices, edge_index);
+        diagnostics.edges.push_back(edge_diagnostics);
+
+        if (edge.left_cell.has_value() && edge.right_cell.has_value()) {
+            const std::size_t left_index = cell_indices.at(*edge.left_cell);
+            const std::size_t right_index = cell_indices.at(*edge.right_cell);
+            const core::Real integrated_flux = edge_diagnostics.mass_flux * edge.length;
+            diagnostics.cells[left_index].mass_residual -= integrated_flux;
+            diagnostics.cells[right_index].mass_residual += integrated_flux;
+        }
     }
+    apply_depth_update(mesh, state, config, diagnostics.cells);
     return diagnostics;
 }
 

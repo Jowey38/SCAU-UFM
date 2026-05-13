@@ -69,3 +69,12 @@ target_link_libraries(test_cfl_rollback
         GTest::gtest_main
 )
 add_test(NAME test_cfl_rollback COMMAND test_cfl_rollback)
+
+add_executable(test_conservative_update test_conservative_update.cpp)
+target_link_libraries(test_conservative_update
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_conservative_update COMMAND test_conservative_update)

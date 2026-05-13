@@ -10,8 +10,8 @@ HydrostaticPair reconstruct_hydrostatic_pair(const CellState& left, const CellSt
     const core::Real right_depth = std::max(0.0, right.conserved.h - (right.eta - eta));
 
     return HydrostaticPair{
-        .left = CellState{.conserved = {.h = left_depth, .hu = 0.0, .hv = 0.0}, .eta = eta},
-        .right = CellState{.conserved = {.h = right_depth, .hu = 0.0, .hv = 0.0}, .eta = eta},
+        .left = CellState{.conserved = {.h = left_depth, .hu = left_depth * left.u(), .hv = left_depth * left.v()}, .eta = eta},
+        .right = CellState{.conserved = {.h = right_depth, .hu = right_depth * right.u(), .hv = right_depth * right.v()}, .eta = eta},
     };
 }
 
