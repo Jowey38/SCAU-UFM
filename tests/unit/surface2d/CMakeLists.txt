@@ -60,3 +60,12 @@ target_link_libraries(test_surface2d_golden_minimal
         GTest::gtest_main
 )
 add_test(NAME test_surface2d_golden_minimal COMMAND test_surface2d_golden_minimal)
+
+add_executable(test_cfl_rollback test_cfl_rollback.cpp)
+target_link_libraries(test_cfl_rollback
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_cfl_rollback COMMAND test_cfl_rollback)

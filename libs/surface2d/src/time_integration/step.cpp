@@ -1,5 +1,7 @@
 #include "surface2d/time_integration/step.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -39,6 +41,22 @@ std::size_t edge_cell_index(
     return cell_indices.at(cell_id);
 }
 
+core::Real cell_speed(const CellState& cell) {
+    return std::hypot(cell.u(), cell.v());
+}
+
+core::Real raw_cell_cfl(const mesh::Mesh& mesh, const SurfaceState& state, const StepConfig& config) {
+    core::Real max_cfl = 0.0;
+    const auto nodes = mesh::node_lookup(mesh.nodes);
+    for (std::size_t cell_index = 0; cell_index < mesh.cells.size(); ++cell_index) {
+        const core::Real area = mesh::cell_area(mesh.cells[cell_index], nodes);
+        if (area > 0.0) {
+            max_cfl = std::max(max_cfl, config.dt * cell_speed(state.cells[cell_index]) / area);
+        }
+    }
+    return max_cfl;
+}
+
 EdgeStepDiagnostics edge_step_diagnostics(
     const mesh::Edge& edge,
     const SurfaceState& state,
@@ -76,12 +94,13 @@ EdgeStepDiagnostics edge_step_diagnostics(
     return diagnostics;
 }
 
-StepDiagnostics base_diagnostics(const mesh::Mesh& mesh) {
+StepDiagnostics base_diagnostics(const mesh::Mesh& mesh, const SurfaceState& state, const StepConfig& config) {
+    const core::Real max_cell_cfl = raw_cell_cfl(mesh, state, config);
     return StepDiagnostics{
         .cell_count = mesh.cells.size(),
         .edge_count = mesh.edges.size(),
-        .max_cell_cfl = 0.0,
-        .rollback_required = false,
+        .max_cell_cfl = max_cell_cfl,
+        .rollback_required = max_cell_cfl > config.c_rollback,
     };
 }
 
@@ -89,7 +108,7 @@ StepDiagnostics base_diagnostics(const mesh::Mesh& mesh) {
 
 StepDiagnostics advance_one_step_cpu(const mesh::Mesh& mesh, SurfaceState& state, const StepConfig& config) {
     validate_step_inputs(mesh, state, config);
-    return base_diagnostics(mesh);
+    return base_diagnostics(mesh, state, config);
 }
 
 StepDiagnostics advance_one_step_cpu(
@@ -100,7 +119,7 @@ StepDiagnostics advance_one_step_cpu(
     validate_step_inputs(mesh, state, config);
     validate_dpm_fields_match_mesh(dpm_fields, mesh);
 
-    auto diagnostics = base_diagnostics(mesh);
+    auto diagnostics = base_diagnostics(mesh, state, config);
     diagnostics.edges.reserve(mesh.edges.size());
     const auto cell_indices = cell_indices_by_id(mesh);
     for (std::size_t edge_index = 0; edge_index < mesh.edges.size(); ++edge_index) {

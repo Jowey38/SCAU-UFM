@@ -20,7 +20,7 @@ TEST(SurfaceStep, CpuSkeletonPreservesStateAndReportsDiagnostics) {
     EXPECT_EQ(state.cells[0].conserved.hv, -0.25);
     EXPECT_EQ(diagnostics.cell_count, mesh.cells.size());
     EXPECT_EQ(diagnostics.edge_count, mesh.edges.size());
-    EXPECT_EQ(diagnostics.max_cell_cfl, 0.0);
+    EXPECT_DOUBLE_EQ(diagnostics.max_cell_cfl, 0.22360679774997899);
     EXPECT_FALSE(diagnostics.rollback_required);
     EXPECT_TRUE(diagnostics.edges.empty());
 }
