@@ -1,4 +1,8 @@
 add_library(scau_surface2d
+    src/dpm/fields.cpp
+    src/reconstruction/hydrostatic.cpp
+    src/riemann/hllc.cpp
+    src/source_terms/phi_t.cpp
     src/time_integration/step.cpp
 )
 add_library(scau::surface2d ALIAS scau_surface2d)

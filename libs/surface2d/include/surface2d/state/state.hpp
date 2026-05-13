@@ -16,6 +16,15 @@ struct ConservedState {
 
 struct CellState {
     ConservedState conserved;
+    core::Real eta{0.0};
+
+    [[nodiscard]] core::Real u() const {
+        return conserved.h > 0.0 ? conserved.hu / conserved.h : 0.0;
+    }
+
+    [[nodiscard]] core::Real v() const {
+        return conserved.h > 0.0 ? conserved.hv / conserved.h : 0.0;
+    }
 };
 
 struct SurfaceState {
@@ -24,6 +33,20 @@ struct SurfaceState {
     [[nodiscard]] static SurfaceState for_mesh(const mesh::Mesh& mesh) {
         SurfaceState state;
         state.cells.resize(mesh.cells.size());
+        return state;
+    }
+
+    [[nodiscard]] static SurfaceState hydrostatic_for_mesh(
+        const mesh::Mesh& mesh,
+        core::Real eta,
+        core::Real depth) {
+        SurfaceState state = for_mesh(mesh);
+        for (auto& cell : state.cells) {
+            cell.conserved.h = depth;
+            cell.conserved.hu = 0.0;
+            cell.conserved.hv = 0.0;
+            cell.eta = eta;
+        }
         return state;
     }
 };
