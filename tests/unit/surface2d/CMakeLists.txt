@@ -78,3 +78,21 @@ target_link_libraries(test_conservative_update
         GTest::gtest_main
 )
 add_test(NAME test_conservative_update COMMAND test_conservative_update)
+
+add_executable(test_wetting_drying test_wetting_drying.cpp)
+target_link_libraries(test_wetting_drying
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_wetting_drying COMMAND test_wetting_drying)
+
+add_executable(test_boundary_flux test_boundary_flux.cpp)
+target_link_libraries(test_boundary_flux
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_boundary_flux COMMAND test_boundary_flux)

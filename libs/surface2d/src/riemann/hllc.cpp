@@ -12,12 +12,17 @@ EdgeFlux hllc_normal_flux(
     const CellState& left,
     const CellState& right,
     const EdgeDpmFields& edge_fields,
-    Normal2 normal) {
+    Normal2 normal,
+    core::Real h_min) {
     if (edge_fields.omega_edge == 0.0 || edge_fields.phi_e_n < PhiEdgeMin) {
         return EdgeFlux{};
     }
 
     const auto pair = reconstruct_hydrostatic_pair(left, right);
+    if (pair.left.conserved.h <= h_min || pair.right.conserved.h <= h_min) {
+        return EdgeFlux{};
+    }
+
     const core::Real left_un = normal_velocity(pair.left, normal);
     const core::Real right_un = normal_velocity(pair.right, normal);
     if (left_un == 0.0 && right_un == 0.0 && pair.left.eta == pair.right.eta) {
