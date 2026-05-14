@@ -54,6 +54,13 @@ TEST(SurfaceStep, RejectsInvalidStepInputs) {
             scau::surface2d::StepConfig{.dt = 0.0, .cfl_safety = 0.45, .c_rollback = 1.0})),
         std::invalid_argument);
 
+    EXPECT_THROW(
+        static_cast<void>(scau::surface2d::advance_one_step_cpu(
+            mesh,
+            state,
+            scau::surface2d::StepConfig{.dt = 0.5, .cfl_safety = 0.45, .c_rollback = 1.0, .h_min = -1.0})),
+        std::invalid_argument);
+
     state.cells.pop_back();
     EXPECT_THROW(
         static_cast<void>(scau::surface2d::advance_one_step_cpu(

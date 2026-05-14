@@ -14,6 +14,7 @@ struct StepConfig {
     core::Real dt{0.0};
     core::Real cfl_safety{0.45};
     core::Real c_rollback{1.0};
+    core::Real h_min{1.0e-8};
 };
 
 struct EdgeStepDiagnostics {

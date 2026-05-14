@@ -24,6 +24,7 @@ struct EdgeFlux {
     const CellState& left,
     const CellState& right,
     const EdgeDpmFields& edge_fields,
-    Normal2 normal);
+    Normal2 normal,
+    core::Real h_min = 1.0e-8);
 
 }  // namespace scau::surface2d

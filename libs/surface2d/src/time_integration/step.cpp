@@ -22,6 +22,9 @@ void validate_step_inputs(const mesh::Mesh& mesh, const SurfaceState& state, con
     if (config.c_rollback <= 0.0) {
         throw std::invalid_argument("C_rollback must be positive");
     }
+    if (config.h_min < 0.0) {
+        throw std::invalid_argument("h_min must be non-negative");
+    }
     validate_state_matches_mesh(state, mesh);
 }
 
@@ -66,7 +69,9 @@ void apply_depth_update(
     for (std::size_t cell_index = 0; cell_index < mesh.cells.size(); ++cell_index) {
         const core::Real area = mesh::cell_area(mesh.cells[cell_index], nodes);
         if (area > 0.0) {
-            state.cells[cell_index].conserved.h += config.dt * cells[cell_index].mass_residual / area;
+            state.cells[cell_index].conserved.h = std::max(
+                0.0,
+                state.cells[cell_index].conserved.h + config.dt * cells[cell_index].mass_residual / area);
         }
     }
 }
@@ -76,7 +81,8 @@ EdgeStepDiagnostics edge_step_diagnostics(
     const SurfaceState& state,
     const DpmFields& dpm_fields,
     const std::unordered_map<std::string, std::size_t>& cell_indices,
-    std::size_t edge_index) {
+    std::size_t edge_index,
+    core::Real h_min) {
     const std::size_t left_index = edge_cell_index(cell_indices, edge.left_cell, edge.right_cell);
     const std::size_t right_index = edge_cell_index(cell_indices, edge.right_cell, edge.left_cell);
     const auto& left = state.cells[left_index];
@@ -85,7 +91,8 @@ EdgeStepDiagnostics edge_step_diagnostics(
         left,
         right,
         dpm_fields.edges[edge_index],
-        Normal2{.x = edge.normal.x, .y = edge.normal.y});
+        Normal2{.x = edge.normal.x, .y = edge.normal.y},
+        h_min);
 
     EdgeStepDiagnostics diagnostics{
         .mass_flux = flux.mass,
@@ -139,7 +146,7 @@ StepDiagnostics advance_one_step_cpu(
     const auto cell_indices = cell_indices_by_id(mesh);
     for (std::size_t edge_index = 0; edge_index < mesh.edges.size(); ++edge_index) {
         const auto& edge = mesh.edges[edge_index];
-        const auto edge_diagnostics = edge_step_diagnostics(edge, state, dpm_fields, cell_indices, edge_index);
+        const auto edge_diagnostics = edge_step_diagnostics(edge, state, dpm_fields, cell_indices, edge_index, config.h_min);
         diagnostics.edges.push_back(edge_diagnostics);
 
         if (edge.left_cell.has_value() && edge.right_cell.has_value()) {
