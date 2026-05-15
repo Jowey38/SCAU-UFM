@@ -126,6 +126,13 @@ StepDiagnostics base_diagnostics(const mesh::Mesh& mesh, const SurfaceState& sta
     };
 }
 
+CellState open_boundary_outside_state(const CellState& inside) {
+    return CellState{
+        .conserved = {.h = inside.conserved.h, .hu = inside.conserved.hu, .hv = inside.conserved.hv},
+        .eta = inside.eta,
+    };
+}
+
 }  // namespace
 
 StepDiagnostics advance_one_step_cpu(const mesh::Mesh& mesh, SurfaceState& state, const StepConfig& config) {
@@ -138,23 +145,63 @@ StepDiagnostics advance_one_step_cpu(
     SurfaceState& state,
     const StepConfig& config,
     const DpmFields& dpm_fields) {
+    return advance_one_step_cpu(mesh, state, config, dpm_fields, BoundaryConditions::for_mesh(mesh));
+}
+
+StepDiagnostics advance_one_step_cpu(
+    const mesh::Mesh& mesh,
+    SurfaceState& state,
+    const StepConfig& config,
+    const DpmFields& dpm_fields,
+    const BoundaryConditions& boundary) {
     validate_step_inputs(mesh, state, config);
     validate_dpm_fields_match_mesh(dpm_fields, mesh);
+    validate_boundary_conditions_match_mesh(boundary, mesh);
 
     auto diagnostics = base_diagnostics(mesh, state, config);
     diagnostics.edges.reserve(mesh.edges.size());
     const auto cell_indices = cell_indices_by_id(mesh);
     for (std::size_t edge_index = 0; edge_index < mesh.edges.size(); ++edge_index) {
         const auto& edge = mesh.edges[edge_index];
-        const auto edge_diagnostics = edge_step_diagnostics(edge, state, dpm_fields, cell_indices, edge_index, config.h_min);
-        diagnostics.edges.push_back(edge_diagnostics);
+        const bool is_internal = edge.left_cell.has_value() && edge.right_cell.has_value();
 
-        if (edge.left_cell.has_value() && edge.right_cell.has_value()) {
+        if (is_internal) {
+            const auto edge_diagnostics = edge_step_diagnostics(edge, state, dpm_fields, cell_indices, edge_index, config.h_min);
+            diagnostics.edges.push_back(edge_diagnostics);
             const std::size_t left_index = cell_indices.at(*edge.left_cell);
             const std::size_t right_index = cell_indices.at(*edge.right_cell);
             const core::Real integrated_flux = edge_diagnostics.mass_flux * edge.length;
             diagnostics.cells[left_index].mass_residual -= integrated_flux;
             diagnostics.cells[right_index].mass_residual += integrated_flux;
+            continue;
+        }
+
+        if (boundary.edges[edge_index] == BoundaryKind::Wall) {
+            diagnostics.edges.push_back(EdgeStepDiagnostics{});
+            continue;
+        }
+
+        const std::size_t inside_index = edge_cell_index(cell_indices, edge.left_cell, edge.right_cell);
+        const auto& inside = state.cells[inside_index];
+        const auto outside = open_boundary_outside_state(inside);
+        const auto flux = hllc_normal_flux(
+            inside,
+            outside,
+            dpm_fields.edges[edge_index],
+            Normal2{.x = edge.normal.x, .y = edge.normal.y},
+            config.h_min);
+
+        EdgeStepDiagnostics edge_diagnostics{
+            .mass_flux = flux.mass,
+            .momentum_flux_n = flux.momentum_n,
+        };
+        diagnostics.edges.push_back(edge_diagnostics);
+
+        const core::Real integrated_flux = edge_diagnostics.mass_flux * edge.length;
+        if (edge.left_cell.has_value()) {
+            diagnostics.cells[inside_index].mass_residual -= integrated_flux;
+        } else {
+            diagnostics.cells[inside_index].mass_residual += integrated_flux;
         }
     }
     apply_depth_update(mesh, state, config, diagnostics.cells);

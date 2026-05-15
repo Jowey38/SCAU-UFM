@@ -96,3 +96,12 @@ target_link_libraries(test_boundary_flux
         GTest::gtest_main
 )
 add_test(NAME test_boundary_flux COMMAND test_boundary_flux)
+
+add_executable(test_boundary_conditions test_boundary_conditions.cpp)
+target_link_libraries(test_boundary_conditions
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_boundary_conditions COMMAND test_boundary_conditions)
