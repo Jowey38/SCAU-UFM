@@ -5,6 +5,7 @@
 
 #include "core/types.hpp"
 #include "mesh/mesh.hpp"
+#include "surface2d/boundary/conditions.hpp"
 #include "surface2d/dpm/fields.hpp"
 #include "surface2d/state/state.hpp"
 
@@ -48,5 +49,12 @@ struct StepDiagnostics {
     SurfaceState& state,
     const StepConfig& config,
     const DpmFields& dpm_fields);
+
+[[nodiscard]] StepDiagnostics advance_one_step_cpu(
+    const mesh::Mesh& mesh,
+    SurfaceState& state,
+    const StepConfig& config,
+    const DpmFields& dpm_fields,
+    const BoundaryConditions& boundary);
 
 }  // namespace scau::surface2d

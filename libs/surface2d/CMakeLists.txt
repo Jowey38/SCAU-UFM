@@ -1,4 +1,5 @@
 add_library(scau_surface2d
+    src/boundary/conditions.cpp
     src/dpm/fields.cpp
     src/reconstruction/hydrostatic.cpp
     src/riemann/hllc.cpp

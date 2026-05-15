@@ -44,7 +44,7 @@ void isolate_edge(scau::surface2d::DpmFields& dpm_fields, std::size_t edge_index
 
 }  // namespace
 
-TEST(SurfaceBoundaryFlux, BoundaryEdgesReportFluxDiagnosticsWithoutCellResidualUpdate) {
+TEST(SurfaceBoundaryConditions, WallBoundaryProducesNoResidual) {
     const auto mesh = scau::mesh::build_mixed_minimal_mesh();
     const auto edge_index = first_boundary_edge_index(mesh);
     const auto cell_index = edge_cell_index(mesh, edge_index);
@@ -53,29 +53,45 @@ TEST(SurfaceBoundaryFlux, BoundaryEdgesReportFluxDiagnosticsWithoutCellResidualU
     state.cells[cell_index].conserved.hu = 1.0;
     auto dpm_fields = scau::surface2d::DpmFields::for_mesh(mesh);
     isolate_edge(dpm_fields, edge_index);
-
-    const scau::surface2d::StepConfig config{.dt = 0.1, .cfl_safety = 0.45, .c_rollback = 10.0};
-    const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields);
-
-    ASSERT_EQ(diagnostics.edges.size(), mesh.edges.size());
-    EXPECT_EQ(diagnostics.cells[cell_index].mass_residual, 0.0);
-}
-
-TEST(SurfaceBoundaryFlux, DefaultWallBoundaryConditionsMatchM5DocumentedBehavior) {
-    const auto mesh = scau::mesh::build_mixed_minimal_mesh();
-    const auto edge_index = first_boundary_edge_index(mesh);
-    const auto cell_index = edge_cell_index(mesh, edge_index);
-
-    auto state = scau::surface2d::SurfaceState::hydrostatic_for_mesh(mesh, 1.0, 1.0);
-    state.cells[cell_index].conserved.hu = 1.0;
-    auto dpm_fields = scau::surface2d::DpmFields::for_mesh(mesh);
-    isolate_edge(dpm_fields, edge_index);
-    const auto boundary = scau::surface2d::BoundaryConditions::for_mesh(mesh);
+    auto boundary = scau::surface2d::BoundaryConditions::for_mesh(mesh);
+    boundary.edges[edge_index] = scau::surface2d::BoundaryKind::Wall;
 
     const scau::surface2d::StepConfig config{.dt = 0.1, .cfl_safety = 0.45, .c_rollback = 10.0};
     const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields, boundary);
 
-    ASSERT_EQ(diagnostics.edges.size(), mesh.edges.size());
     EXPECT_EQ(diagnostics.edges[edge_index].mass_flux, 0.0);
     EXPECT_EQ(diagnostics.cells[cell_index].mass_residual, 0.0);
+}
+
+TEST(SurfaceBoundaryConditions, OpenBoundaryAccumulatesResidualOnInsideCell) {
+    const auto mesh = scau::mesh::build_mixed_minimal_mesh();
+    const auto edge_index = first_boundary_edge_index(mesh);
+    const auto cell_index = edge_cell_index(mesh, edge_index);
+
+    auto state = scau::surface2d::SurfaceState::hydrostatic_for_mesh(mesh, 1.0, 1.0);
+    state.cells[cell_index].conserved.hu = 1.0;
+    state.cells[cell_index].conserved.hv = 1.0;
+    auto dpm_fields = scau::surface2d::DpmFields::for_mesh(mesh);
+    isolate_edge(dpm_fields, edge_index);
+    auto boundary = scau::surface2d::BoundaryConditions::for_mesh(mesh);
+    boundary.edges[edge_index] = scau::surface2d::BoundaryKind::Open;
+
+    const scau::surface2d::StepConfig config{.dt = 0.1, .cfl_safety = 0.45, .c_rollback = 10.0};
+    const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields, boundary);
+
+    EXPECT_NE(diagnostics.edges[edge_index].mass_flux, 0.0);
+    EXPECT_NE(diagnostics.cells[cell_index].mass_residual, 0.0);
+}
+
+TEST(SurfaceBoundaryConditions, RejectsMismatchedBoundaryConditions) {
+    const auto mesh = scau::mesh::build_mixed_minimal_mesh();
+    auto state = scau::surface2d::SurfaceState::hydrostatic_for_mesh(mesh, 1.0, 1.0);
+    auto dpm_fields = scau::surface2d::DpmFields::for_mesh(mesh);
+    auto boundary = scau::surface2d::BoundaryConditions::for_mesh(mesh);
+    boundary.edges.pop_back();
+
+    const scau::surface2d::StepConfig config{.dt = 0.1, .cfl_safety = 0.45, .c_rollback = 10.0};
+    EXPECT_THROW(
+        static_cast<void>(scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields, boundary)),
+        std::invalid_argument);
 }
