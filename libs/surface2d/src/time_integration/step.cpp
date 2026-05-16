@@ -133,6 +133,39 @@ CellState open_boundary_outside_state(const CellState& inside) {
     };
 }
 
+const CellState& upwind_state(core::Real mass_flux, const CellState& left, const CellState& right) {
+    return mass_flux >= 0.0 ? left : right;
+}
+
+void accumulate_momentum_residual(
+    CellStepDiagnostics& sink,
+    core::Real signed_integrated_flux,
+    const CellState& upwind) {
+    sink.momentum_residual.x += signed_integrated_flux * upwind.u();
+    sink.momentum_residual.y += signed_integrated_flux * upwind.v();
+}
+
+void apply_momentum_update(
+    const mesh::Mesh& mesh,
+    SurfaceState& state,
+    const StepConfig& config,
+    const std::vector<CellStepDiagnostics>& cells) {
+    const auto nodes = mesh::node_lookup(mesh.nodes);
+    for (std::size_t cell_index = 0; cell_index < mesh.cells.size(); ++cell_index) {
+        const core::Real area = mesh::cell_area(mesh.cells[cell_index], nodes);
+        if (area <= 0.0) {
+            continue;
+        }
+        if (state.cells[cell_index].conserved.h <= config.h_min) {
+            state.cells[cell_index].conserved.hu = 0.0;
+            state.cells[cell_index].conserved.hv = 0.0;
+            continue;
+        }
+        state.cells[cell_index].conserved.hu += config.dt * cells[cell_index].momentum_residual.x / area;
+        state.cells[cell_index].conserved.hv += config.dt * cells[cell_index].momentum_residual.y / area;
+    }
+}
+
 }  // namespace
 
 StepDiagnostics advance_one_step_cpu(const mesh::Mesh& mesh, SurfaceState& state, const StepConfig& config) {
@@ -173,6 +206,9 @@ StepDiagnostics advance_one_step_cpu(
             const core::Real integrated_flux = edge_diagnostics.mass_flux * edge.length;
             diagnostics.cells[left_index].mass_residual -= integrated_flux;
             diagnostics.cells[right_index].mass_residual += integrated_flux;
+            const auto& upwind = upwind_state(edge_diagnostics.mass_flux, state.cells[left_index], state.cells[right_index]);
+            accumulate_momentum_residual(diagnostics.cells[left_index], -integrated_flux, upwind);
+            accumulate_momentum_residual(diagnostics.cells[right_index], integrated_flux, upwind);
             continue;
         }
 
@@ -198,13 +234,15 @@ StepDiagnostics advance_one_step_cpu(
         diagnostics.edges.push_back(edge_diagnostics);
 
         const core::Real integrated_flux = edge_diagnostics.mass_flux * edge.length;
-        if (edge.left_cell.has_value()) {
-            diagnostics.cells[inside_index].mass_residual -= integrated_flux;
-        } else {
-            diagnostics.cells[inside_index].mass_residual += integrated_flux;
-        }
+        const core::Real signed_integrated_flux = edge.left_cell.has_value() ? -integrated_flux : integrated_flux;
+        diagnostics.cells[inside_index].mass_residual += signed_integrated_flux;
+
+        const auto outside_for_upwind = open_boundary_outside_state(inside);
+        const auto& upwind_open = upwind_state(edge_diagnostics.mass_flux, inside, outside_for_upwind);
+        accumulate_momentum_residual(diagnostics.cells[inside_index], signed_integrated_flux, upwind_open);
     }
     apply_depth_update(mesh, state, config, diagnostics.cells);
+    apply_momentum_update(mesh, state, config, diagnostics.cells);
     return diagnostics;
 }
 

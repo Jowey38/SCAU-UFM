@@ -26,8 +26,14 @@ struct EdgeStepDiagnostics {
     core::Real residual{0.0};
 };
 
+struct MomentumResidual {
+    core::Real x{0.0};
+    core::Real y{0.0};
+};
+
 struct CellStepDiagnostics {
     core::Real mass_residual{0.0};
+    MomentumResidual momentum_residual{};
 };
 
 struct StepDiagnostics {
