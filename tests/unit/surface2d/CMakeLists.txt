@@ -105,3 +105,12 @@ target_link_libraries(test_boundary_conditions
         GTest::gtest_main
 )
 add_test(NAME test_boundary_conditions COMMAND test_boundary_conditions)
+
+add_executable(test_momentum_transport test_momentum_transport.cpp)
+target_link_libraries(test_momentum_transport
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_momentum_transport COMMAND test_momentum_transport)
