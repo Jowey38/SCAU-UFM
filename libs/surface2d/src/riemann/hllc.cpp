@@ -3,6 +3,13 @@
 #include "surface2d/reconstruction/hydrostatic.hpp"
 
 namespace scau::surface2d {
+namespace {
+
+core::Real pressure_normal_momentum(const CellState& left, const CellState& right, core::Real gravity = 9.81) {
+    return 0.25 * gravity * (left.conserved.h * left.conserved.h + right.conserved.h * right.conserved.h);
+}
+
+}  // namespace
 
 core::Real normal_velocity(const CellState& state, Normal2 normal) {
     return state.u() * normal.x + state.v() * normal.y;
@@ -25,13 +32,10 @@ EdgeFlux hllc_normal_flux(
 
     const core::Real left_un = normal_velocity(pair.left, normal);
     const core::Real right_un = normal_velocity(pair.right, normal);
-    if (left_un == 0.0 && right_un == 0.0 && pair.left.eta == pair.right.eta) {
-        return EdgeFlux{};
-    }
 
     return EdgeFlux{
         .mass = 0.5 * edge_fields.phi_e_n * (pair.left.conserved.h * left_un + pair.right.conserved.h * right_un),
-        .momentum_n = 0.0,
+        .momentum_n = edge_fields.phi_e_n * pressure_normal_momentum(pair.left, pair.right),
     };
 }
 

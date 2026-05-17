@@ -114,3 +114,12 @@ target_link_libraries(test_momentum_transport
         GTest::gtest_main
 )
 add_test(NAME test_momentum_transport COMMAND test_momentum_transport)
+
+add_executable(test_pressure_momentum test_pressure_momentum.cpp)
+target_link_libraries(test_pressure_momentum
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_pressure_momentum COMMAND test_pressure_momentum)
