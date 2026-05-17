@@ -145,6 +145,14 @@ void accumulate_momentum_residual(
     sink.momentum_residual.y += signed_integrated_flux * upwind.v();
 }
 
+void accumulate_pressure_momentum_residual(
+    CellStepDiagnostics& sink,
+    core::Real signed_pressure_integral,
+    Normal2 normal) {
+    sink.momentum_residual.x += signed_pressure_integral * normal.x;
+    sink.momentum_residual.y += signed_pressure_integral * normal.y;
+}
+
 void apply_momentum_update(
     const mesh::Mesh& mesh,
     SurfaceState& state,
@@ -209,6 +217,15 @@ StepDiagnostics advance_one_step_cpu(
             const auto& upwind = upwind_state(edge_diagnostics.mass_flux, state.cells[left_index], state.cells[right_index]);
             accumulate_momentum_residual(diagnostics.cells[left_index], -integrated_flux, upwind);
             accumulate_momentum_residual(diagnostics.cells[right_index], integrated_flux, upwind);
+            const core::Real pressure_integral = edge_diagnostics.momentum_flux_n * edge.length;
+            accumulate_pressure_momentum_residual(
+                diagnostics.cells[left_index],
+                -pressure_integral,
+                Normal2{.x = edge.normal.x, .y = edge.normal.y});
+            accumulate_pressure_momentum_residual(
+                diagnostics.cells[right_index],
+                pressure_integral,
+                Normal2{.x = edge.normal.x, .y = edge.normal.y});
             continue;
         }
 
@@ -240,6 +257,12 @@ StepDiagnostics advance_one_step_cpu(
         const auto outside_for_upwind = open_boundary_outside_state(inside);
         const auto& upwind_open = upwind_state(edge_diagnostics.mass_flux, inside, outside_for_upwind);
         accumulate_momentum_residual(diagnostics.cells[inside_index], signed_integrated_flux, upwind_open);
+        const core::Real pressure_integral = edge_diagnostics.momentum_flux_n * edge.length;
+        const core::Real signed_pressure_integral = edge.left_cell.has_value() ? -pressure_integral : pressure_integral;
+        accumulate_pressure_momentum_residual(
+            diagnostics.cells[inside_index],
+            signed_pressure_integral,
+            Normal2{.x = edge.normal.x, .y = edge.normal.y});
     }
     apply_depth_update(mesh, state, config, diagnostics.cells);
     apply_momentum_update(mesh, state, config, diagnostics.cells);
