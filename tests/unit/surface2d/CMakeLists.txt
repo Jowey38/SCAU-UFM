@@ -132,3 +132,12 @@ target_link_libraries(test_hllc_wave_momentum
         GTest::gtest_main
 )
 add_test(NAME test_hllc_wave_momentum COMMAND test_hllc_wave_momentum)
+
+add_executable(test_hllc_wave_mass test_hllc_wave_mass.cpp)
+target_link_libraries(test_hllc_wave_mass
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_hllc_wave_mass COMMAND test_hllc_wave_mass)

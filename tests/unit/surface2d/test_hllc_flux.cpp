@@ -54,6 +54,28 @@ TEST(HllcFlux, NormalMomentumFluxDependsOnVelocityDirection) {
     EXPECT_GT(moving_flux.mass, still_flux.mass);
 }
 
+TEST(HllcFlux, MassFluxUsesLeftStateWhenAllWavesMoveRight) {
+    const scau::surface2d::CellState left{.conserved = {.h = 1.0, .hu = 6.0, .hv = 0.0}, .eta = 1.0};
+    const scau::surface2d::CellState right{.conserved = {.h = 1.0, .hu = 4.0, .hv = 0.0}, .eta = 1.0};
+    const scau::surface2d::EdgeDpmFields edge_fields{.phi_e_n = 1.0, .omega_edge = 1.0};
+    const auto normal = scau::surface2d::Normal2{.x = 1.0, .y = 0.0};
+
+    const auto flux = scau::surface2d::hllc_normal_flux(left, right, edge_fields, normal);
+
+    EXPECT_DOUBLE_EQ(flux.mass, 6.0);
+}
+
+TEST(HllcFlux, MassFluxAppliesPhiEdgeScalingAfterHllcBranchSelection) {
+    const scau::surface2d::CellState left{.conserved = {.h = 1.0, .hu = 6.0, .hv = 0.0}, .eta = 1.0};
+    const scau::surface2d::CellState right{.conserved = {.h = 1.0, .hu = 4.0, .hv = 0.0}, .eta = 1.0};
+    const scau::surface2d::EdgeDpmFields edge_fields{.phi_e_n = 0.25, .omega_edge = 1.0};
+    const auto normal = scau::surface2d::Normal2{.x = 1.0, .y = 0.0};
+
+    const auto flux = scau::surface2d::hllc_normal_flux(left, right, edge_fields, normal);
+
+    EXPECT_DOUBLE_EQ(flux.mass, 1.5);
+}
+
 TEST(HllcFlux, HardAndSoftBlocksHaveZeroMassFlux) {
     const scau::surface2d::CellState left{.conserved = {.h = 1.0, .hu = 1.0, .hv = 0.0}, .eta = 1.0};
     const scau::surface2d::CellState right{.conserved = {.h = 1.0, .hu = 1.0, .hv = 0.0}, .eta = 1.0};

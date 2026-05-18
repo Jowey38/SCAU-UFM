@@ -12,9 +12,27 @@ core::Real wave_celerity(const CellState& state, core::Real gravity) {
     return std::sqrt(gravity * state.conserved.h);
 }
 
+core::Real physical_normal_mass_flux(const CellState& state, Normal2 normal) {
+    return state.conserved.h * normal_velocity(state, normal);
+}
+
 core::Real physical_normal_momentum_flux(const CellState& state, Normal2 normal, core::Real gravity) {
     const core::Real un = normal_velocity(state, normal);
     return state.conserved.h * un * un + 0.5 * gravity * state.conserved.h * state.conserved.h;
+}
+
+core::Real hllc_star_normal_mass_flux(
+    const CellState& state,
+    Normal2 normal,
+    core::Real s_k,
+    core::Real s_star) {
+    const core::Real un = normal_velocity(state, normal);
+    const core::Real denominator = s_k - s_star;
+    if (denominator == 0.0) {
+        return physical_normal_mass_flux(state, normal);
+    }
+    const core::Real h_star = state.conserved.h * (s_k - un) / denominator;
+    return physical_normal_mass_flux(state, normal) + s_k * (h_star - state.conserved.h);
 }
 
 core::Real hllc_star_normal_momentum_flux(
@@ -76,23 +94,26 @@ EdgeFlux hllc_normal_flux(
         return EdgeFlux{};
     }
 
-    const core::Real left_un = normal_velocity(pair.left, normal);
-    const core::Real right_un = normal_velocity(pair.right, normal);
     const auto speeds = estimate_hllc_wave_speeds(pair.left, pair.right, normal);
 
+    core::Real mass = 0.0;
     core::Real momentum_n = 0.0;
     if (0.0 <= speeds.s_l) {
+        mass = physical_normal_mass_flux(pair.left, normal);
         momentum_n = physical_normal_momentum_flux(pair.left, normal, 9.81);
     } else if (speeds.s_l <= 0.0 && 0.0 <= speeds.s_star) {
+        mass = hllc_star_normal_mass_flux(pair.left, normal, speeds.s_l, speeds.s_star);
         momentum_n = hllc_star_normal_momentum_flux(pair.left, normal, speeds.s_l, speeds.s_star, 9.81);
     } else if (speeds.s_star <= 0.0 && 0.0 <= speeds.s_r) {
+        mass = hllc_star_normal_mass_flux(pair.right, normal, speeds.s_r, speeds.s_star);
         momentum_n = hllc_star_normal_momentum_flux(pair.right, normal, speeds.s_r, speeds.s_star, 9.81);
     } else {
+        mass = physical_normal_mass_flux(pair.right, normal);
         momentum_n = physical_normal_momentum_flux(pair.right, normal, 9.81);
     }
 
     return EdgeFlux{
-        .mass = 0.5 * edge_fields.phi_e_n * (pair.left.conserved.h * left_un + pair.right.conserved.h * right_un),
+        .mass = edge_fields.phi_e_n * mass,
         .momentum_n = edge_fields.phi_e_n * momentum_n,
     };
 }
