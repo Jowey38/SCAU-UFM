@@ -21,6 +21,15 @@ core::Real physical_normal_momentum_flux(const CellState& state, Normal2 normal,
     return state.conserved.h * un * un + 0.5 * gravity * state.conserved.h * state.conserved.h;
 }
 
+Normal2 tangent_from_normal(Normal2 normal) {
+    return Normal2{.x = -normal.y, .y = normal.x};
+}
+
+core::Real tangential_velocity(const CellState& state, Normal2 normal) {
+    const auto tangent = tangent_from_normal(normal);
+    return state.u() * tangent.x + state.v() * tangent.y;
+}
+
 core::Real hllc_star_normal_mass_flux(
     const CellState& state,
     Normal2 normal,
@@ -98,23 +107,35 @@ EdgeFlux hllc_normal_flux(
 
     core::Real mass = 0.0;
     core::Real momentum_n = 0.0;
+    core::Real tangential = 0.0;
     if (0.0 <= speeds.s_l) {
         mass = physical_normal_mass_flux(pair.left, normal);
         momentum_n = physical_normal_momentum_flux(pair.left, normal, 9.81);
+        tangential = tangential_velocity(pair.left, normal);
     } else if (speeds.s_l <= 0.0 && 0.0 <= speeds.s_star) {
         mass = hllc_star_normal_mass_flux(pair.left, normal, speeds.s_l, speeds.s_star);
         momentum_n = hllc_star_normal_momentum_flux(pair.left, normal, speeds.s_l, speeds.s_star, 9.81);
+        tangential = tangential_velocity(pair.left, normal);
     } else if (speeds.s_star <= 0.0 && 0.0 <= speeds.s_r) {
         mass = hllc_star_normal_mass_flux(pair.right, normal, speeds.s_r, speeds.s_star);
         momentum_n = hllc_star_normal_momentum_flux(pair.right, normal, speeds.s_r, speeds.s_star, 9.81);
+        tangential = tangential_velocity(pair.right, normal);
     } else {
         mass = physical_normal_mass_flux(pair.right, normal);
         momentum_n = physical_normal_momentum_flux(pair.right, normal, 9.81);
+        tangential = tangential_velocity(pair.right, normal);
     }
 
+    const auto tangent = tangent_from_normal(normal);
+    const core::Real scaled_mass = edge_fields.phi_e_n * mass;
+    const core::Real scaled_momentum_n = edge_fields.phi_e_n * momentum_n;
+    const core::Real scaled_momentum_t = scaled_mass * tangential;
+
     return EdgeFlux{
-        .mass = edge_fields.phi_e_n * mass,
-        .momentum_n = edge_fields.phi_e_n * momentum_n,
+        .mass = scaled_mass,
+        .momentum_n = scaled_momentum_n,
+        .momentum_x = scaled_momentum_n * normal.x + scaled_momentum_t * tangent.x,
+        .momentum_y = scaled_momentum_n * normal.y + scaled_momentum_t * tangent.y,
     };
 }
 

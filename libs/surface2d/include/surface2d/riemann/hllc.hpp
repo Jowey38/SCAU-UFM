@@ -16,6 +16,8 @@ struct Normal2 {
 struct EdgeFlux {
     core::Real mass{0.0};
     core::Real momentum_n{0.0};
+    core::Real momentum_x{0.0};
+    core::Real momentum_y{0.0};
 };
 
 struct WaveSpeeds {

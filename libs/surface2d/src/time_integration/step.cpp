@@ -81,18 +81,11 @@ EdgeStepDiagnostics edge_step_diagnostics(
     const SurfaceState& state,
     const DpmFields& dpm_fields,
     const std::unordered_map<std::string, std::size_t>& cell_indices,
-    std::size_t edge_index,
-    core::Real h_min) {
+    const EdgeFlux& flux) {
     const std::size_t left_index = edge_cell_index(cell_indices, edge.left_cell, edge.right_cell);
     const std::size_t right_index = edge_cell_index(cell_indices, edge.right_cell, edge.left_cell);
     const auto& left = state.cells[left_index];
     const auto& right = state.cells[right_index];
-    const auto flux = hllc_normal_flux(
-        left,
-        right,
-        dpm_fields.edges[edge_index],
-        Normal2{.x = edge.normal.x, .y = edge.normal.y},
-        h_min);
 
     EdgeStepDiagnostics diagnostics{
         .mass_flux = flux.mass,
@@ -133,24 +126,12 @@ CellState open_boundary_outside_state(const CellState& inside) {
     };
 }
 
-const CellState& upwind_state(core::Real mass_flux, const CellState& left, const CellState& right) {
-    return mass_flux >= 0.0 ? left : right;
-}
-
-void accumulate_momentum_residual(
+void accumulate_momentum_flux_residual(
     CellStepDiagnostics& sink,
-    core::Real signed_integrated_flux,
-    const CellState& upwind) {
-    sink.momentum_residual.x += signed_integrated_flux * upwind.u();
-    sink.momentum_residual.y += signed_integrated_flux * upwind.v();
-}
-
-void accumulate_pressure_momentum_residual(
-    CellStepDiagnostics& sink,
-    core::Real signed_pressure_integral,
-    Normal2 normal) {
-    sink.momentum_residual.x += signed_pressure_integral * normal.x;
-    sink.momentum_residual.y += signed_pressure_integral * normal.y;
+    core::Real signed_integrated_flux_x,
+    core::Real signed_integrated_flux_y) {
+    sink.momentum_residual.x += signed_integrated_flux_x;
+    sink.momentum_residual.y += signed_integrated_flux_y;
 }
 
 void apply_momentum_update(
@@ -207,25 +188,23 @@ StepDiagnostics advance_one_step_cpu(
         const bool is_internal = edge.left_cell.has_value() && edge.right_cell.has_value();
 
         if (is_internal) {
-            const auto edge_diagnostics = edge_step_diagnostics(edge, state, dpm_fields, cell_indices, edge_index, config.h_min);
+            const auto flux = hllc_normal_flux(
+                state.cells[cell_indices.at(*edge.left_cell)],
+                state.cells[cell_indices.at(*edge.right_cell)],
+                dpm_fields.edges[edge_index],
+                Normal2{.x = edge.normal.x, .y = edge.normal.y},
+                config.h_min);
+            const auto edge_diagnostics = edge_step_diagnostics(edge, state, dpm_fields, cell_indices, flux);
             diagnostics.edges.push_back(edge_diagnostics);
             const std::size_t left_index = cell_indices.at(*edge.left_cell);
             const std::size_t right_index = cell_indices.at(*edge.right_cell);
             const core::Real integrated_flux = edge_diagnostics.mass_flux * edge.length;
             diagnostics.cells[left_index].mass_residual -= integrated_flux;
             diagnostics.cells[right_index].mass_residual += integrated_flux;
-            const auto& upwind = upwind_state(edge_diagnostics.mass_flux, state.cells[left_index], state.cells[right_index]);
-            accumulate_momentum_residual(diagnostics.cells[left_index], -integrated_flux, upwind);
-            accumulate_momentum_residual(diagnostics.cells[right_index], integrated_flux, upwind);
-            const core::Real pressure_integral = edge_diagnostics.momentum_flux_n * edge.length;
-            accumulate_pressure_momentum_residual(
-                diagnostics.cells[left_index],
-                -pressure_integral,
-                Normal2{.x = edge.normal.x, .y = edge.normal.y});
-            accumulate_pressure_momentum_residual(
-                diagnostics.cells[right_index],
-                pressure_integral,
-                Normal2{.x = edge.normal.x, .y = edge.normal.y});
+            const core::Real integrated_momentum_x = flux.momentum_x * edge.length;
+            const core::Real integrated_momentum_y = flux.momentum_y * edge.length;
+            accumulate_momentum_flux_residual(diagnostics.cells[left_index], -integrated_momentum_x, -integrated_momentum_y);
+            accumulate_momentum_flux_residual(diagnostics.cells[right_index], integrated_momentum_x, integrated_momentum_y);
             continue;
         }
 
@@ -254,15 +233,9 @@ StepDiagnostics advance_one_step_cpu(
         const core::Real signed_integrated_flux = edge.left_cell.has_value() ? -integrated_flux : integrated_flux;
         diagnostics.cells[inside_index].mass_residual += signed_integrated_flux;
 
-        const auto outside_for_upwind = open_boundary_outside_state(inside);
-        const auto& upwind_open = upwind_state(edge_diagnostics.mass_flux, inside, outside_for_upwind);
-        accumulate_momentum_residual(diagnostics.cells[inside_index], signed_integrated_flux, upwind_open);
-        const core::Real pressure_integral = edge_diagnostics.momentum_flux_n * edge.length;
-        const core::Real signed_pressure_integral = edge.left_cell.has_value() ? -pressure_integral : pressure_integral;
-        accumulate_pressure_momentum_residual(
-            diagnostics.cells[inside_index],
-            signed_pressure_integral,
-            Normal2{.x = edge.normal.x, .y = edge.normal.y});
+        const core::Real signed_momentum_x = edge.left_cell.has_value() ? -flux.momentum_x * edge.length : flux.momentum_x * edge.length;
+        const core::Real signed_momentum_y = edge.left_cell.has_value() ? -flux.momentum_y * edge.length : flux.momentum_y * edge.length;
+        accumulate_momentum_flux_residual(diagnostics.cells[inside_index], signed_momentum_x, signed_momentum_y);
     }
     apply_depth_update(mesh, state, config, diagnostics.cells);
     apply_momentum_update(mesh, state, config, diagnostics.cells);
