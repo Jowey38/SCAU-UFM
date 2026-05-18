@@ -18,7 +18,19 @@ struct EdgeFlux {
     core::Real momentum_n{0.0};
 };
 
+struct WaveSpeeds {
+    core::Real s_l{0.0};
+    core::Real s_star{0.0};
+    core::Real s_r{0.0};
+};
+
 [[nodiscard]] core::Real normal_velocity(const CellState& state, Normal2 normal);
+
+[[nodiscard]] WaveSpeeds estimate_hllc_wave_speeds(
+    const CellState& left,
+    const CellState& right,
+    Normal2 normal,
+    core::Real gravity = 9.81);
 
 [[nodiscard]] EdgeFlux hllc_normal_flux(
     const CellState& left,

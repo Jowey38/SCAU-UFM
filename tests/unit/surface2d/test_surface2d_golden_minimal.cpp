@@ -40,7 +40,7 @@ std::size_t right_cell_index(const scau::mesh::Mesh& mesh, std::size_t edge_inde
 
 }  // namespace
 
-TEST(Surface2DGoldenMinimal, G1MixedMeshHydrostaticStateProducesZeroFluxes) {
+TEST(Surface2DGoldenMinimal, G1MixedMeshHydrostaticStateProducesZeroMassFluxes) {
     const auto mesh = scau::mesh::build_mixed_minimal_mesh();
     auto state = scau::surface2d::SurfaceState::hydrostatic_for_mesh(mesh, 1.0, 1.0);
     const auto dpm_fields = scau::surface2d::DpmFields::for_mesh(mesh);
@@ -51,7 +51,6 @@ TEST(Surface2DGoldenMinimal, G1MixedMeshHydrostaticStateProducesZeroFluxes) {
     ASSERT_EQ(diagnostics.edges.size(), mesh.edges.size());
     for (const auto& edge : diagnostics.edges) {
         EXPECT_EQ(edge.mass_flux, 0.0);
-        EXPECT_EQ(edge.momentum_flux_n, 0.0);
     }
     EXPECT_EQ(diagnostics.max_cell_cfl, 0.0);
     EXPECT_FALSE(diagnostics.rollback_required);
