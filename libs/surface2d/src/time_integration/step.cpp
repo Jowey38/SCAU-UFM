@@ -2,9 +2,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "surface2d/riemann/hllc.hpp"
 #include "surface2d/source_terms/phi_t.hpp"
@@ -44,20 +46,48 @@ std::size_t edge_cell_index(
     return cell_indices.at(cell_id);
 }
 
-core::Real cell_speed(const CellState& cell) {
-    return std::hypot(cell.u(), cell.v());
+std::vector<core::Real> cell_areas(const mesh::Mesh& mesh) {
+    const auto nodes = mesh::node_lookup(mesh.nodes);
+    std::vector<core::Real> areas(mesh.cells.size(), 0.0);
+    for (std::size_t cell_index = 0; cell_index < mesh.cells.size(); ++cell_index) {
+        areas[cell_index] = mesh::cell_area(mesh.cells[cell_index], nodes);
+    }
+    return areas;
 }
 
-core::Real raw_cell_cfl(const mesh::Mesh& mesh, const SurfaceState& state, const StepConfig& config) {
-    core::Real max_cfl = 0.0;
-    const auto nodes = mesh::node_lookup(mesh.nodes);
-    for (std::size_t cell_index = 0; cell_index < mesh.cells.size(); ++cell_index) {
-        const core::Real area = mesh::cell_area(mesh.cells[cell_index], nodes);
-        if (area > 0.0) {
-            max_cfl = std::max(max_cfl, config.dt * cell_speed(state.cells[cell_index]) / area);
+core::Real raw_cell_cfl(
+    const mesh::Mesh& mesh,
+    const SurfaceState& state,
+    const StepConfig& config,
+    const BoundaryConditions& boundary) {
+    const auto cell_indices = cell_indices_by_id(mesh);
+    const auto areas = cell_areas(mesh);
+    std::vector<core::Real> cell_cfl(mesh.cells.size(), 0.0);
+
+    for (std::size_t edge_index = 0; edge_index < mesh.edges.size(); ++edge_index) {
+        const auto& edge = mesh.edges[edge_index];
+        const bool is_internal = edge.left_cell.has_value() && edge.right_cell.has_value();
+        if (!is_internal && boundary.edges[edge_index] == BoundaryKind::Wall) {
+            continue;
+        }
+
+        const std::size_t left_index = edge_cell_index(cell_indices, edge.left_cell, edge.right_cell);
+        const std::size_t right_index = edge_cell_index(cell_indices, edge.right_cell, edge.left_cell);
+        const auto speeds = estimate_hllc_wave_speeds(
+            state.cells[left_index],
+            state.cells[right_index],
+            Normal2{.x = edge.normal.x, .y = edge.normal.y});
+        const core::Real spectral_radius = std::max(std::abs(speeds.s_l), std::abs(speeds.s_r));
+
+        if (edge.left_cell.has_value() && areas[left_index] > 0.0) {
+            cell_cfl[left_index] += config.dt * edge.length * spectral_radius / areas[left_index];
+        }
+        if (edge.right_cell.has_value() && areas[right_index] > 0.0) {
+            cell_cfl[right_index] += config.dt * edge.length * spectral_radius / areas[right_index];
         }
     }
-    return max_cfl;
+
+    return *std::max_element(cell_cfl.begin(), cell_cfl.end());
 }
 
 void apply_depth_update(
@@ -108,8 +138,12 @@ EdgeStepDiagnostics edge_step_diagnostics(
     return diagnostics;
 }
 
-StepDiagnostics base_diagnostics(const mesh::Mesh& mesh, const SurfaceState& state, const StepConfig& config) {
-    const core::Real max_cell_cfl = raw_cell_cfl(mesh, state, config);
+StepDiagnostics base_diagnostics(
+    const mesh::Mesh& mesh,
+    const SurfaceState& state,
+    const StepConfig& config,
+    const BoundaryConditions& boundary) {
+    const core::Real max_cell_cfl = raw_cell_cfl(mesh, state, config, boundary);
     return StepDiagnostics{
         .cell_count = mesh.cells.size(),
         .edge_count = mesh.edges.size(),
@@ -159,7 +193,7 @@ void apply_momentum_update(
 
 StepDiagnostics advance_one_step_cpu(const mesh::Mesh& mesh, SurfaceState& state, const StepConfig& config) {
     validate_step_inputs(mesh, state, config);
-    return base_diagnostics(mesh, state, config);
+    return base_diagnostics(mesh, state, config, BoundaryConditions::for_mesh(mesh));
 }
 
 StepDiagnostics advance_one_step_cpu(
@@ -180,7 +214,7 @@ StepDiagnostics advance_one_step_cpu(
     validate_dpm_fields_match_mesh(dpm_fields, mesh);
     validate_boundary_conditions_match_mesh(boundary, mesh);
 
-    auto diagnostics = base_diagnostics(mesh, state, config);
+    auto diagnostics = base_diagnostics(mesh, state, config, boundary);
     diagnostics.edges.reserve(mesh.edges.size());
     const auto cell_indices = cell_indices_by_id(mesh);
     for (std::size_t edge_index = 0; edge_index < mesh.edges.size(); ++edge_index) {

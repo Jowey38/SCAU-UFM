@@ -44,7 +44,7 @@ TEST(Surface2DGoldenMinimal, G1MixedMeshHydrostaticStateProducesZeroMassFluxes) 
     const auto mesh = scau::mesh::build_mixed_minimal_mesh();
     auto state = scau::surface2d::SurfaceState::hydrostatic_for_mesh(mesh, 1.0, 1.0);
     const auto dpm_fields = scau::surface2d::DpmFields::for_mesh(mesh);
-    const scau::surface2d::StepConfig config{.dt = 0.5, .cfl_safety = 0.45, .c_rollback = 1.0};
+    const scau::surface2d::StepConfig config{.dt = 0.5, .cfl_safety = 0.45, .c_rollback = 10.0};
 
     const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields);
 
@@ -52,7 +52,7 @@ TEST(Surface2DGoldenMinimal, G1MixedMeshHydrostaticStateProducesZeroMassFluxes) 
     for (const auto& edge : diagnostics.edges) {
         EXPECT_EQ(edge.mass_flux, 0.0);
     }
-    EXPECT_EQ(diagnostics.max_cell_cfl, 0.0);
+    EXPECT_DOUBLE_EQ(diagnostics.max_cell_cfl, 7.5615388707431856);
     EXPECT_FALSE(diagnostics.rollback_required);
 }
 
