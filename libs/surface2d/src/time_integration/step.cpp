@@ -168,13 +168,6 @@ void accumulate_momentum_flux_residual(
     sink.momentum_residual.y += signed_integrated_flux_y;
 }
 
-void accumulate_pressure_momentum_residual(
-    CellStepDiagnostics& sink,
-    core::Real signed_pressure_integral,
-    Normal2 normal) {
-    sink.momentum_residual.x += signed_pressure_integral * normal.x;
-    sink.momentum_residual.y += signed_pressure_integral * normal.y;
-}
 
 void apply_momentum_update(
     const mesh::Mesh& mesh,
