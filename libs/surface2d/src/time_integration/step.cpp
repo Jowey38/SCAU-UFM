@@ -273,6 +273,9 @@ StepDiagnostics advance_one_step_cpu(
         const core::Real signed_momentum_y = edge.left_cell.has_value() ? -flux.momentum_y * edge.length : flux.momentum_y * edge.length;
         accumulate_momentum_flux_residual(diagnostics.cells[inside_index], signed_momentum_x, signed_momentum_y);
     }
+    if (diagnostics.rollback_required) {
+        return diagnostics;
+    }
     apply_depth_update(mesh, state, config, diagnostics.cells);
     apply_momentum_update(mesh, state, config, diagnostics.cells);
     return diagnostics;

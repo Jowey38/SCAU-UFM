@@ -150,3 +150,12 @@ target_link_libraries(test_hllc_wave_mass
         GTest::gtest_main
 )
 add_test(NAME test_hllc_wave_mass COMMAND test_hllc_wave_mass)
+
+add_executable(test_step_rollback_rejection test_step_rollback_rejection.cpp)
+target_link_libraries(test_step_rollback_rejection
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_step_rollback_rejection COMMAND test_step_rollback_rejection)
