@@ -150,6 +150,7 @@ StepDiagnostics base_diagnostics(
         .max_cell_cfl = max_cell_cfl,
         .rollback_required = max_cell_cfl > config.c_rollback,
         .cells = std::vector<CellStepDiagnostics>(mesh.cells.size()),
+        .edges = {},
     };
 }
 
