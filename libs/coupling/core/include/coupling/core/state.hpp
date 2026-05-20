@@ -7,7 +7,17 @@ namespace scau::coupling::core {
 
 struct ExchangeCellState {
     double volume{0.0};
+    double phi_t{0.0};
+    double h{0.0};
+    double area{0.0};
 };
+
+struct FlowLimit {
+    double v_limit{0.0};
+    double q_limit{0.0};
+};
+
+[[nodiscard]] FlowLimit compute_flow_limit(const ExchangeCellState& cell, double dt_sub);
 
 struct CouplingEvent {
     std::size_t exchange_cell_index{0U};

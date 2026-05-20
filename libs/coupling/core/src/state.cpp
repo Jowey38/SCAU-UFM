@@ -5,6 +5,27 @@
 
 namespace scau::coupling::core {
 
+FlowLimit compute_flow_limit(const ExchangeCellState& cell, double dt_sub) {
+    if (dt_sub <= 0.0) {
+        throw std::invalid_argument("dt_sub must be positive");
+    }
+    if (cell.phi_t < 0.0) {
+        throw std::invalid_argument("phi_t must be non-negative");
+    }
+    if (cell.h < 0.0) {
+        throw std::invalid_argument("h must be non-negative");
+    }
+    if (cell.area < 0.0) {
+        throw std::invalid_argument("area must be non-negative");
+    }
+
+    const double v_limit = 0.9 * cell.phi_t * cell.h * cell.area;
+    return FlowLimit{
+        .v_limit = v_limit,
+        .q_limit = v_limit / dt_sub,
+    };
+}
+
 CouplingSnapshot::CouplingSnapshot(std::vector<ExchangeCellState> cells) : cells_(std::move(cells)) {}
 
 const std::vector<ExchangeCellState>& CouplingSnapshot::cells() const noexcept {
