@@ -12,7 +12,7 @@ TEST(SurfaceStep, CpuSkeletonPreservesStateAndReportsDiagnostics) {
     state.cells[0].conserved.hu = 0.5;
     state.cells[0].conserved.hv = -0.25;
 
-    const scau::surface2d::StepConfig config{.dt = 0.5, .cfl_safety = 0.45, .c_rollback = 1.0};
+    const scau::surface2d::StepConfig config{.dt = 0.5, .cfl_safety = 0.45, .c_rollback = 10.0};
     const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config);
 
     EXPECT_EQ(state.cells[0].conserved.h, 1.25);
@@ -20,7 +20,7 @@ TEST(SurfaceStep, CpuSkeletonPreservesStateAndReportsDiagnostics) {
     EXPECT_EQ(state.cells[0].conserved.hv, -0.25);
     EXPECT_EQ(diagnostics.cell_count, mesh.cells.size());
     EXPECT_EQ(diagnostics.edge_count, mesh.edges.size());
-    EXPECT_DOUBLE_EQ(diagnostics.max_cell_cfl, 0.22360679774997899);
+    EXPECT_DOUBLE_EQ(diagnostics.max_cell_cfl, 3.9017852589786255);
     EXPECT_FALSE(diagnostics.rollback_required);
     EXPECT_TRUE(diagnostics.edges.empty());
 }
@@ -31,7 +31,7 @@ TEST(SurfaceStep, CpuStepReportsDpmEdgeDiagnostics) {
     auto dpm_fields = scau::surface2d::DpmFields::for_mesh(mesh);
     dpm_fields.cells[1].phi_t = 1.25;
 
-    const scau::surface2d::StepConfig config{.dt = 0.5, .cfl_safety = 0.45, .c_rollback = 1.0};
+    const scau::surface2d::StepConfig config{.dt = 0.5, .cfl_safety = 0.45, .c_rollback = 10.0};
     const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields);
 
     ASSERT_EQ(diagnostics.edges.size(), mesh.edges.size());
@@ -39,7 +39,7 @@ TEST(SurfaceStep, CpuStepReportsDpmEdgeDiagnostics) {
     EXPECT_DOUBLE_EQ(diagnostics.edges[1].pressure_pairing, 1.22625);
     EXPECT_DOUBLE_EQ(diagnostics.edges[1].s_phi_t, -1.22625);
     EXPECT_DOUBLE_EQ(diagnostics.edges[1].residual, 0.0);
-    EXPECT_EQ(diagnostics.max_cell_cfl, 0.0);
+    EXPECT_DOUBLE_EQ(diagnostics.max_cell_cfl, 7.5615388707431856);
     EXPECT_FALSE(diagnostics.rollback_required);
 }
 

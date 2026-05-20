@@ -70,6 +70,15 @@ target_link_libraries(test_cfl_rollback
 )
 add_test(NAME test_cfl_rollback COMMAND test_cfl_rollback)
 
+add_executable(test_dpm_edge_source_conservation test_dpm_edge_source_conservation.cpp)
+target_link_libraries(test_dpm_edge_source_conservation
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_dpm_edge_source_conservation COMMAND test_dpm_edge_source_conservation)
+
 add_executable(test_conservative_update test_conservative_update.cpp)
 target_link_libraries(test_conservative_update
     PRIVATE
@@ -123,3 +132,21 @@ target_link_libraries(test_pressure_momentum
         GTest::gtest_main
 )
 add_test(NAME test_pressure_momentum COMMAND test_pressure_momentum)
+
+add_executable(test_hllc_wave_momentum test_hllc_wave_momentum.cpp)
+target_link_libraries(test_hllc_wave_momentum
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_hllc_wave_momentum COMMAND test_hllc_wave_momentum)
+
+add_executable(test_hllc_wave_mass test_hllc_wave_mass.cpp)
+target_link_libraries(test_hllc_wave_mass
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_hllc_wave_mass COMMAND test_hllc_wave_mass)

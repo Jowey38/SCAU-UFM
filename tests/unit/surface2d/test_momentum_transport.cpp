@@ -7,6 +7,7 @@
 #include "mesh/mesh.hpp"
 #include "surface2d/boundary/conditions.hpp"
 #include "surface2d/dpm/fields.hpp"
+#include "surface2d/riemann/hllc.hpp"
 #include "surface2d/state/state.hpp"
 #include "surface2d/time_integration/step.hpp"
 
@@ -86,6 +87,45 @@ TEST(SurfaceMomentumTransport, InternalEdgeMomentumResidualIsAntisymmetric) {
     EXPECT_DOUBLE_EQ(
         diagnostics.cells[left_index].momentum_residual.y,
         -diagnostics.cells[right_index].momentum_residual.y);
+}
+
+TEST(SurfaceMomentumTransport, InternalEdgeUsesHllcVectorMomentumFlux) {
+    const auto mesh = scau::mesh::build_mixed_minimal_mesh();
+    const auto edge_index = first_internal_edge_index(mesh);
+    const auto left_index = cell_index_by_id(mesh, *mesh.edges[edge_index].left_cell);
+    const auto right_index = cell_index_by_id(mesh, *mesh.edges[edge_index].right_cell);
+
+    auto state = scau::surface2d::SurfaceState::hydrostatic_for_mesh(mesh, 1.0, 1.0);
+    state.cells[left_index].conserved.hu = 6.0;
+    state.cells[left_index].conserved.hv = 2.0;
+    state.cells[right_index].conserved.hu = 4.0;
+    state.cells[right_index].conserved.hv = -3.0;
+    auto dpm_fields = scau::surface2d::DpmFields::for_mesh(mesh);
+    isolate_edge(dpm_fields, edge_index);
+
+    const scau::surface2d::StepConfig config{.dt = 0.1, .cfl_safety = 0.45, .c_rollback = 10.0};
+    const auto normal = scau::surface2d::Normal2{
+        .x = mesh.edges[edge_index].normal.x,
+        .y = mesh.edges[edge_index].normal.y,
+    };
+    const auto expected_flux = scau::surface2d::hllc_normal_flux(
+        state.cells[left_index],
+        state.cells[right_index],
+        dpm_fields.edges[edge_index],
+        normal,
+        config.h_min);
+    const double integrated_x = expected_flux.momentum_x * mesh.edges[edge_index].length;
+    const double integrated_y = expected_flux.momentum_y * mesh.edges[edge_index].length;
+
+    const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields);
+    const auto edge_diagnostics = diagnostics.edges[edge_index];
+
+    EXPECT_DOUBLE_EQ(edge_diagnostics.mass_flux, expected_flux.mass);
+    EXPECT_DOUBLE_EQ(edge_diagnostics.momentum_flux_n, expected_flux.momentum_n);
+    EXPECT_DOUBLE_EQ(diagnostics.cells[left_index].momentum_residual.x, -integrated_x);
+    EXPECT_DOUBLE_EQ(diagnostics.cells[left_index].momentum_residual.y, -integrated_y);
+    EXPECT_DOUBLE_EQ(diagnostics.cells[right_index].momentum_residual.x, integrated_x);
+    EXPECT_DOUBLE_EQ(diagnostics.cells[right_index].momentum_residual.y, integrated_y);
 }
 
 TEST(SurfaceMomentumTransport, AdvancesHuHvFromInternalMassFlux) {
