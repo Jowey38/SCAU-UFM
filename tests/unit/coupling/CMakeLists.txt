@@ -15,3 +15,12 @@ target_link_libraries(test_coupling_flow_limit
         GTest::gtest_main
 )
 add_test(NAME test_coupling_flow_limit COMMAND test_coupling_flow_limit)
+
+add_executable(test_coupling_mass_deficit_account test_coupling_mass_deficit_account.cpp)
+target_link_libraries(test_coupling_mass_deficit_account
+    PRIVATE
+        scau::coupling_core
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_mass_deficit_account COMMAND test_coupling_mass_deficit_account)

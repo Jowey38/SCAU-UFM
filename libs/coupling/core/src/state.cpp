@@ -1,5 +1,6 @@
 #include "coupling/core/state.hpp"
 
+#include <algorithm>
 #include <stdexcept>
 #include <utility>
 
@@ -24,6 +25,28 @@ FlowLimit compute_flow_limit(const ExchangeCellState& cell, double dt_sub) {
         .v_limit = v_limit,
         .q_limit = v_limit / dt_sub,
     };
+}
+
+MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume) {
+    if (account.volume < 0.0) {
+        throw std::invalid_argument("deficit volume must be non-negative");
+    }
+    if (unmet_volume < 0.0) {
+        throw std::invalid_argument("unmet volume must be non-negative");
+    }
+
+    return MassDeficitAccount{.volume = account.volume + unmet_volume};
+}
+
+MassDeficitAccount apply_repayment(const MassDeficitAccount& account, double applied_volume) {
+    if (account.volume < 0.0) {
+        throw std::invalid_argument("deficit volume must be non-negative");
+    }
+    if (applied_volume < 0.0) {
+        throw std::invalid_argument("applied volume must be non-negative");
+    }
+
+    return MassDeficitAccount{.volume = std::max(0.0, account.volume - applied_volume)};
 }
 
 CouplingSnapshot::CouplingSnapshot(std::vector<ExchangeCellState> cells) : cells_(std::move(cells)) {}

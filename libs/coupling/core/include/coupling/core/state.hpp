@@ -19,6 +19,13 @@ struct FlowLimit {
 
 [[nodiscard]] FlowLimit compute_flow_limit(const ExchangeCellState& cell, double dt_sub);
 
+struct MassDeficitAccount {
+    double volume{0.0};
+};
+
+[[nodiscard]] MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume);
+[[nodiscard]] MassDeficitAccount apply_repayment(const MassDeficitAccount& account, double applied_volume);
+
 struct CouplingEvent {
     std::size_t exchange_cell_index{0U};
     double volume_delta{0.0};
