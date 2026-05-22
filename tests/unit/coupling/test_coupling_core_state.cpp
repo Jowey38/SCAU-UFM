@@ -65,3 +65,55 @@ TEST(CouplingCoreState, EnqueueRejectsOutOfRangeExchangeCellIndex) {
         state.enqueue_event({.exchange_cell_index = 1U, .volume_delta = 1.0}),
         std::out_of_range);
 }
+
+TEST(CouplingCoreState, SnapshotCapturesDeficitAccountsAndRemainsImmutable) {
+    scau::coupling::core::CouplingState state{{
+        {.volume = 10.0, .mass_deficit_account = {.volume = 1.0}},
+        {.volume = 20.0, .mass_deficit_account = {.volume = 2.0}},
+    }};
+
+    const auto snapshot = state.snapshot();
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 5.0, .unmet_volume = 3.0});
+    state.replay_pending();
+
+    ASSERT_EQ(snapshot.cells().size(), 2U);
+    EXPECT_DOUBLE_EQ(snapshot.cells()[0].mass_deficit_account.volume, 1.0);
+    EXPECT_DOUBLE_EQ(snapshot.cells()[1].mass_deficit_account.volume, 2.0);
+    EXPECT_DOUBLE_EQ(state.cells()[0].mass_deficit_account.volume, 4.0);
+}
+
+TEST(CouplingCoreState, RollbackRestoresSnapshotDeficitAccounts) {
+    scau::coupling::core::CouplingState state{{
+        {.volume = 10.0, .mass_deficit_account = {.volume = 1.0}},
+        {.volume = 20.0, .mass_deficit_account = {.volume = 2.0}},
+    }};
+
+    const auto snapshot = state.snapshot();
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = -3.0, .unmet_volume = 4.0});
+    state.enqueue_event({.exchange_cell_index = 1U, .volume_delta = 7.0, .repayment_volume = 1.5});
+    state.replay_pending();
+    state.rollback(snapshot);
+
+    ASSERT_EQ(state.cells().size(), 2U);
+    EXPECT_DOUBLE_EQ(state.cells()[0].mass_deficit_account.volume, 1.0);
+    EXPECT_DOUBLE_EQ(state.cells()[1].mass_deficit_account.volume, 2.0);
+}
+
+TEST(CouplingCoreState, RollbackPreservesPendingDeficitEventsForReplay) {
+    scau::coupling::core::CouplingState state{{
+        {.volume = 10.0, .mass_deficit_account = {.volume = 1.0}},
+        {.volume = 20.0, .mass_deficit_account = {.volume = 5.0}},
+    }};
+
+    const auto snapshot = state.snapshot();
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 2.0, .unmet_volume = 3.0});
+    state.enqueue_event({.exchange_cell_index = 1U, .volume_delta = -4.0, .repayment_volume = 2.5});
+    state.rollback(snapshot);
+    state.replay_pending();
+
+    ASSERT_EQ(state.cells().size(), 2U);
+    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 12.0);
+    EXPECT_DOUBLE_EQ(state.cells()[0].mass_deficit_account.volume, 4.0);
+    EXPECT_DOUBLE_EQ(state.cells()[1].volume, 16.0);
+    EXPECT_DOUBLE_EQ(state.cells()[1].mass_deficit_account.volume, 2.5);
+}

@@ -78,7 +78,10 @@ void CouplingState::rollback(const CouplingSnapshot& snapshot) {
 
 void CouplingState::replay_pending() {
     for (const auto& event : pending_events_) {
-        cells_[event.exchange_cell_index].volume += event.volume_delta;
+        auto& cell = cells_[event.exchange_cell_index];
+        cell.volume += event.volume_delta;
+        cell.mass_deficit_account = roll_deficit(cell.mass_deficit_account, event.unmet_volume);
+        cell.mass_deficit_account = apply_repayment(cell.mass_deficit_account, event.repayment_volume);
     }
     pending_events_.clear();
 }
