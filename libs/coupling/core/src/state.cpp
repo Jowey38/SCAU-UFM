@@ -1,6 +1,7 @@
 #include "coupling/core/state.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
 #include <utility>
 
@@ -48,6 +49,44 @@ ExchangeDecision evaluate_exchange(const ExchangeCellState& cell, const Exchange
         .q_repay = q_repay,
         .v_repay = v_repay,
         .v_unmet = v_unmet,
+    };
+}
+
+DrainSplit split_drain(const ExchangeCellState& cell, const ExchangeDecision& decision, double dt_sub) {
+    if (dt_sub <= 0.0) {
+        throw std::invalid_argument("dt_sub must be positive");
+    }
+    if (cell.phi_t < 0.0) {
+        throw std::invalid_argument("phi_t must be non-negative");
+    }
+    if (cell.h < 0.0) {
+        throw std::invalid_argument("h must be non-negative");
+    }
+    if (cell.area < 0.0) {
+        throw std::invalid_argument("area must be non-negative");
+    }
+    if (decision.v_granted < 0.0) {
+        throw std::invalid_argument("v_granted must be non-negative");
+    }
+
+    const double threshold = 0.2 * cell.phi_t * cell.h * cell.area;
+    if (decision.v_granted <= threshold) {
+        return DrainSplit{
+            .micro_steps = 1,
+            .dt_micro = dt_sub,
+            .v_per_micro_step = decision.v_granted,
+        };
+    }
+    if (threshold <= 0.0) {
+        throw std::invalid_argument("geometric storage must be positive when v_granted is positive");
+    }
+
+    const int requested = static_cast<int>(std::ceil(decision.v_granted / threshold));
+    const int micro_steps = std::min(5, requested);
+    return DrainSplit{
+        .micro_steps = micro_steps,
+        .dt_micro = dt_sub / micro_steps,
+        .v_per_micro_step = decision.v_granted / micro_steps,
     };
 }
 

@@ -41,6 +41,17 @@ struct ExchangeDecision {
     const ExchangeCellState& cell,
     const ExchangeRequest& request);
 
+struct DrainSplit {
+    int micro_steps{1};
+    double dt_micro{0.0};
+    double v_per_micro_step{0.0};
+};
+
+[[nodiscard]] DrainSplit split_drain(
+    const ExchangeCellState& cell,
+    const ExchangeDecision& decision,
+    double dt_sub);
+
 [[nodiscard]] MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume);
 [[nodiscard]] MassDeficitAccount apply_repayment(const MassDeficitAccount& account, double applied_volume);
 

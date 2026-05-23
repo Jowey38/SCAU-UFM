@@ -33,3 +33,12 @@ target_link_libraries(test_coupling_exchange_decision
         GTest::gtest_main
 )
 add_test(NAME test_coupling_exchange_decision COMMAND test_coupling_exchange_decision)
+
+add_executable(test_coupling_drain_split test_coupling_drain_split.cpp)
+target_link_libraries(test_coupling_drain_split
+    PRIVATE
+        scau::coupling_core
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_drain_split COMMAND test_coupling_drain_split)
