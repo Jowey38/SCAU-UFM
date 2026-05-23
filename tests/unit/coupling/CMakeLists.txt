@@ -24,3 +24,12 @@ target_link_libraries(test_coupling_mass_deficit_account
         GTest::gtest_main
 )
 add_test(NAME test_coupling_mass_deficit_account COMMAND test_coupling_mass_deficit_account)
+
+add_executable(test_coupling_exchange_decision test_coupling_exchange_decision.cpp)
+target_link_libraries(test_coupling_exchange_decision
+    PRIVATE
+        scau::coupling_core
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_exchange_decision COMMAND test_coupling_exchange_decision)

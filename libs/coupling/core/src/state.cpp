@@ -27,6 +27,30 @@ FlowLimit compute_flow_limit(const ExchangeCellState& cell, double dt_sub) {
     };
 }
 
+ExchangeDecision evaluate_exchange(const ExchangeCellState& cell, const ExchangeRequest& request) {
+    if (request.q_request < 0.0) {
+        throw std::invalid_argument("q_request must be non-negative");
+    }
+    if (cell.mass_deficit_account.volume < 0.0) {
+        throw std::invalid_argument("deficit volume must be non-negative");
+    }
+
+    const auto limit = compute_flow_limit(cell, request.dt_sub);
+    const double q_repay = std::min(cell.mass_deficit_account.volume / request.dt_sub, limit.q_limit);
+    const double q_granted = std::min(request.q_request, limit.q_limit - q_repay);
+    const double v_granted = q_granted * request.dt_sub;
+    const double v_repay = q_repay * request.dt_sub;
+    const double v_unmet = (request.q_request - q_granted) * request.dt_sub;
+
+    return ExchangeDecision{
+        .q_granted = q_granted,
+        .v_granted = v_granted,
+        .q_repay = q_repay,
+        .v_repay = v_repay,
+        .v_unmet = v_unmet,
+    };
+}
+
 MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume) {
     if (account.volume < 0.0) {
         throw std::invalid_argument("deficit volume must be non-negative");

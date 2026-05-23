@@ -24,6 +24,23 @@ struct FlowLimit {
 
 [[nodiscard]] FlowLimit compute_flow_limit(const ExchangeCellState& cell, double dt_sub);
 
+struct ExchangeRequest {
+    double q_request{0.0};
+    double dt_sub{0.0};
+};
+
+struct ExchangeDecision {
+    double q_granted{0.0};
+    double v_granted{0.0};
+    double q_repay{0.0};
+    double v_repay{0.0};
+    double v_unmet{0.0};
+};
+
+[[nodiscard]] ExchangeDecision evaluate_exchange(
+    const ExchangeCellState& cell,
+    const ExchangeRequest& request);
+
 [[nodiscard]] MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume);
 [[nodiscard]] MassDeficitAccount apply_repayment(const MassDeficitAccount& account, double applied_volume);
 
