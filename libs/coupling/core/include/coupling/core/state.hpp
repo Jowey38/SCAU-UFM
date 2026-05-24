@@ -60,6 +60,8 @@ struct DrainSplit {
 struct ExchangePipelineDecision {
     ExchangeDecision exchange{};
     DrainSplit drain_split{};
+    bool drain_split_engaged{false};
+    bool negative_depth_fix_engaged{false};
 };
 
 [[nodiscard]] ExchangePipelineDecision evaluate_exchange_pipeline(

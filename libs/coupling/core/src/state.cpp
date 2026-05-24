@@ -147,6 +147,8 @@ ExchangePipelineDecision evaluate_exchange_pipeline(
     return ExchangePipelineDecision{
         .exchange = nonnegative,
         .drain_split = split,
+        .drain_split_engaged = split.micro_steps > 1,
+        .negative_depth_fix_engaged = nonnegative.v_granted < initial.v_granted,
     };
 }
 

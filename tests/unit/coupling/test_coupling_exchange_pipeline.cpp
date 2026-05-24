@@ -36,6 +36,8 @@ TEST(CouplingExchangePipeline, SafeRequestReturnsFullGrantAndSingleMicroStep) {
     EXPECT_EQ(decision.drain_split.micro_steps, 2);
     EXPECT_DOUBLE_EQ(decision.drain_split.dt_micro, 2.0);
     EXPECT_DOUBLE_EQ(decision.drain_split.v_per_micro_step, 8.0);
+    EXPECT_TRUE(decision.drain_split_engaged);
+    EXPECT_FALSE(decision.negative_depth_fix_engaged);
 }
 
 TEST(CouplingExchangePipeline, RequestAboveHardGateClampsAndAccruesUnmet) {
@@ -50,6 +52,8 @@ TEST(CouplingExchangePipeline, RequestAboveHardGateClampsAndAccruesUnmet) {
     EXPECT_EQ(decision.drain_split.micro_steps, 5);
     EXPECT_DOUBLE_EQ(decision.drain_split.dt_micro, 0.8);
     EXPECT_DOUBLE_EQ(decision.drain_split.v_per_micro_step, 7.2);
+    EXPECT_TRUE(decision.drain_split_engaged);
+    EXPECT_FALSE(decision.negative_depth_fix_engaged);
 }
 
 TEST(CouplingExchangePipeline, NonnegativeStorageBackoffRunsAfterHardGateClamp) {
@@ -64,6 +68,8 @@ TEST(CouplingExchangePipeline, NonnegativeStorageBackoffRunsAfterHardGateClamp) 
     EXPECT_EQ(decision.drain_split.micro_steps, 5);
     EXPECT_DOUBLE_EQ(decision.drain_split.dt_micro, 0.8);
     EXPECT_DOUBLE_EQ(decision.drain_split.v_per_micro_step, 1.8);
+    EXPECT_TRUE(decision.drain_split_engaged);
+    EXPECT_FALSE(decision.negative_depth_fix_engaged);
 }
 
 TEST(CouplingExchangePipeline, DeficitRepaymentPrecedesNewRequestGrant) {
@@ -80,6 +86,22 @@ TEST(CouplingExchangePipeline, DeficitRepaymentPrecedesNewRequestGrant) {
     EXPECT_EQ(decision.drain_split.micro_steps, 3);
     EXPECT_DOUBLE_EQ(decision.drain_split.dt_micro, 4.0 / 3.0);
     EXPECT_DOUBLE_EQ(decision.drain_split.v_per_micro_step, 20.0 / 3.0);
+    EXPECT_TRUE(decision.drain_split_engaged);
+    EXPECT_FALSE(decision.negative_depth_fix_engaged);
+}
+
+TEST(CouplingExchangePipeline, EngagementFlagsRemainOffForSafeRequestAtSplitThreshold) {
+    const auto cell = make_cell();
+    const scau::coupling::core::ExchangeRequest request{.q_request = 2.0, .dt_sub = 4.0};
+
+    const auto decision = scau::coupling::core::evaluate_exchange_pipeline(cell, request);
+
+    EXPECT_DOUBLE_EQ(decision.exchange.q_granted, 2.0);
+    EXPECT_DOUBLE_EQ(decision.exchange.v_granted, 8.0);
+    EXPECT_DOUBLE_EQ(decision.exchange.v_unmet, 0.0);
+    EXPECT_EQ(decision.drain_split.micro_steps, 1);
+    EXPECT_FALSE(decision.drain_split_engaged);
+    EXPECT_FALSE(decision.negative_depth_fix_engaged);
 }
 
 TEST(CouplingExchangePipeline, InvalidInputsAreRejectedByComposedHelpers) {
