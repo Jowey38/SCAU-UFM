@@ -90,6 +90,53 @@ DrainSplit split_drain(const ExchangeCellState& cell, const ExchangeDecision& de
     };
 }
 
+ExchangeDecision enforce_nonnegative_storage(
+    const ExchangeCellState& cell,
+    const ExchangeDecision& decision,
+    double dt_sub) {
+    if (dt_sub <= 0.0) {
+        throw std::invalid_argument("dt_sub must be positive");
+    }
+    if (cell.phi_t < 0.0) {
+        throw std::invalid_argument("phi_t must be non-negative");
+    }
+    if (cell.h < 0.0) {
+        throw std::invalid_argument("h must be non-negative");
+    }
+    if (cell.area < 0.0) {
+        throw std::invalid_argument("area must be non-negative");
+    }
+    if (decision.q_granted < 0.0) {
+        throw std::invalid_argument("q_granted must be non-negative");
+    }
+    if (decision.v_granted < 0.0) {
+        throw std::invalid_argument("v_granted must be non-negative");
+    }
+    if (decision.q_repay < 0.0) {
+        throw std::invalid_argument("q_repay must be non-negative");
+    }
+    if (decision.v_repay < 0.0) {
+        throw std::invalid_argument("v_repay must be non-negative");
+    }
+    if (decision.v_unmet < 0.0) {
+        throw std::invalid_argument("v_unmet must be non-negative");
+    }
+
+    const double available_storage = cell.phi_t * cell.h * cell.area;
+    if (decision.v_granted <= available_storage) {
+        return decision;
+    }
+
+    const double additional_unmet = decision.v_granted - available_storage;
+    return ExchangeDecision{
+        .q_granted = available_storage / dt_sub,
+        .v_granted = available_storage,
+        .q_repay = decision.q_repay,
+        .v_repay = decision.v_repay,
+        .v_unmet = decision.v_unmet + additional_unmet,
+    };
+}
+
 MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume) {
     if (account.volume < 0.0) {
         throw std::invalid_argument("deficit volume must be non-negative");

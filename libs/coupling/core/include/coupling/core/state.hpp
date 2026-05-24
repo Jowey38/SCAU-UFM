@@ -52,6 +52,11 @@ struct DrainSplit {
     const ExchangeDecision& decision,
     double dt_sub);
 
+[[nodiscard]] ExchangeDecision enforce_nonnegative_storage(
+    const ExchangeCellState& cell,
+    const ExchangeDecision& decision,
+    double dt_sub);
+
 [[nodiscard]] MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume);
 [[nodiscard]] MassDeficitAccount apply_repayment(const MassDeficitAccount& account, double applied_volume);
 

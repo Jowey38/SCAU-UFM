@@ -42,3 +42,12 @@ target_link_libraries(test_coupling_drain_split
         GTest::gtest_main
 )
 add_test(NAME test_coupling_drain_split COMMAND test_coupling_drain_split)
+
+add_executable(test_coupling_nonnegative_storage_backoff test_coupling_nonnegative_storage_backoff.cpp)
+target_link_libraries(test_coupling_nonnegative_storage_backoff
+    PRIVATE
+        scau::coupling_core
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_nonnegative_storage_backoff COMMAND test_coupling_nonnegative_storage_backoff)
