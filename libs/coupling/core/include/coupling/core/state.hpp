@@ -109,6 +109,7 @@ public:
     void rollback(const CouplingSnapshot& snapshot);
     void replay_pending();
     void record_pipeline_decision(const ExchangePipelineDecision& decision);
+    ExchangePipelineDecision apply_exchange(std::size_t cell_index, const ExchangeRequest& request);
 
 private:
     std::vector<ExchangeCellState> cells_;

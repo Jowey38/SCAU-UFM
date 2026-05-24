@@ -230,4 +230,25 @@ void CouplingState::record_pipeline_decision(const ExchangePipelineDecision& dec
     }
 }
 
+ExchangePipelineDecision CouplingState::apply_exchange(
+    std::size_t cell_index,
+    const ExchangeRequest& request) {
+    if (cell_index >= cells_.size()) {
+        throw std::out_of_range("apply_exchange cell index is out of range");
+    }
+
+    const auto decision = evaluate_exchange_pipeline(cells_[cell_index], request);
+
+    enqueue_event(CouplingEvent{
+        .exchange_cell_index = cell_index,
+        .volume_delta = decision.exchange.v_granted,
+        .unmet_volume = decision.exchange.v_unmet,
+        .repayment_volume = decision.exchange.v_repay,
+    });
+
+    record_pipeline_decision(decision);
+
+    return decision;
+}
+
 }  // namespace scau::coupling::core

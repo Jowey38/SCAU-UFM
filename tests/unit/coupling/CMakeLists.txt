@@ -60,3 +60,12 @@ target_link_libraries(test_coupling_exchange_pipeline
         GTest::gtest_main
 )
 add_test(NAME test_coupling_exchange_pipeline COMMAND test_coupling_exchange_pipeline)
+
+add_executable(test_coupling_apply_exchange test_coupling_apply_exchange.cpp)
+target_link_libraries(test_coupling_apply_exchange
+    PRIVATE
+        scau::coupling_core
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_apply_exchange COMMAND test_coupling_apply_exchange)
