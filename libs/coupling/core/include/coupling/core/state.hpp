@@ -68,6 +68,17 @@ struct ExchangePipelineDecision {
     const ExchangeCellState& cell,
     const ExchangeRequest& request);
 
+struct ExchangeConservationAudit {
+    double request_volume{0.0};
+    double accounted_volume{0.0};
+    double residual{0.0};
+    bool balanced{true};
+};
+
+[[nodiscard]] ExchangeConservationAudit audit_exchange_decision(
+    const ExchangeRequest& request,
+    const ExchangePipelineDecision& decision);
+
 [[nodiscard]] MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume);
 [[nodiscard]] MassDeficitAccount apply_repayment(const MassDeficitAccount& account, double applied_volume);
 

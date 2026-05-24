@@ -69,3 +69,12 @@ target_link_libraries(test_coupling_apply_exchange
         GTest::gtest_main
 )
 add_test(NAME test_coupling_apply_exchange COMMAND test_coupling_apply_exchange)
+
+add_executable(test_coupling_exchange_audit test_coupling_exchange_audit.cpp)
+target_link_libraries(test_coupling_exchange_audit
+    PRIVATE
+        scau::coupling_core
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_exchange_audit COMMAND test_coupling_exchange_audit)

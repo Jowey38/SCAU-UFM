@@ -152,6 +152,34 @@ ExchangePipelineDecision evaluate_exchange_pipeline(
     };
 }
 
+ExchangeConservationAudit audit_exchange_decision(
+    const ExchangeRequest& request,
+    const ExchangePipelineDecision& decision) {
+    if (request.dt_sub <= 0.0) {
+        throw std::invalid_argument("dt_sub must be positive");
+    }
+    if (request.q_request < 0.0) {
+        throw std::invalid_argument("q_request must be non-negative");
+    }
+    if (decision.exchange.v_granted < 0.0) {
+        throw std::invalid_argument("v_granted must be non-negative");
+    }
+    if (decision.exchange.v_unmet < 0.0) {
+        throw std::invalid_argument("v_unmet must be non-negative");
+    }
+
+    const double request_volume = request.q_request * request.dt_sub;
+    const double accounted_volume = decision.exchange.v_granted + decision.exchange.v_unmet;
+    const double residual = request_volume - accounted_volume;
+
+    return ExchangeConservationAudit{
+        .request_volume = request_volume,
+        .accounted_volume = accounted_volume,
+        .residual = residual,
+        .balanced = (residual == 0.0),
+    };
+}
+
 MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume) {
     if (account.volume < 0.0) {
         throw std::invalid_argument("deficit volume must be non-negative");
