@@ -57,6 +57,15 @@ struct DrainSplit {
     const ExchangeDecision& decision,
     double dt_sub);
 
+struct ExchangePipelineDecision {
+    ExchangeDecision exchange{};
+    DrainSplit drain_split{};
+};
+
+[[nodiscard]] ExchangePipelineDecision evaluate_exchange_pipeline(
+    const ExchangeCellState& cell,
+    const ExchangeRequest& request);
+
 [[nodiscard]] MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume);
 [[nodiscard]] MassDeficitAccount apply_repayment(const MassDeficitAccount& account, double applied_volume);
 

@@ -51,3 +51,12 @@ target_link_libraries(test_coupling_nonnegative_storage_backoff
         GTest::gtest_main
 )
 add_test(NAME test_coupling_nonnegative_storage_backoff COMMAND test_coupling_nonnegative_storage_backoff)
+
+add_executable(test_coupling_exchange_pipeline test_coupling_exchange_pipeline.cpp)
+target_link_libraries(test_coupling_exchange_pipeline
+    PRIVATE
+        scau::coupling_core
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_exchange_pipeline COMMAND test_coupling_exchange_pipeline)

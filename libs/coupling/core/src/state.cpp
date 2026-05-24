@@ -137,6 +137,19 @@ ExchangeDecision enforce_nonnegative_storage(
     };
 }
 
+ExchangePipelineDecision evaluate_exchange_pipeline(
+    const ExchangeCellState& cell,
+    const ExchangeRequest& request) {
+    const auto initial = evaluate_exchange(cell, request);
+    const auto nonnegative = enforce_nonnegative_storage(cell, initial, request.dt_sub);
+    const auto split = split_drain(cell, nonnegative, request.dt_sub);
+
+    return ExchangePipelineDecision{
+        .exchange = nonnegative,
+        .drain_split = split,
+    };
+}
+
 MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume) {
     if (account.volume < 0.0) {
         throw std::invalid_argument("deficit volume must be non-negative");
