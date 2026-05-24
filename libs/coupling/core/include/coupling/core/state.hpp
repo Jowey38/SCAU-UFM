@@ -78,16 +78,23 @@ struct CouplingEvent {
     double repayment_volume{0.0};
 };
 
+struct RuntimeCounters {
+    std::size_t count_drain_split{0};
+    std::size_t count_negative_depth_fix{0};
+};
+
 class CouplingSnapshot {
 public:
     [[nodiscard]] const std::vector<ExchangeCellState>& cells() const noexcept;
+    [[nodiscard]] const RuntimeCounters& runtime_counters() const noexcept;
 
 private:
     friend class CouplingState;
 
-    explicit CouplingSnapshot(std::vector<ExchangeCellState> cells);
+    CouplingSnapshot(std::vector<ExchangeCellState> cells, RuntimeCounters counters);
 
     std::vector<ExchangeCellState> cells_;
+    RuntimeCounters runtime_counters_;
 };
 
 class CouplingState {
@@ -95,14 +102,17 @@ public:
     explicit CouplingState(std::vector<ExchangeCellState> cells);
 
     [[nodiscard]] const std::vector<ExchangeCellState>& cells() const noexcept;
+    [[nodiscard]] const RuntimeCounters& runtime_counters() const noexcept;
     [[nodiscard]] CouplingSnapshot snapshot() const;
 
     void enqueue_event(CouplingEvent event);
     void rollback(const CouplingSnapshot& snapshot);
     void replay_pending();
+    void record_pipeline_decision(const ExchangePipelineDecision& decision);
 
 private:
     std::vector<ExchangeCellState> cells_;
+    RuntimeCounters runtime_counters_{};
     std::vector<CouplingEvent> pending_events_;
 };
 

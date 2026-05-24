@@ -174,10 +174,15 @@ MassDeficitAccount apply_repayment(const MassDeficitAccount& account, double app
     return MassDeficitAccount{.volume = std::max(0.0, account.volume - applied_volume)};
 }
 
-CouplingSnapshot::CouplingSnapshot(std::vector<ExchangeCellState> cells) : cells_(std::move(cells)) {}
+CouplingSnapshot::CouplingSnapshot(std::vector<ExchangeCellState> cells, RuntimeCounters counters)
+    : cells_(std::move(cells)), runtime_counters_(counters) {}
 
 const std::vector<ExchangeCellState>& CouplingSnapshot::cells() const noexcept {
     return cells_;
+}
+
+const RuntimeCounters& CouplingSnapshot::runtime_counters() const noexcept {
+    return runtime_counters_;
 }
 
 CouplingState::CouplingState(std::vector<ExchangeCellState> cells) : cells_(std::move(cells)) {}
@@ -186,8 +191,12 @@ const std::vector<ExchangeCellState>& CouplingState::cells() const noexcept {
     return cells_;
 }
 
+const RuntimeCounters& CouplingState::runtime_counters() const noexcept {
+    return runtime_counters_;
+}
+
 CouplingSnapshot CouplingState::snapshot() const {
-    return CouplingSnapshot{cells_};
+    return CouplingSnapshot{cells_, runtime_counters_};
 }
 
 void CouplingState::enqueue_event(CouplingEvent event) {
@@ -199,6 +208,7 @@ void CouplingState::enqueue_event(CouplingEvent event) {
 
 void CouplingState::rollback(const CouplingSnapshot& snapshot) {
     cells_ = snapshot.cells_;
+    runtime_counters_ = snapshot.runtime_counters_;
 }
 
 void CouplingState::replay_pending() {
@@ -209,6 +219,15 @@ void CouplingState::replay_pending() {
         cell.mass_deficit_account = apply_repayment(cell.mass_deficit_account, event.repayment_volume);
     }
     pending_events_.clear();
+}
+
+void CouplingState::record_pipeline_decision(const ExchangePipelineDecision& decision) {
+    if (decision.drain_split_engaged) {
+        ++runtime_counters_.count_drain_split;
+    }
+    if (decision.negative_depth_fix_engaged) {
+        ++runtime_counters_.count_negative_depth_fix;
+    }
 }
 
 }  // namespace scau::coupling::core
