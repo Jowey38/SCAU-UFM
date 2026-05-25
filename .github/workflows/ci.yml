@@ -68,3 +68,53 @@ jobs:
 
       - name: Test
         run: ctest --preset ${{ matrix.preset }}
+
+  spike-isolation-check:
+    name: spike-isolation-check
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enforce spike-spec §2 / §3.3 isolation invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          fail() {
+            echo "::error::M30 spike-isolation invariant violated: $1"
+            exit 1
+          }
+
+          echo "--- Invariant 1: spike must not reference main repo symbols"
+          if grep -rnE "scau::coupling|scau::surface|scau::mesh|scau::stcf" spikes/ ; then
+              fail "spike references scau:: namespace (spike-spec §2)"
+          fi
+          if grep -rn "libs/coupling" spikes/ ; then
+              fail "spike references libs/coupling path (spike-spec §2)"
+          fi
+          if grep -rn "libs/surface2d" spikes/ ; then
+              fail "spike references libs/surface2d path (spike-spec §2)"
+          fi
+
+          echo "--- Invariant 2: main CMake graph must not consume spike targets"
+          if grep -nE "add_subdirectory\s*\(\s*spikes" CMakeLists.txt ; then
+              fail "root CMakeLists.txt calls add_subdirectory(spikes...) (spike-spec §2)"
+          fi
+          for dir in libs apps tests cmake ; do
+              if [ -d "$dir" ] && grep -rnE "add_subdirectory\s*\([^)]*spikes" "$dir" ; then
+                  fail "$dir/ contains add_subdirectory targeting spikes/ (spike-spec §2)"
+              fi
+          done
+
+          echo "--- Invariant 3: spike CMakeLists must not link main repo targets"
+          if grep -rnE "scau::|GTest::" spikes/*/CMakeLists.txt ; then
+              fail "spike CMakeLists links a main-repo CMake target (spike-spec §2)"
+          fi
+
+          echo "--- Invariant 4: no top-level vendor source under git tracking"
+          if git ls-files | grep -E "^(Delft3D-main|Stormwater-Management-Model-develop)/" ; then
+              fail "top-level vendor source committed (§3.3)"
+          fi
+
+          echo "OK all four spike-isolation invariants pass"
