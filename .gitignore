@@ -20,3 +20,10 @@ __pycache__/
 .vs/
 .DS_Store
 Thumbs.db
+
+# Top-level vendor sources must never enter git history.
+# Canonical layout per §3.3: extern/swmm5/, extern/dflowfm/, extern/dflowfm-bmi/.
+# Spike vendor mirror per third-party-spike-design §2: spikes/<engine>/vendor/.
+# See superpowers/specs/2026-05-25-m28-vendor-source-layout-isolation-design.md.
+/Delft3D-main/
+/Stormwater-Management-Model-develop/
