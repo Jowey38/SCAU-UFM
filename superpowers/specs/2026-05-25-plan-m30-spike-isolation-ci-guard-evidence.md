@@ -63,16 +63,15 @@ Added as a sibling top-level job (not a step under `build-and-test`):
 
 ## Post-Commit Verification
 
-After commit `<sha>` and push:
+After commit `24418d2` and push:
 
-- `gh run watch <run-id> --exit-status`: PASS.
-- Jobs visible:
-  - `linux-gcc` (existing) — PASS
-  - `windows-msvc` (existing) — PASS
-  - `spike-isolation-check` (new) — PASS
-- Total CI matrix: 3 jobs, all green.
-
-(CI run ID and observed durations recorded after push lands.)
+- CI run id: **26383159087** (`gh run view 26383159087`).
+- Jobs observed (all green):
+  - `linux-gcc` — PASS in 56s
+  - `windows-msvc` — PASS in 2m56s
+  - `spike-isolation-check` — PASS in **4s** (well within the < 30s design target)
+- Total CI matrix: 3 jobs.
+- Push required 5 retries due to intermittent github.com:443 connectivity from the host; the underlying commit hash and CI run are unaffected.
 
 ## Boundaries Preserved
 
