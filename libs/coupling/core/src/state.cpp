@@ -263,6 +263,10 @@ const RuntimeCounters& CouplingSnapshot::runtime_counters() const noexcept {
     return runtime_counters_;
 }
 
+SystemMassAudit CouplingSnapshot::compute_system_mass(double h_wet) const {
+    return core::compute_system_mass(cells_, h_wet);
+}
+
 CouplingState::CouplingState(std::vector<ExchangeCellState> cells) : cells_(std::move(cells)) {}
 
 const std::vector<ExchangeCellState>& CouplingState::cells() const noexcept {

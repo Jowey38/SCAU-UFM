@@ -121,6 +121,7 @@ class CouplingSnapshot {
 public:
     [[nodiscard]] const std::vector<ExchangeCellState>& cells() const noexcept;
     [[nodiscard]] const RuntimeCounters& runtime_counters() const noexcept;
+    [[nodiscard]] SystemMassAudit compute_system_mass(double h_wet) const;
 
 private:
     friend class CouplingState;

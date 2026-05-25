@@ -394,3 +394,26 @@ TEST(CouplingCoreState, AuditSystemMassAgainstReferenceUsesCurrentCells) {
     EXPECT_DOUBLE_EQ(delta.residual, 4.0);
     EXPECT_FALSE(delta.conserved);
 }
+
+TEST(CouplingCoreState, SnapshotComputeSystemMassUsesCapturedCellsAfterStateMutates) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto snapshot = state.snapshot();
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 0.0, .unmet_volume = 4.0});
+    state.replay_pending();
+
+    const auto snapshot_audit = snapshot.compute_system_mass(kHWet);
+    const auto state_audit = state.compute_system_mass(kHWet);
+
+    EXPECT_DOUBLE_EQ(snapshot_audit.surface_mass, 40.0);
+    EXPECT_DOUBLE_EQ(snapshot_audit.deficit_mass, 1.0);
+    EXPECT_DOUBLE_EQ(snapshot_audit.total_mass, 41.0);
+    EXPECT_DOUBLE_EQ(state_audit.deficit_mass, 5.0);
+}
