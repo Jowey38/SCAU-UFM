@@ -138,6 +138,10 @@ public:
     [[nodiscard]] const std::vector<ExchangeCellState>& cells() const noexcept;
     [[nodiscard]] const RuntimeCounters& runtime_counters() const noexcept;
     [[nodiscard]] CouplingSnapshot snapshot() const;
+    [[nodiscard]] SystemMassAudit compute_system_mass(double h_wet) const;
+    [[nodiscard]] SystemMassDelta audit_system_mass_against_reference(
+        const SystemMassAudit& baseline,
+        double h_wet) const;
 
     void enqueue_event(CouplingEvent event);
     void rollback(const CouplingSnapshot& snapshot);

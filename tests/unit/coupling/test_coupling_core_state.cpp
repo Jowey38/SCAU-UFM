@@ -341,3 +341,56 @@ TEST(CouplingCoreState, ReReplayAfterRollbackAndReEnqueueIsBitwiseIdentical) {
         state.runtime_counters().count_negative_depth_fix,
         first_counters.count_negative_depth_fix);
 }
+
+TEST(CouplingCoreState, ComputeSystemMassAuditsCurrentCellsWithoutMutatingState) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{
+        {
+            .volume = 10.0,
+            .mass_deficit_account = {.volume = 1.0},
+            .phi_t = 0.4,
+            .h = 2.0,
+            .area = 50.0,
+        },
+        {
+            .volume = 20.0,
+            .mass_deficit_account = {.volume = 3.0},
+            .phi_t = 0.4,
+            .h = kHWet / 2.0,
+            .area = 50.0,
+        },
+    }};
+
+    const auto audit = state.compute_system_mass(kHWet);
+
+    EXPECT_DOUBLE_EQ(audit.surface_mass, 40.0);
+    EXPECT_DOUBLE_EQ(audit.deficit_mass, 4.0);
+    EXPECT_DOUBLE_EQ(audit.total_mass, 44.0);
+    EXPECT_EQ(audit.wet_cell_count, 1U);
+    ASSERT_EQ(state.cells().size(), 2U);
+    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 10.0);
+    EXPECT_DOUBLE_EQ(state.cells()[1].volume, 20.0);
+}
+
+TEST(CouplingCoreState, AuditSystemMassAgainstReferenceUsesCurrentCells) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .mass_deficit_account = {.volume = 0.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.compute_system_mass(kHWet);
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 0.0, .unmet_volume = 4.0});
+    state.replay_pending();
+
+    const auto delta = state.audit_system_mass_against_reference(baseline, kHWet);
+
+    EXPECT_DOUBLE_EQ(delta.baseline.total_mass, 40.0);
+    EXPECT_DOUBLE_EQ(delta.current.deficit_mass, 4.0);
+    EXPECT_DOUBLE_EQ(delta.current.total_mass, 44.0);
+    EXPECT_DOUBLE_EQ(delta.residual, 4.0);
+    EXPECT_FALSE(delta.conserved);
+}
