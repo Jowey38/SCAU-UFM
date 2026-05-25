@@ -291,6 +291,12 @@ SystemMassDelta CouplingState::audit_system_mass_against_reference(
     return core::audit_system_mass_against_reference(baseline, cells_, h_wet);
 }
 
+SystemMassDelta CouplingState::audit_system_mass_against_snapshot(
+    const CouplingSnapshot& baseline,
+    double h_wet) const {
+    return audit_system_mass_against_reference(baseline.compute_system_mass(h_wet), h_wet);
+}
+
 void CouplingState::enqueue_event(CouplingEvent event) {
     if (event.exchange_cell_index >= cells_.size()) {
         throw std::out_of_range("coupling event exchange cell index is out of range");
