@@ -180,6 +180,56 @@ ExchangeConservationAudit audit_exchange_decision(
     };
 }
 
+SystemMassAudit compute_system_mass(
+    const std::vector<ExchangeCellState>& cells,
+    double h_wet) {
+    if (h_wet <= 0.0) {
+        throw std::invalid_argument("h_wet must be positive");
+    }
+
+    SystemMassAudit audit{};
+    for (const auto& cell : cells) {
+        if (cell.phi_t < 0.0) {
+            throw std::invalid_argument("phi_t must be non-negative");
+        }
+        if (cell.h < 0.0) {
+            throw std::invalid_argument("h must be non-negative");
+        }
+        if (cell.area < 0.0) {
+            throw std::invalid_argument("area must be non-negative");
+        }
+        if (cell.mass_deficit_account.volume < 0.0) {
+            throw std::invalid_argument("deficit volume must be non-negative");
+        }
+
+        if (cell.h >= h_wet) {
+            audit.surface_mass += cell.phi_t * cell.h * cell.area;
+            ++audit.wet_cell_count;
+        }
+        audit.deficit_mass += cell.mass_deficit_account.volume;
+    }
+    audit.total_mass = audit.surface_mass + audit.deficit_mass;
+    return audit;
+}
+
+SystemMassDelta audit_system_mass_against_reference(
+    const SystemMassAudit& baseline,
+    const std::vector<ExchangeCellState>& current_cells,
+    double h_wet) {
+    if (baseline.total_mass < 0.0) {
+        throw std::invalid_argument("baseline total_mass must be non-negative");
+    }
+
+    const auto current = compute_system_mass(current_cells, h_wet);
+    const double residual = current.total_mass - baseline.total_mass;
+    return SystemMassDelta{
+        .baseline = baseline,
+        .current = current,
+        .residual = residual,
+        .conserved = (residual == 0.0),
+    };
+}
+
 MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume) {
     if (account.volume < 0.0) {
         throw std::invalid_argument("deficit volume must be non-negative");

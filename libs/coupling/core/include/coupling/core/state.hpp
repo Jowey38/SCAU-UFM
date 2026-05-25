@@ -79,6 +79,29 @@ struct ExchangeConservationAudit {
     const ExchangeRequest& request,
     const ExchangePipelineDecision& decision);
 
+struct SystemMassAudit {
+    double surface_mass{0.0};
+    double deficit_mass{0.0};
+    double total_mass{0.0};
+    std::size_t wet_cell_count{0};
+};
+
+struct SystemMassDelta {
+    SystemMassAudit baseline{};
+    SystemMassAudit current{};
+    double residual{0.0};
+    bool conserved{true};
+};
+
+[[nodiscard]] SystemMassAudit compute_system_mass(
+    const std::vector<ExchangeCellState>& cells,
+    double h_wet);
+
+[[nodiscard]] SystemMassDelta audit_system_mass_against_reference(
+    const SystemMassAudit& baseline,
+    const std::vector<ExchangeCellState>& current_cells,
+    double h_wet);
+
 [[nodiscard]] MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume);
 [[nodiscard]] MassDeficitAccount apply_repayment(const MassDeficitAccount& account, double applied_volume);
 
