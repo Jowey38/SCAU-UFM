@@ -165,3 +165,35 @@ TEST(CouplingSystemMassAudit, ClassifiesNonConservedDeltaAsDrifted) {
         scau::coupling::core::classify_system_mass_conservation(delta),
         scau::coupling::core::SystemMassConservationStatus::drifted);
 }
+
+TEST(CouplingSystemMassAudit, BuildsConservationDiagnosticFromDelta) {
+    const scau::coupling::core::SystemMassDelta delta{
+        .baseline = {.total_mass = 40.0},
+        .current = {.total_mass = 40.0},
+        .residual = 0.0,
+        .conserved = true,
+    };
+
+    const auto diagnostic = scau::coupling::core::make_system_mass_conservation_diagnostic(delta);
+
+    EXPECT_EQ(diagnostic.status, scau::coupling::core::SystemMassConservationStatus::conserved);
+    EXPECT_DOUBLE_EQ(diagnostic.residual, 0.0);
+    EXPECT_DOUBLE_EQ(diagnostic.baseline_total_mass, 40.0);
+    EXPECT_DOUBLE_EQ(diagnostic.current_total_mass, 40.0);
+}
+
+TEST(CouplingSystemMassAudit, BuildsDriftDiagnosticFromDelta) {
+    const scau::coupling::core::SystemMassDelta delta{
+        .baseline = {.total_mass = 40.0},
+        .current = {.total_mass = 44.0},
+        .residual = 4.0,
+        .conserved = false,
+    };
+
+    const auto diagnostic = scau::coupling::core::make_system_mass_conservation_diagnostic(delta);
+
+    EXPECT_EQ(diagnostic.status, scau::coupling::core::SystemMassConservationStatus::drifted);
+    EXPECT_DOUBLE_EQ(diagnostic.residual, 4.0);
+    EXPECT_DOUBLE_EQ(diagnostic.baseline_total_mass, 40.0);
+    EXPECT_DOUBLE_EQ(diagnostic.current_total_mass, 44.0);
+}

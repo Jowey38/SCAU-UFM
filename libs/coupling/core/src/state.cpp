@@ -237,6 +237,16 @@ SystemMassConservationStatus classify_system_mass_conservation(const SystemMassD
     return SystemMassConservationStatus::drifted;
 }
 
+SystemMassConservationDiagnostic make_system_mass_conservation_diagnostic(
+    const SystemMassDelta& delta) {
+    return SystemMassConservationDiagnostic{
+        .status = classify_system_mass_conservation(delta),
+        .residual = delta.residual,
+        .baseline_total_mass = delta.baseline.total_mass,
+        .current_total_mass = delta.current.total_mass,
+    };
+}
+
 MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume) {
     if (account.volume < 0.0) {
         throw std::invalid_argument("deficit volume must be non-negative");

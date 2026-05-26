@@ -98,6 +98,13 @@ enum class SystemMassConservationStatus {
     drifted,
 };
 
+struct SystemMassConservationDiagnostic {
+    SystemMassConservationStatus status{SystemMassConservationStatus::conserved};
+    double residual{0.0};
+    double baseline_total_mass{0.0};
+    double current_total_mass{0.0};
+};
+
 [[nodiscard]] SystemMassAudit compute_system_mass(
     const std::vector<ExchangeCellState>& cells,
     double h_wet);
@@ -108,6 +115,9 @@ enum class SystemMassConservationStatus {
     double h_wet);
 
 [[nodiscard]] SystemMassConservationStatus classify_system_mass_conservation(
+    const SystemMassDelta& delta);
+
+[[nodiscard]] SystemMassConservationDiagnostic make_system_mass_conservation_diagnostic(
     const SystemMassDelta& delta);
 
 [[nodiscard]] MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume);
