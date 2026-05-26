@@ -335,6 +335,13 @@ SystemMassConservationDiagnostic CouplingState::diagnose_system_mass_against_sna
         audit_system_mass_against_snapshot(baseline, h_wet));
 }
 
+SystemMassGateDecision CouplingState::decide_system_mass_gate_action_against_snapshot(
+    const CouplingSnapshot& baseline,
+    double h_wet) const {
+    return core::decide_system_mass_gate_action(
+        diagnose_system_mass_against_snapshot(baseline, h_wet));
+}
+
 void CouplingState::enqueue_event(CouplingEvent event) {
     if (event.exchange_cell_index >= cells_.size()) {
         throw std::out_of_range("coupling event exchange cell index is out of range");

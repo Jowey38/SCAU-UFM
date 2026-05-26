@@ -180,6 +180,9 @@ public:
     [[nodiscard]] SystemMassConservationDiagnostic diagnose_system_mass_against_snapshot(
         const CouplingSnapshot& baseline,
         double h_wet) const;
+    [[nodiscard]] SystemMassGateDecision decide_system_mass_gate_action_against_snapshot(
+        const CouplingSnapshot& baseline,
+        double h_wet) const;
 
     void enqueue_event(CouplingEvent event);
     void rollback(const CouplingSnapshot& snapshot);
