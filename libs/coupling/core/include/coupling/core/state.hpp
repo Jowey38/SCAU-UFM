@@ -105,6 +105,16 @@ struct SystemMassConservationDiagnostic {
     double current_total_mass{0.0};
 };
 
+enum class SystemMassGateAction {
+    continue_run,
+    abort_run,
+};
+
+struct SystemMassGateDecision {
+    SystemMassGateAction action{SystemMassGateAction::continue_run};
+    SystemMassConservationDiagnostic diagnostic{};
+};
+
 [[nodiscard]] SystemMassAudit compute_system_mass(
     const std::vector<ExchangeCellState>& cells,
     double h_wet);
@@ -119,6 +129,9 @@ struct SystemMassConservationDiagnostic {
 
 [[nodiscard]] SystemMassConservationDiagnostic make_system_mass_conservation_diagnostic(
     const SystemMassDelta& delta);
+
+[[nodiscard]] SystemMassGateDecision decide_system_mass_gate_action(
+    const SystemMassConservationDiagnostic& diagnostic);
 
 [[nodiscard]] MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume);
 [[nodiscard]] MassDeficitAccount apply_repayment(const MassDeficitAccount& account, double applied_volume);

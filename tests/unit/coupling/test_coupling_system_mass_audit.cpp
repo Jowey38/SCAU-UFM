@@ -197,3 +197,37 @@ TEST(CouplingSystemMassAudit, BuildsDriftDiagnosticFromDelta) {
     EXPECT_DOUBLE_EQ(diagnostic.baseline_total_mass, 40.0);
     EXPECT_DOUBLE_EQ(diagnostic.current_total_mass, 44.0);
 }
+
+TEST(CouplingSystemMassAudit, GateDecisionContinuesForConservedDiagnostic) {
+    const scau::coupling::core::SystemMassConservationDiagnostic diagnostic{
+        .status = scau::coupling::core::SystemMassConservationStatus::conserved,
+        .residual = 0.0,
+        .baseline_total_mass = 40.0,
+        .current_total_mass = 40.0,
+    };
+
+    const auto decision = scau::coupling::core::decide_system_mass_gate_action(diagnostic);
+
+    EXPECT_EQ(decision.action, scau::coupling::core::SystemMassGateAction::continue_run);
+    EXPECT_EQ(decision.diagnostic.status, diagnostic.status);
+    EXPECT_DOUBLE_EQ(decision.diagnostic.residual, diagnostic.residual);
+    EXPECT_DOUBLE_EQ(decision.diagnostic.baseline_total_mass, diagnostic.baseline_total_mass);
+    EXPECT_DOUBLE_EQ(decision.diagnostic.current_total_mass, diagnostic.current_total_mass);
+}
+
+TEST(CouplingSystemMassAudit, GateDecisionAbortsForDriftedDiagnostic) {
+    const scau::coupling::core::SystemMassConservationDiagnostic diagnostic{
+        .status = scau::coupling::core::SystemMassConservationStatus::drifted,
+        .residual = 4.0,
+        .baseline_total_mass = 40.0,
+        .current_total_mass = 44.0,
+    };
+
+    const auto decision = scau::coupling::core::decide_system_mass_gate_action(diagnostic);
+
+    EXPECT_EQ(decision.action, scau::coupling::core::SystemMassGateAction::abort_run);
+    EXPECT_EQ(decision.diagnostic.status, diagnostic.status);
+    EXPECT_DOUBLE_EQ(decision.diagnostic.residual, diagnostic.residual);
+    EXPECT_DOUBLE_EQ(decision.diagnostic.baseline_total_mass, diagnostic.baseline_total_mass);
+    EXPECT_DOUBLE_EQ(decision.diagnostic.current_total_mass, diagnostic.current_total_mass);
+}

@@ -247,6 +247,20 @@ SystemMassConservationDiagnostic make_system_mass_conservation_diagnostic(
     };
 }
 
+SystemMassGateDecision decide_system_mass_gate_action(
+    const SystemMassConservationDiagnostic& diagnostic) {
+    if (diagnostic.status == SystemMassConservationStatus::conserved) {
+        return SystemMassGateDecision{
+            .action = SystemMassGateAction::continue_run,
+            .diagnostic = diagnostic,
+        };
+    }
+    return SystemMassGateDecision{
+        .action = SystemMassGateAction::abort_run,
+        .diagnostic = diagnostic,
+    };
+}
+
 MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume) {
     if (account.volume < 0.0) {
         throw std::invalid_argument("deficit volume must be non-negative");
