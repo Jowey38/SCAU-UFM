@@ -93,6 +93,11 @@ struct SystemMassDelta {
     bool conserved{true};
 };
 
+enum class SystemMassConservationStatus {
+    conserved,
+    drifted,
+};
+
 [[nodiscard]] SystemMassAudit compute_system_mass(
     const std::vector<ExchangeCellState>& cells,
     double h_wet);
@@ -101,6 +106,9 @@ struct SystemMassDelta {
     const SystemMassAudit& baseline,
     const std::vector<ExchangeCellState>& current_cells,
     double h_wet);
+
+[[nodiscard]] SystemMassConservationStatus classify_system_mass_conservation(
+    const SystemMassDelta& delta);
 
 [[nodiscard]] MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume);
 [[nodiscard]] MassDeficitAccount apply_repayment(const MassDeficitAccount& account, double applied_volume);

@@ -230,6 +230,13 @@ SystemMassDelta audit_system_mass_against_reference(
     };
 }
 
+SystemMassConservationStatus classify_system_mass_conservation(const SystemMassDelta& delta) {
+    if (delta.conserved) {
+        return SystemMassConservationStatus::conserved;
+    }
+    return SystemMassConservationStatus::drifted;
+}
+
 MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume) {
     if (account.volume < 0.0) {
         throw std::invalid_argument("deficit volume must be non-negative");

@@ -149,3 +149,19 @@ TEST(CouplingSystemMassAudit, RejectsNegativeBaseline) {
                      bad_baseline, cells, kHWet)),
                  std::invalid_argument);
 }
+
+TEST(CouplingSystemMassAudit, ClassifiesStrictlyConservedDelta) {
+    const scau::coupling::core::SystemMassDelta delta{.residual = 0.0, .conserved = true};
+
+    EXPECT_EQ(
+        scau::coupling::core::classify_system_mass_conservation(delta),
+        scau::coupling::core::SystemMassConservationStatus::conserved);
+}
+
+TEST(CouplingSystemMassAudit, ClassifiesNonConservedDeltaAsDrifted) {
+    const scau::coupling::core::SystemMassDelta delta{.residual = 0.0, .conserved = false};
+
+    EXPECT_EQ(
+        scau::coupling::core::classify_system_mass_conservation(delta),
+        scau::coupling::core::SystemMassConservationStatus::drifted);
+}
