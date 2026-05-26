@@ -261,6 +261,14 @@ SystemMassGateDecision decide_system_mass_gate_action(
     };
 }
 
+SystemMassRuntimeAbortHandlingState classify_system_mass_runtime_abort_handling(
+    const SystemMassRuntimeGateOutcome& outcome) {
+    if (outcome.status == SystemMassRuntimeGateStatus::abort) {
+        return SystemMassRuntimeAbortHandlingState::abort;
+    }
+    return SystemMassRuntimeAbortHandlingState::continue_run;
+}
+
 MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume) {
     if (account.volume < 0.0) {
         throw std::invalid_argument("deficit volume must be non-negative");

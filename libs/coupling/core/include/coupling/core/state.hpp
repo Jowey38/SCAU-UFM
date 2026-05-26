@@ -125,6 +125,14 @@ struct SystemMassRuntimeGateOutcome {
     SystemMassRuntimeGateStatus status{SystemMassRuntimeGateStatus::running};
 };
 
+enum class SystemMassRuntimeAbortHandlingState {
+    continue_run,
+    abort,
+};
+
+[[nodiscard]] SystemMassRuntimeAbortHandlingState classify_system_mass_runtime_abort_handling(
+    const SystemMassRuntimeGateOutcome& outcome);
+
 [[nodiscard]] SystemMassAudit compute_system_mass(
     const std::vector<ExchangeCellState>& cells,
     double h_wet);

@@ -551,3 +551,41 @@ TEST(CouplingCoreState, RuntimeGateAgainstSnapshotSignalsAbortWhenMassDrifted) {
     EXPECT_DOUBLE_EQ(outcome.decision.diagnostic.baseline_total_mass, 41.0);
     EXPECT_DOUBLE_EQ(outcome.decision.diagnostic.current_total_mass, 45.0);
 }
+
+TEST(CouplingCoreState, RuntimeAbortHandlingContinuesForRunningGateOutcome) {
+    const scau::coupling::core::SystemMassRuntimeGateOutcome outcome{
+        .decision = {
+            .action = scau::coupling::core::SystemMassGateAction::continue_run,
+            .diagnostic = {
+                .status = scau::coupling::core::SystemMassConservationStatus::conserved,
+                .residual = 0.0,
+                .baseline_total_mass = 41.0,
+                .current_total_mass = 41.0,
+            },
+        },
+        .status = scau::coupling::core::SystemMassRuntimeGateStatus::running,
+    };
+
+    const auto handling = scau::coupling::core::classify_system_mass_runtime_abort_handling(outcome);
+
+    EXPECT_EQ(handling, scau::coupling::core::SystemMassRuntimeAbortHandlingState::continue_run);
+}
+
+TEST(CouplingCoreState, RuntimeAbortHandlingSignalsAbortForAbortGateOutcome) {
+    const scau::coupling::core::SystemMassRuntimeGateOutcome outcome{
+        .decision = {
+            .action = scau::coupling::core::SystemMassGateAction::abort_run,
+            .diagnostic = {
+                .status = scau::coupling::core::SystemMassConservationStatus::drifted,
+                .residual = 4.0,
+                .baseline_total_mass = 41.0,
+                .current_total_mass = 45.0,
+            },
+        },
+        .status = scau::coupling::core::SystemMassRuntimeGateStatus::abort,
+    };
+
+    const auto handling = scau::coupling::core::classify_system_mass_runtime_abort_handling(outcome);
+
+    EXPECT_EQ(handling, scau::coupling::core::SystemMassRuntimeAbortHandlingState::abort);
+}
