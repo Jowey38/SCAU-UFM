@@ -115,6 +115,16 @@ struct SystemMassGateDecision {
     SystemMassConservationDiagnostic diagnostic{};
 };
 
+enum class SystemMassRuntimeGateStatus {
+    running,
+    abort,
+};
+
+struct SystemMassRuntimeGateOutcome {
+    SystemMassGateDecision decision{};
+    SystemMassRuntimeGateStatus status{SystemMassRuntimeGateStatus::running};
+};
+
 [[nodiscard]] SystemMassAudit compute_system_mass(
     const std::vector<ExchangeCellState>& cells,
     double h_wet);
@@ -181,6 +191,9 @@ public:
         const CouplingSnapshot& baseline,
         double h_wet) const;
     [[nodiscard]] SystemMassGateDecision decide_system_mass_gate_action_against_snapshot(
+        const CouplingSnapshot& baseline,
+        double h_wet) const;
+    [[nodiscard]] SystemMassRuntimeGateOutcome evaluate_system_mass_runtime_gate_against_snapshot(
         const CouplingSnapshot& baseline,
         double h_wet) const;
 

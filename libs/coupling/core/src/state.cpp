@@ -342,6 +342,18 @@ SystemMassGateDecision CouplingState::decide_system_mass_gate_action_against_sna
         diagnose_system_mass_against_snapshot(baseline, h_wet));
 }
 
+SystemMassRuntimeGateOutcome CouplingState::evaluate_system_mass_runtime_gate_against_snapshot(
+    const CouplingSnapshot& baseline,
+    double h_wet) const {
+    const auto decision = decide_system_mass_gate_action_against_snapshot(baseline, h_wet);
+    return SystemMassRuntimeGateOutcome{
+        .decision = decision,
+        .status = decision.action == SystemMassGateAction::abort_run
+            ? SystemMassRuntimeGateStatus::abort
+            : SystemMassRuntimeGateStatus::running,
+    };
+}
+
 void CouplingState::enqueue_event(CouplingEvent event) {
     if (event.exchange_cell_index >= cells_.size()) {
         throw std::out_of_range("coupling event exchange cell index is out of range");
