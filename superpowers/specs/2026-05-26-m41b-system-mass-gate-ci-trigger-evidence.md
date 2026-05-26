@@ -62,7 +62,7 @@ No workflow run for `5bb615a` was present in the recent `ci.yml` workflow run li
 
 ## Recovery Action
 
-This M41b documentation-only commit is intended to create a new normal `push` event on `master` without amending or force-pushing M41.
+This M41b documentation-only commit was intended to create a new normal `push` event on `master` without amending or force-pushing M41.
 
 Expected outcome:
 
@@ -70,6 +70,14 @@ Expected outcome:
 - The resulting run validates the repository state that includes M41.
 - The M41 trigger anomaly remains recorded for traceability.
 
+Observed outcome:
+
+- The M41b push also did not create a CI run.
+- M41c added `workflow_dispatch` to `.github/workflows/ci.yml` so current `master` can be validated without rewriting history.
+- The M41c push-triggered run failed before validating the code because GitHub checkout/action download failed.
+- Manual `workflow_dispatch` run `26449643170` on `master` completed successfully for `linux-gcc`, `windows-msvc`, and `spike-isolation-check`.
+
 ## Boundaries
 
 M41b does not change code, build configuration, workflow configuration, or tests.
+M41c changes only CI trigger configuration by adding `workflow_dispatch`.
