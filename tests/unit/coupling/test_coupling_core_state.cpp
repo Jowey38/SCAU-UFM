@@ -462,7 +462,28 @@ TEST(CouplingCoreState, DiagnoseSystemMassAgainstSnapshotUsesSnapshotBaselineAnd
     EXPECT_DOUBLE_EQ(diagnostic.current_total_mass, 45.0);
 }
 
-TEST(CouplingCoreState, GateDecisionAgainstSnapshotUsesSnapshotDiagnostic) {
+TEST(CouplingCoreState, GateDecisionAgainstSnapshotContinuesWhenMassIsConserved) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.snapshot();
+
+    const auto decision = state.decide_system_mass_gate_action_against_snapshot(baseline, kHWet);
+
+    EXPECT_EQ(decision.action, scau::coupling::core::SystemMassGateAction::continue_run);
+    EXPECT_EQ(decision.diagnostic.status, scau::coupling::core::SystemMassConservationStatus::conserved);
+    EXPECT_DOUBLE_EQ(decision.diagnostic.residual, 0.0);
+    EXPECT_DOUBLE_EQ(decision.diagnostic.baseline_total_mass, 41.0);
+    EXPECT_DOUBLE_EQ(decision.diagnostic.current_total_mass, 41.0);
+}
+
+TEST(CouplingCoreState, GateDecisionAgainstSnapshotAbortsWhenMassDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
         .volume = 10.0,
