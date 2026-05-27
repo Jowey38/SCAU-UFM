@@ -384,6 +384,13 @@ SystemMassGateDecision CouplingState::decide_system_mass_gate_action_against_ref
         diagnose_system_mass_against_reference(baseline, h_wet));
 }
 
+SystemMassRuntimeGateOutcome CouplingState::evaluate_system_mass_runtime_gate_against_reference(
+    const SystemMassAudit& baseline,
+    double h_wet) const {
+    return make_system_mass_runtime_gate_outcome(
+        decide_system_mass_gate_action_against_reference(baseline, h_wet));
+}
+
 SystemMassRuntimeControlDecision CouplingState::decide_system_mass_runtime_control_against_reference(
     const SystemMassAudit& baseline,
     double h_wet) const {

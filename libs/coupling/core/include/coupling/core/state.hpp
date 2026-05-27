@@ -222,6 +222,9 @@ public:
     [[nodiscard]] SystemMassGateDecision decide_system_mass_gate_action_against_reference(
         const SystemMassAudit& baseline,
         double h_wet) const;
+    [[nodiscard]] SystemMassRuntimeGateOutcome evaluate_system_mass_runtime_gate_against_reference(
+        const SystemMassAudit& baseline,
+        double h_wet) const;
     [[nodiscard]] SystemMassRuntimeControlDecision decide_system_mass_runtime_control_against_reference(
         const SystemMassAudit& baseline,
         double h_wet) const;
