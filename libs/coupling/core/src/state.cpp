@@ -334,6 +334,26 @@ SystemMassDelta CouplingState::audit_system_mass_against_reference(
     return core::audit_system_mass_against_reference(baseline, cells_, h_wet);
 }
 
+SystemMassRuntimeControlDecision CouplingState::decide_system_mass_runtime_control_against_reference(
+    const SystemMassAudit& baseline,
+    double h_wet) const {
+    const auto decision = core::decide_system_mass_gate_action(
+        make_system_mass_conservation_diagnostic(
+            audit_system_mass_against_reference(baseline, h_wet)));
+    const auto gate_outcome = SystemMassRuntimeGateOutcome{
+        .decision = decision,
+        .status = decision.action == SystemMassGateAction::abort_run
+            ? SystemMassRuntimeGateStatus::abort
+            : SystemMassRuntimeGateStatus::running,
+    };
+    const auto handling_state = classify_system_mass_runtime_abort_handling(gate_outcome);
+    return SystemMassRuntimeControlDecision{
+        .gate_outcome = gate_outcome,
+        .handling_state = handling_state,
+        .should_abort = should_abort_system_mass_runtime(handling_state),
+    };
+}
+
 SystemMassDelta CouplingState::audit_system_mass_against_snapshot(
     const CouplingSnapshot& baseline,
     double h_wet) const {
