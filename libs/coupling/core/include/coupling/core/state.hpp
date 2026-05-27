@@ -130,6 +130,12 @@ enum class SystemMassRuntimeAbortHandlingState {
     abort,
 };
 
+struct SystemMassRuntimeControlDecision {
+    SystemMassRuntimeGateOutcome gate_outcome{};
+    SystemMassRuntimeAbortHandlingState handling_state{SystemMassRuntimeAbortHandlingState::continue_run};
+    bool should_abort{false};
+};
+
 [[nodiscard]] SystemMassRuntimeAbortHandlingState classify_system_mass_runtime_abort_handling(
     const SystemMassRuntimeGateOutcome& outcome);
 
@@ -208,6 +214,9 @@ public:
         const CouplingSnapshot& baseline,
         double h_wet) const;
     [[nodiscard]] bool should_abort_system_mass_runtime_against_snapshot(
+        const CouplingSnapshot& baseline,
+        double h_wet) const;
+    [[nodiscard]] SystemMassRuntimeControlDecision decide_system_mass_runtime_control_against_snapshot(
         const CouplingSnapshot& baseline,
         double h_wet) const;
 

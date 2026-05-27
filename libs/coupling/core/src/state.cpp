@@ -369,9 +369,19 @@ SystemMassRuntimeGateOutcome CouplingState::evaluate_system_mass_runtime_gate_ag
 bool CouplingState::should_abort_system_mass_runtime_against_snapshot(
     const CouplingSnapshot& baseline,
     double h_wet) const {
-    return should_abort_system_mass_runtime(
-        classify_system_mass_runtime_abort_handling(
-            evaluate_system_mass_runtime_gate_against_snapshot(baseline, h_wet)));
+    return decide_system_mass_runtime_control_against_snapshot(baseline, h_wet).should_abort;
+}
+
+SystemMassRuntimeControlDecision CouplingState::decide_system_mass_runtime_control_against_snapshot(
+    const CouplingSnapshot& baseline,
+    double h_wet) const {
+    const auto gate_outcome = evaluate_system_mass_runtime_gate_against_snapshot(baseline, h_wet);
+    const auto handling_state = classify_system_mass_runtime_abort_handling(gate_outcome);
+    return SystemMassRuntimeControlDecision{
+        .gate_outcome = gate_outcome,
+        .handling_state = handling_state,
+        .should_abort = should_abort_system_mass_runtime(handling_state),
+    };
 }
 
 void CouplingState::enqueue_event(CouplingEvent event) {
