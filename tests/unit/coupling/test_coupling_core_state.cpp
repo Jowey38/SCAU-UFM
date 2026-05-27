@@ -678,6 +678,32 @@ TEST(CouplingCoreState, ShouldAbortSystemMassRuntimeReturnsTrueForAbortHandling)
     EXPECT_TRUE(should_abort);
 }
 
+TEST(CouplingCoreState, ShouldAbortSystemMassRuntimeReturnsFalseForConservedDiagnostic) {
+    const scau::coupling::core::SystemMassConservationDiagnostic diagnostic{
+        .status = scau::coupling::core::SystemMassConservationStatus::conserved,
+        .residual = 0.0,
+        .baseline_total_mass = 41.0,
+        .current_total_mass = 41.0,
+    };
+
+    const bool should_abort = scau::coupling::core::should_abort_system_mass_runtime(diagnostic);
+
+    EXPECT_FALSE(should_abort);
+}
+
+TEST(CouplingCoreState, ShouldAbortSystemMassRuntimeReturnsTrueForDriftedDiagnostic) {
+    const scau::coupling::core::SystemMassConservationDiagnostic diagnostic{
+        .status = scau::coupling::core::SystemMassConservationStatus::drifted,
+        .residual = 4.0,
+        .baseline_total_mass = 41.0,
+        .current_total_mass = 45.0,
+    };
+
+    const bool should_abort = scau::coupling::core::should_abort_system_mass_runtime(diagnostic);
+
+    EXPECT_TRUE(should_abort);
+}
+
 TEST(CouplingCoreState, RuntimeControlDecisionHelperContinuesForRunningGateOutcome) {
     const scau::coupling::core::SystemMassRuntimeGateOutcome outcome{
         .decision = {

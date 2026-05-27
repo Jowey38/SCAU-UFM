@@ -148,6 +148,9 @@ struct SystemMassRuntimeControlDecision {
 [[nodiscard]] bool should_abort_system_mass_runtime(
     SystemMassRuntimeAbortHandlingState handling_state);
 
+[[nodiscard]] bool should_abort_system_mass_runtime(
+    const SystemMassConservationDiagnostic& diagnostic);
+
 [[nodiscard]] SystemMassRuntimeControlDecision make_system_mass_runtime_control_decision(
     const SystemMassRuntimeGateOutcome& gate_outcome);
 
