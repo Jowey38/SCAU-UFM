@@ -1439,3 +1439,99 @@ TEST(CouplingCoreState, RuntimeControlGateOutcomeAgainstSnapshotMatchesGateWhenD
     EXPECT_EQ(control.gate_outcome.status, scau::coupling::core::SystemMassRuntimeGateStatus::abort);
     EXPECT_TRUE(control.should_abort);
 }
+
+TEST(CouplingCoreState, RuntimeAbortHandlingStateAgainstReferenceMatchesControlWhenConserved) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.compute_system_mass(kHWet);
+
+    const auto control = state.decide_system_mass_runtime_control_against_reference(baseline, kHWet);
+    const auto classified = scau::coupling::core::classify_system_mass_runtime_abort_handling(control.gate_outcome);
+    const bool predicate = scau::coupling::core::should_abort_system_mass_runtime(control.handling_state);
+
+    EXPECT_EQ(classified, control.handling_state);
+    EXPECT_EQ(predicate, control.should_abort);
+    EXPECT_EQ(control.gate_outcome.status, scau::coupling::core::SystemMassRuntimeGateStatus::running);
+    EXPECT_EQ(control.handling_state, scau::coupling::core::SystemMassRuntimeAbortHandlingState::continue_run);
+    EXPECT_FALSE(control.should_abort);
+}
+
+TEST(CouplingCoreState, RuntimeAbortHandlingStateAgainstReferenceMatchesControlWhenDrifted) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.compute_system_mass(kHWet);
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 0.0, .unmet_volume = 4.0});
+    state.replay_pending();
+
+    const auto control = state.decide_system_mass_runtime_control_against_reference(baseline, kHWet);
+    const auto classified = scau::coupling::core::classify_system_mass_runtime_abort_handling(control.gate_outcome);
+    const bool predicate = scau::coupling::core::should_abort_system_mass_runtime(control.handling_state);
+
+    EXPECT_EQ(classified, control.handling_state);
+    EXPECT_EQ(predicate, control.should_abort);
+    EXPECT_EQ(control.gate_outcome.status, scau::coupling::core::SystemMassRuntimeGateStatus::abort);
+    EXPECT_EQ(control.handling_state, scau::coupling::core::SystemMassRuntimeAbortHandlingState::abort);
+    EXPECT_TRUE(control.should_abort);
+}
+
+TEST(CouplingCoreState, RuntimeAbortHandlingStateAgainstSnapshotMatchesControlWhenConserved) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.snapshot();
+
+    const auto control = state.decide_system_mass_runtime_control_against_snapshot(baseline, kHWet);
+    const auto classified = scau::coupling::core::classify_system_mass_runtime_abort_handling(control.gate_outcome);
+    const bool predicate = scau::coupling::core::should_abort_system_mass_runtime(control.handling_state);
+
+    EXPECT_EQ(classified, control.handling_state);
+    EXPECT_EQ(predicate, control.should_abort);
+    EXPECT_EQ(control.gate_outcome.status, scau::coupling::core::SystemMassRuntimeGateStatus::running);
+    EXPECT_EQ(control.handling_state, scau::coupling::core::SystemMassRuntimeAbortHandlingState::continue_run);
+    EXPECT_FALSE(control.should_abort);
+}
+
+TEST(CouplingCoreState, RuntimeAbortHandlingStateAgainstSnapshotMatchesControlWhenDrifted) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.snapshot();
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 0.0, .unmet_volume = 4.0});
+    state.replay_pending();
+
+    const auto control = state.decide_system_mass_runtime_control_against_snapshot(baseline, kHWet);
+    const auto classified = scau::coupling::core::classify_system_mass_runtime_abort_handling(control.gate_outcome);
+    const bool predicate = scau::coupling::core::should_abort_system_mass_runtime(control.handling_state);
+
+    EXPECT_EQ(classified, control.handling_state);
+    EXPECT_EQ(predicate, control.should_abort);
+    EXPECT_EQ(control.gate_outcome.status, scau::coupling::core::SystemMassRuntimeGateStatus::abort);
+    EXPECT_EQ(control.handling_state, scau::coupling::core::SystemMassRuntimeAbortHandlingState::abort);
+    EXPECT_TRUE(control.should_abort);
+}
