@@ -128,6 +128,9 @@ struct SystemMassRuntimeGateOutcome {
 [[nodiscard]] SystemMassRuntimeGateOutcome make_system_mass_runtime_gate_outcome(
     const SystemMassGateDecision& decision);
 
+[[nodiscard]] SystemMassRuntimeGateOutcome make_system_mass_runtime_gate_outcome(
+    const SystemMassConservationDiagnostic& diagnostic);
+
 enum class SystemMassRuntimeAbortHandlingState {
     continue_run,
     abort,

@@ -271,6 +271,12 @@ SystemMassRuntimeGateOutcome make_system_mass_runtime_gate_outcome(
     };
 }
 
+SystemMassRuntimeGateOutcome make_system_mass_runtime_gate_outcome(
+    const SystemMassConservationDiagnostic& diagnostic) {
+    return make_system_mass_runtime_gate_outcome(
+        decide_system_mass_gate_action(diagnostic));
+}
+
 SystemMassRuntimeAbortHandlingState classify_system_mass_runtime_abort_handling(
     const SystemMassRuntimeGateOutcome& outcome) {
     if (outcome.status == SystemMassRuntimeGateStatus::abort) {
@@ -357,11 +363,10 @@ SystemMassDelta CouplingState::audit_system_mass_against_reference(
 SystemMassRuntimeControlDecision CouplingState::decide_system_mass_runtime_control_against_reference(
     const SystemMassAudit& baseline,
     double h_wet) const {
-    const auto decision = core::decide_system_mass_gate_action(
-        make_system_mass_conservation_diagnostic(
-            audit_system_mass_against_reference(baseline, h_wet)));
     return make_system_mass_runtime_control_decision(
-        make_system_mass_runtime_gate_outcome(decision));
+        make_system_mass_runtime_gate_outcome(
+            make_system_mass_conservation_diagnostic(
+                audit_system_mass_against_reference(baseline, h_wet))));
 }
 
 SystemMassDelta CouplingState::audit_system_mass_against_snapshot(
@@ -388,7 +393,7 @@ SystemMassRuntimeGateOutcome CouplingState::evaluate_system_mass_runtime_gate_ag
     const CouplingSnapshot& baseline,
     double h_wet) const {
     return make_system_mass_runtime_gate_outcome(
-        decide_system_mass_gate_action_against_snapshot(baseline, h_wet));
+        diagnose_system_mass_against_snapshot(baseline, h_wet));
 }
 
 bool CouplingState::should_abort_system_mass_runtime_against_snapshot(
