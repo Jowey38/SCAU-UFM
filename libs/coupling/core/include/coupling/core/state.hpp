@@ -207,6 +207,9 @@ public:
     [[nodiscard]] SystemMassRuntimeGateOutcome evaluate_system_mass_runtime_gate_against_snapshot(
         const CouplingSnapshot& baseline,
         double h_wet) const;
+    [[nodiscard]] bool should_abort_system_mass_runtime_against_snapshot(
+        const CouplingSnapshot& baseline,
+        double h_wet) const;
 
     void enqueue_event(CouplingEvent event);
     void rollback(const CouplingSnapshot& snapshot);

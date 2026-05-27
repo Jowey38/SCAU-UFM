@@ -366,6 +366,14 @@ SystemMassRuntimeGateOutcome CouplingState::evaluate_system_mass_runtime_gate_ag
     };
 }
 
+bool CouplingState::should_abort_system_mass_runtime_against_snapshot(
+    const CouplingSnapshot& baseline,
+    double h_wet) const {
+    return should_abort_system_mass_runtime(
+        classify_system_mass_runtime_abort_handling(
+            evaluate_system_mass_runtime_gate_against_snapshot(baseline, h_wet)));
+}
+
 void CouplingState::enqueue_event(CouplingEvent event) {
     if (event.exchange_cell_index >= cells_.size()) {
         throw std::out_of_range("coupling event exchange cell index is out of range");
