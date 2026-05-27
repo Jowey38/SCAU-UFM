@@ -449,7 +449,7 @@ SystemMassRuntimeControlDecision CouplingState::decide_system_mass_runtime_contr
     const CouplingSnapshot& baseline,
     double h_wet) const {
     return make_system_mass_runtime_control_decision(
-        diagnose_system_mass_against_snapshot(baseline, h_wet));
+        evaluate_system_mass_runtime_gate_against_snapshot(baseline, h_wet));
 }
 
 bool CouplingState::should_abort_system_mass_runtime_control_against_snapshot(
