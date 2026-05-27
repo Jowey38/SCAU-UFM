@@ -378,6 +378,14 @@ SystemMassRuntimeControlDecision CouplingState::decide_system_mass_runtime_contr
             audit_system_mass_against_reference(baseline, h_wet)));
 }
 
+bool CouplingState::should_abort_system_mass_runtime_against_reference(
+    const SystemMassAudit& baseline,
+    double h_wet) const {
+    return should_abort_system_mass_runtime(
+        make_system_mass_conservation_diagnostic(
+            audit_system_mass_against_reference(baseline, h_wet)));
+}
+
 SystemMassDelta CouplingState::audit_system_mass_against_snapshot(
     const CouplingSnapshot& baseline,
     double h_wet) const {

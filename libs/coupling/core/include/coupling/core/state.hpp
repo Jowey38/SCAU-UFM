@@ -219,6 +219,9 @@ public:
     [[nodiscard]] SystemMassRuntimeControlDecision decide_system_mass_runtime_control_against_reference(
         const SystemMassAudit& baseline,
         double h_wet) const;
+    [[nodiscard]] bool should_abort_system_mass_runtime_against_reference(
+        const SystemMassAudit& baseline,
+        double h_wet) const;
     [[nodiscard]] SystemMassDelta audit_system_mass_against_snapshot(
         const CouplingSnapshot& baseline,
         double h_wet) const;
