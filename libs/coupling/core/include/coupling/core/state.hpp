@@ -125,6 +125,9 @@ struct SystemMassRuntimeGateOutcome {
     SystemMassRuntimeGateStatus status{SystemMassRuntimeGateStatus::running};
 };
 
+[[nodiscard]] SystemMassRuntimeGateOutcome make_system_mass_runtime_gate_outcome(
+    const SystemMassGateDecision& decision);
+
 enum class SystemMassRuntimeAbortHandlingState {
     continue_run,
     abort,

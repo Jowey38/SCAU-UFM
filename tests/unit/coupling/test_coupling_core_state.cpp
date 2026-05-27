@@ -506,6 +506,46 @@ TEST(CouplingCoreState, GateDecisionAgainstSnapshotAbortsWhenMassDrifted) {
     EXPECT_DOUBLE_EQ(decision.diagnostic.current_total_mass, 45.0);
 }
 
+TEST(CouplingCoreState, RuntimeGateOutcomeHelperKeepsRunningForContinueDecision) {
+    const scau::coupling::core::SystemMassGateDecision decision{
+        .action = scau::coupling::core::SystemMassGateAction::continue_run,
+        .diagnostic = {
+            .status = scau::coupling::core::SystemMassConservationStatus::conserved,
+            .residual = 0.0,
+            .baseline_total_mass = 41.0,
+            .current_total_mass = 41.0,
+        },
+    };
+
+    const auto outcome = scau::coupling::core::make_system_mass_runtime_gate_outcome(decision);
+
+    EXPECT_EQ(outcome.status, scau::coupling::core::SystemMassRuntimeGateStatus::running);
+    EXPECT_EQ(outcome.decision.action, scau::coupling::core::SystemMassGateAction::continue_run);
+    EXPECT_EQ(outcome.decision.diagnostic.status, scau::coupling::core::SystemMassConservationStatus::conserved);
+    EXPECT_DOUBLE_EQ(outcome.decision.diagnostic.baseline_total_mass, 41.0);
+    EXPECT_DOUBLE_EQ(outcome.decision.diagnostic.current_total_mass, 41.0);
+}
+
+TEST(CouplingCoreState, RuntimeGateOutcomeHelperAbortsForAbortDecision) {
+    const scau::coupling::core::SystemMassGateDecision decision{
+        .action = scau::coupling::core::SystemMassGateAction::abort_run,
+        .diagnostic = {
+            .status = scau::coupling::core::SystemMassConservationStatus::drifted,
+            .residual = 4.0,
+            .baseline_total_mass = 41.0,
+            .current_total_mass = 45.0,
+        },
+    };
+
+    const auto outcome = scau::coupling::core::make_system_mass_runtime_gate_outcome(decision);
+
+    EXPECT_EQ(outcome.status, scau::coupling::core::SystemMassRuntimeGateStatus::abort);
+    EXPECT_EQ(outcome.decision.action, scau::coupling::core::SystemMassGateAction::abort_run);
+    EXPECT_EQ(outcome.decision.diagnostic.status, scau::coupling::core::SystemMassConservationStatus::drifted);
+    EXPECT_DOUBLE_EQ(outcome.decision.diagnostic.residual, 4.0);
+    EXPECT_DOUBLE_EQ(outcome.decision.diagnostic.current_total_mass, 45.0);
+}
+
 TEST(CouplingCoreState, RuntimeGateAgainstSnapshotKeepsRunningWhenMassIsConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{

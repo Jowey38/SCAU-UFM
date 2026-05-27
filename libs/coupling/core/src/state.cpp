@@ -261,6 +261,16 @@ SystemMassGateDecision decide_system_mass_gate_action(
     };
 }
 
+SystemMassRuntimeGateOutcome make_system_mass_runtime_gate_outcome(
+    const SystemMassGateDecision& decision) {
+    return SystemMassRuntimeGateOutcome{
+        .decision = decision,
+        .status = decision.action == SystemMassGateAction::abort_run
+            ? SystemMassRuntimeGateStatus::abort
+            : SystemMassRuntimeGateStatus::running,
+    };
+}
+
 SystemMassRuntimeAbortHandlingState classify_system_mass_runtime_abort_handling(
     const SystemMassRuntimeGateOutcome& outcome) {
     if (outcome.status == SystemMassRuntimeGateStatus::abort) {
@@ -350,12 +360,8 @@ SystemMassRuntimeControlDecision CouplingState::decide_system_mass_runtime_contr
     const auto decision = core::decide_system_mass_gate_action(
         make_system_mass_conservation_diagnostic(
             audit_system_mass_against_reference(baseline, h_wet)));
-    return make_system_mass_runtime_control_decision(SystemMassRuntimeGateOutcome{
-        .decision = decision,
-        .status = decision.action == SystemMassGateAction::abort_run
-            ? SystemMassRuntimeGateStatus::abort
-            : SystemMassRuntimeGateStatus::running,
-    });
+    return make_system_mass_runtime_control_decision(
+        make_system_mass_runtime_gate_outcome(decision));
 }
 
 SystemMassDelta CouplingState::audit_system_mass_against_snapshot(
@@ -381,13 +387,8 @@ SystemMassGateDecision CouplingState::decide_system_mass_gate_action_against_sna
 SystemMassRuntimeGateOutcome CouplingState::evaluate_system_mass_runtime_gate_against_snapshot(
     const CouplingSnapshot& baseline,
     double h_wet) const {
-    const auto decision = decide_system_mass_gate_action_against_snapshot(baseline, h_wet);
-    return SystemMassRuntimeGateOutcome{
-        .decision = decision,
-        .status = decision.action == SystemMassGateAction::abort_run
-            ? SystemMassRuntimeGateStatus::abort
-            : SystemMassRuntimeGateStatus::running,
-    };
+    return make_system_mass_runtime_gate_outcome(
+        decide_system_mass_gate_action_against_snapshot(baseline, h_wet));
 }
 
 bool CouplingState::should_abort_system_mass_runtime_against_snapshot(
