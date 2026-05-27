@@ -151,6 +151,9 @@ struct SystemMassRuntimeControlDecision {
 [[nodiscard]] SystemMassRuntimeControlDecision make_system_mass_runtime_control_decision(
     const SystemMassRuntimeGateOutcome& gate_outcome);
 
+[[nodiscard]] SystemMassRuntimeControlDecision make_system_mass_runtime_control_decision(
+    const SystemMassConservationDiagnostic& diagnostic);
+
 [[nodiscard]] SystemMassAudit compute_system_mass(
     const std::vector<ExchangeCellState>& cells,
     double h_wet);

@@ -299,6 +299,12 @@ SystemMassRuntimeControlDecision make_system_mass_runtime_control_decision(
     };
 }
 
+SystemMassRuntimeControlDecision make_system_mass_runtime_control_decision(
+    const SystemMassConservationDiagnostic& diagnostic) {
+    return make_system_mass_runtime_control_decision(
+        make_system_mass_runtime_gate_outcome(diagnostic));
+}
+
 MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume) {
     if (account.volume < 0.0) {
         throw std::invalid_argument("deficit volume must be non-negative");
@@ -364,9 +370,8 @@ SystemMassRuntimeControlDecision CouplingState::decide_system_mass_runtime_contr
     const SystemMassAudit& baseline,
     double h_wet) const {
     return make_system_mass_runtime_control_decision(
-        make_system_mass_runtime_gate_outcome(
-            make_system_mass_conservation_diagnostic(
-                audit_system_mass_against_reference(baseline, h_wet))));
+        make_system_mass_conservation_diagnostic(
+            audit_system_mass_against_reference(baseline, h_wet)));
 }
 
 SystemMassDelta CouplingState::audit_system_mass_against_snapshot(
@@ -406,7 +411,7 @@ SystemMassRuntimeControlDecision CouplingState::decide_system_mass_runtime_contr
     const CouplingSnapshot& baseline,
     double h_wet) const {
     return make_system_mass_runtime_control_decision(
-        evaluate_system_mass_runtime_gate_against_snapshot(baseline, h_wet));
+        diagnose_system_mass_against_snapshot(baseline, h_wet));
 }
 
 void CouplingState::enqueue_event(CouplingEvent event) {
