@@ -589,3 +589,17 @@ TEST(CouplingCoreState, RuntimeAbortHandlingSignalsAbortForAbortGateOutcome) {
 
     EXPECT_EQ(handling, scau::coupling::core::SystemMassRuntimeAbortHandlingState::abort);
 }
+
+TEST(CouplingCoreState, ShouldAbortSystemMassRuntimeReturnsFalseForContinueHandling) {
+    const bool should_abort = scau::coupling::core::should_abort_system_mass_runtime(
+        scau::coupling::core::SystemMassRuntimeAbortHandlingState::continue_run);
+
+    EXPECT_FALSE(should_abort);
+}
+
+TEST(CouplingCoreState, ShouldAbortSystemMassRuntimeReturnsTrueForAbortHandling) {
+    const bool should_abort = scau::coupling::core::should_abort_system_mass_runtime(
+        scau::coupling::core::SystemMassRuntimeAbortHandlingState::abort);
+
+    EXPECT_TRUE(should_abort);
+}

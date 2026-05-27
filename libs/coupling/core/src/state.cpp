@@ -269,6 +269,10 @@ SystemMassRuntimeAbortHandlingState classify_system_mass_runtime_abort_handling(
     return SystemMassRuntimeAbortHandlingState::continue_run;
 }
 
+bool should_abort_system_mass_runtime(SystemMassRuntimeAbortHandlingState handling_state) {
+    return handling_state == SystemMassRuntimeAbortHandlingState::abort;
+}
+
 MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume) {
     if (account.volume < 0.0) {
         throw std::invalid_argument("deficit volume must be non-negative");

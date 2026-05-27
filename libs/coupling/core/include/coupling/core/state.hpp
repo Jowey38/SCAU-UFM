@@ -133,6 +133,9 @@ enum class SystemMassRuntimeAbortHandlingState {
 [[nodiscard]] SystemMassRuntimeAbortHandlingState classify_system_mass_runtime_abort_handling(
     const SystemMassRuntimeGateOutcome& outcome);
 
+[[nodiscard]] bool should_abort_system_mass_runtime(
+    SystemMassRuntimeAbortHandlingState handling_state);
+
 [[nodiscard]] SystemMassAudit compute_system_mass(
     const std::vector<ExchangeCellState>& cells,
     double h_wet);
