@@ -462,6 +462,48 @@ TEST(CouplingCoreState, DiagnoseSystemMassAgainstSnapshotUsesSnapshotBaselineAnd
     EXPECT_DOUBLE_EQ(diagnostic.current_total_mass, 45.0);
 }
 
+TEST(CouplingCoreState, DiagnoseSystemMassAgainstReferenceContinuesWhenMassIsConserved) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.compute_system_mass(kHWet);
+
+    const auto diagnostic = state.diagnose_system_mass_against_reference(baseline, kHWet);
+
+    EXPECT_EQ(diagnostic.status, scau::coupling::core::SystemMassConservationStatus::conserved);
+    EXPECT_DOUBLE_EQ(diagnostic.residual, 0.0);
+    EXPECT_DOUBLE_EQ(diagnostic.baseline_total_mass, 41.0);
+    EXPECT_DOUBLE_EQ(diagnostic.current_total_mass, 41.0);
+}
+
+TEST(CouplingCoreState, DiagnoseSystemMassAgainstReferenceDetectsMassDrift) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.compute_system_mass(kHWet);
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 0.0, .unmet_volume = 4.0});
+    state.replay_pending();
+
+    const auto diagnostic = state.diagnose_system_mass_against_reference(baseline, kHWet);
+
+    EXPECT_EQ(diagnostic.status, scau::coupling::core::SystemMassConservationStatus::drifted);
+    EXPECT_DOUBLE_EQ(diagnostic.residual, 4.0);
+    EXPECT_DOUBLE_EQ(diagnostic.baseline_total_mass, 41.0);
+    EXPECT_DOUBLE_EQ(diagnostic.current_total_mass, 45.0);
+}
+
 TEST(CouplingCoreState, GateDecisionAgainstSnapshotContinuesWhenMassIsConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{

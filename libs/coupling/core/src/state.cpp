@@ -370,20 +370,25 @@ SystemMassDelta CouplingState::audit_system_mass_against_reference(
     return core::audit_system_mass_against_reference(baseline, cells_, h_wet);
 }
 
+SystemMassConservationDiagnostic CouplingState::diagnose_system_mass_against_reference(
+    const SystemMassAudit& baseline,
+    double h_wet) const {
+    return make_system_mass_conservation_diagnostic(
+        audit_system_mass_against_reference(baseline, h_wet));
+}
+
 SystemMassRuntimeControlDecision CouplingState::decide_system_mass_runtime_control_against_reference(
     const SystemMassAudit& baseline,
     double h_wet) const {
     return make_system_mass_runtime_control_decision(
-        make_system_mass_conservation_diagnostic(
-            audit_system_mass_against_reference(baseline, h_wet)));
+        diagnose_system_mass_against_reference(baseline, h_wet));
 }
 
 bool CouplingState::should_abort_system_mass_runtime_against_reference(
     const SystemMassAudit& baseline,
     double h_wet) const {
     return should_abort_system_mass_runtime(
-        make_system_mass_conservation_diagnostic(
-            audit_system_mass_against_reference(baseline, h_wet)));
+        diagnose_system_mass_against_reference(baseline, h_wet));
 }
 
 SystemMassDelta CouplingState::audit_system_mass_against_snapshot(
