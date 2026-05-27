@@ -1046,6 +1046,42 @@ TEST(CouplingCoreState, RuntimeControlDecisionAgainstReferenceAbortsWhenMassDrif
     EXPECT_DOUBLE_EQ(decision.gate_outcome.decision.diagnostic.current_total_mass, 45.0);
 }
 
+TEST(CouplingCoreState, RuntimeControlAbortPredicateAgainstReferenceContinuesWhenMassIsConserved) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.compute_system_mass(kHWet);
+
+    const bool should_abort = state.should_abort_system_mass_runtime_control_against_reference(baseline, kHWet);
+
+    EXPECT_FALSE(should_abort);
+}
+
+TEST(CouplingCoreState, RuntimeControlAbortPredicateAgainstReferenceAbortsWhenMassDrifted) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.compute_system_mass(kHWet);
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 0.0, .unmet_volume = 4.0});
+    state.replay_pending();
+
+    const bool should_abort = state.should_abort_system_mass_runtime_control_against_reference(baseline, kHWet);
+
+    EXPECT_TRUE(should_abort);
+}
+
 TEST(CouplingCoreState, RuntimeControlDecisionAgainstSnapshotContinuesWhenMassIsConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
