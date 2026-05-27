@@ -1135,3 +1135,39 @@ TEST(CouplingCoreState, RuntimeControlDecisionAgainstSnapshotAbortsWhenMassDrift
     EXPECT_DOUBLE_EQ(decision.gate_outcome.decision.diagnostic.baseline_total_mass, 41.0);
     EXPECT_DOUBLE_EQ(decision.gate_outcome.decision.diagnostic.current_total_mass, 45.0);
 }
+
+TEST(CouplingCoreState, RuntimeControlAbortPredicateAgainstSnapshotContinuesWhenMassIsConserved) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.snapshot();
+
+    const bool should_abort = state.should_abort_system_mass_runtime_control_against_snapshot(baseline, kHWet);
+
+    EXPECT_FALSE(should_abort);
+}
+
+TEST(CouplingCoreState, RuntimeControlAbortPredicateAgainstSnapshotAbortsWhenMassDrifted) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.snapshot();
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 0.0, .unmet_volume = 4.0});
+    state.replay_pending();
+
+    const bool should_abort = state.should_abort_system_mass_runtime_control_against_snapshot(baseline, kHWet);
+
+    EXPECT_TRUE(should_abort);
+}
