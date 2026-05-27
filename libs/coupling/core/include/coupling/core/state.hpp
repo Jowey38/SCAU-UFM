@@ -142,6 +142,9 @@ struct SystemMassRuntimeControlDecision {
 [[nodiscard]] bool should_abort_system_mass_runtime(
     SystemMassRuntimeAbortHandlingState handling_state);
 
+[[nodiscard]] SystemMassRuntimeControlDecision make_system_mass_runtime_control_decision(
+    const SystemMassRuntimeGateOutcome& gate_outcome);
+
 [[nodiscard]] SystemMassAudit compute_system_mass(
     const std::vector<ExchangeCellState>& cells,
     double h_wet);

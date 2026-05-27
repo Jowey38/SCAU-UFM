@@ -273,6 +273,16 @@ bool should_abort_system_mass_runtime(SystemMassRuntimeAbortHandlingState handli
     return handling_state == SystemMassRuntimeAbortHandlingState::abort;
 }
 
+SystemMassRuntimeControlDecision make_system_mass_runtime_control_decision(
+    const SystemMassRuntimeGateOutcome& gate_outcome) {
+    const auto handling_state = classify_system_mass_runtime_abort_handling(gate_outcome);
+    return SystemMassRuntimeControlDecision{
+        .gate_outcome = gate_outcome,
+        .handling_state = handling_state,
+        .should_abort = should_abort_system_mass_runtime(handling_state),
+    };
+}
+
 MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume) {
     if (account.volume < 0.0) {
         throw std::invalid_argument("deficit volume must be non-negative");
@@ -340,18 +350,12 @@ SystemMassRuntimeControlDecision CouplingState::decide_system_mass_runtime_contr
     const auto decision = core::decide_system_mass_gate_action(
         make_system_mass_conservation_diagnostic(
             audit_system_mass_against_reference(baseline, h_wet)));
-    const auto gate_outcome = SystemMassRuntimeGateOutcome{
+    return make_system_mass_runtime_control_decision(SystemMassRuntimeGateOutcome{
         .decision = decision,
         .status = decision.action == SystemMassGateAction::abort_run
             ? SystemMassRuntimeGateStatus::abort
             : SystemMassRuntimeGateStatus::running,
-    };
-    const auto handling_state = classify_system_mass_runtime_abort_handling(gate_outcome);
-    return SystemMassRuntimeControlDecision{
-        .gate_outcome = gate_outcome,
-        .handling_state = handling_state,
-        .should_abort = should_abort_system_mass_runtime(handling_state),
-    };
+    });
 }
 
 SystemMassDelta CouplingState::audit_system_mass_against_snapshot(
@@ -395,13 +399,8 @@ bool CouplingState::should_abort_system_mass_runtime_against_snapshot(
 SystemMassRuntimeControlDecision CouplingState::decide_system_mass_runtime_control_against_snapshot(
     const CouplingSnapshot& baseline,
     double h_wet) const {
-    const auto gate_outcome = evaluate_system_mass_runtime_gate_against_snapshot(baseline, h_wet);
-    const auto handling_state = classify_system_mass_runtime_abort_handling(gate_outcome);
-    return SystemMassRuntimeControlDecision{
-        .gate_outcome = gate_outcome,
-        .handling_state = handling_state,
-        .should_abort = should_abort_system_mass_runtime(handling_state),
-    };
+    return make_system_mass_runtime_control_decision(
+        evaluate_system_mass_runtime_gate_against_snapshot(baseline, h_wet));
 }
 
 void CouplingState::enqueue_event(CouplingEvent event) {

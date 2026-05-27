@@ -604,6 +604,54 @@ TEST(CouplingCoreState, ShouldAbortSystemMassRuntimeReturnsTrueForAbortHandling)
     EXPECT_TRUE(should_abort);
 }
 
+TEST(CouplingCoreState, RuntimeControlDecisionHelperContinuesForRunningGateOutcome) {
+    const scau::coupling::core::SystemMassRuntimeGateOutcome outcome{
+        .decision = {
+            .action = scau::coupling::core::SystemMassGateAction::continue_run,
+            .diagnostic = {
+                .status = scau::coupling::core::SystemMassConservationStatus::conserved,
+                .residual = 0.0,
+                .baseline_total_mass = 41.0,
+                .current_total_mass = 41.0,
+            },
+        },
+        .status = scau::coupling::core::SystemMassRuntimeGateStatus::running,
+    };
+
+    const auto decision = scau::coupling::core::make_system_mass_runtime_control_decision(outcome);
+
+    EXPECT_EQ(decision.gate_outcome.status, scau::coupling::core::SystemMassRuntimeGateStatus::running);
+    EXPECT_EQ(decision.gate_outcome.decision.action, scau::coupling::core::SystemMassGateAction::continue_run);
+    EXPECT_EQ(decision.handling_state, scau::coupling::core::SystemMassRuntimeAbortHandlingState::continue_run);
+    EXPECT_FALSE(decision.should_abort);
+    EXPECT_DOUBLE_EQ(decision.gate_outcome.decision.diagnostic.baseline_total_mass, 41.0);
+    EXPECT_DOUBLE_EQ(decision.gate_outcome.decision.diagnostic.current_total_mass, 41.0);
+}
+
+TEST(CouplingCoreState, RuntimeControlDecisionHelperAbortsForAbortGateOutcome) {
+    const scau::coupling::core::SystemMassRuntimeGateOutcome outcome{
+        .decision = {
+            .action = scau::coupling::core::SystemMassGateAction::abort_run,
+            .diagnostic = {
+                .status = scau::coupling::core::SystemMassConservationStatus::drifted,
+                .residual = 4.0,
+                .baseline_total_mass = 41.0,
+                .current_total_mass = 45.0,
+            },
+        },
+        .status = scau::coupling::core::SystemMassRuntimeGateStatus::abort,
+    };
+
+    const auto decision = scau::coupling::core::make_system_mass_runtime_control_decision(outcome);
+
+    EXPECT_EQ(decision.gate_outcome.status, scau::coupling::core::SystemMassRuntimeGateStatus::abort);
+    EXPECT_EQ(decision.gate_outcome.decision.action, scau::coupling::core::SystemMassGateAction::abort_run);
+    EXPECT_EQ(decision.handling_state, scau::coupling::core::SystemMassRuntimeAbortHandlingState::abort);
+    EXPECT_TRUE(decision.should_abort);
+    EXPECT_DOUBLE_EQ(decision.gate_outcome.decision.diagnostic.residual, 4.0);
+    EXPECT_DOUBLE_EQ(decision.gate_outcome.decision.diagnostic.current_total_mass, 45.0);
+}
+
 TEST(CouplingCoreState, ShouldAbortSystemMassRuntimeAgainstSnapshotReturnsFalseWhenMassIsConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
