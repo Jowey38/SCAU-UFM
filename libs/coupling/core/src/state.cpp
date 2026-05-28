@@ -309,6 +309,16 @@ SystemMassRuntimeControlDecision make_system_mass_runtime_control_decision(
         make_system_mass_runtime_gate_outcome(diagnostic));
 }
 
+SystemMassRuntimeControlResult consume_system_mass_runtime_control_decision(
+    const SystemMassRuntimeControlDecision& decision) {
+    return SystemMassRuntimeControlResult{
+        .decision = decision,
+        .state = decision.should_abort
+            ? SystemMassRuntimeControlState::abort
+            : SystemMassRuntimeControlState::continue_run,
+    };
+}
+
 MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume) {
     if (account.volume < 0.0) {
         throw std::invalid_argument("deficit volume must be non-negative");

@@ -142,6 +142,19 @@ struct SystemMassRuntimeControlDecision {
     bool should_abort{false};
 };
 
+enum class SystemMassRuntimeControlState {
+    continue_run,
+    abort,
+};
+
+struct SystemMassRuntimeControlResult {
+    SystemMassRuntimeControlDecision decision{};
+    SystemMassRuntimeControlState state{SystemMassRuntimeControlState::continue_run};
+};
+
+[[nodiscard]] SystemMassRuntimeControlResult consume_system_mass_runtime_control_decision(
+    const SystemMassRuntimeControlDecision& decision);
+
 [[nodiscard]] SystemMassRuntimeAbortHandlingState classify_system_mass_runtime_abort_handling(
     const SystemMassRuntimeGateOutcome& outcome);
 
