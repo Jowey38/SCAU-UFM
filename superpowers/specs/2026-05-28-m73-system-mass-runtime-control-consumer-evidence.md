@@ -66,7 +66,26 @@ Total Test time (real) =  10.91 sec
 
 ## CI Evidence
 
-Not collected in this local M73 pass because the evidence commit has not yet been pushed.
+M73 commits:
+
+```text
+a03b6e9 test(coupling): consume system mass runtime control decisions
+425391e docs(coupling): record m73 runtime control consumer evidence
+```
+
+GitHub Actions CI run:
+
+```text
+26584994273 push master success
+```
+
+Jobs:
+
+```text
+spike-isolation-check success
+linux-gcc success
+windows-msvc success
+```
 
 ## Review Evidence
 
