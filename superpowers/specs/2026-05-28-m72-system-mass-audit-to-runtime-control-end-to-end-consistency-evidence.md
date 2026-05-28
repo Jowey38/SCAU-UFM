@@ -72,7 +72,25 @@ Total Test time (real) =   8.40 sec
 
 ## CI Evidence
 
-Not collected in this local M72 pass because no commit or push was requested.
+M72 commit:
+
+```text
+510cbe6 test(coupling): assert runtime control against baseline matches audit chain
+```
+
+GitHub Actions CI run:
+
+```text
+26572566628 push master success
+```
+
+Jobs:
+
+```text
+spike-isolation-check success
+linux-gcc success
+windows-msvc success
+```
 
 ## Review Evidence
 
