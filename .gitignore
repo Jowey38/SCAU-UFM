@@ -21,6 +21,9 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
+# Local git worktrees
+.worktrees/
+
 # Top-level vendor sources must never enter git history.
 # Canonical layout per §3.3: extern/swmm5/, extern/dflowfm/, extern/dflowfm-bmi/.
 # Spike vendor mirror per third-party-spike-design §2: spikes/<engine>/vendor/.
