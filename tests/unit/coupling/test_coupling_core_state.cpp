@@ -1535,3 +1535,103 @@ TEST(CouplingCoreState, RuntimeAbortHandlingStateAgainstSnapshotMatchesControlWh
     EXPECT_EQ(control.handling_state, scau::coupling::core::SystemMassRuntimeAbortHandlingState::abort);
     EXPECT_TRUE(control.should_abort);
 }
+
+TEST(CouplingCoreState, DiagnoseAgainstReferenceMatchesAuditWhenConserved) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.compute_system_mass(kHWet);
+
+    const auto audit = state.audit_system_mass_against_reference(baseline, kHWet);
+    const auto diagnostic = state.diagnose_system_mass_against_reference(baseline, kHWet);
+    const auto via_audit = scau::coupling::core::make_system_mass_conservation_diagnostic(audit);
+
+    EXPECT_EQ(diagnostic.status, via_audit.status);
+    EXPECT_DOUBLE_EQ(diagnostic.residual, via_audit.residual);
+    EXPECT_DOUBLE_EQ(diagnostic.baseline_total_mass, via_audit.baseline_total_mass);
+    EXPECT_DOUBLE_EQ(diagnostic.current_total_mass, via_audit.current_total_mass);
+    EXPECT_EQ(diagnostic.status, scau::coupling::core::SystemMassConservationStatus::conserved);
+    EXPECT_DOUBLE_EQ(diagnostic.residual, 0.0);
+}
+
+TEST(CouplingCoreState, DiagnoseAgainstReferenceMatchesAuditWhenDrifted) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.compute_system_mass(kHWet);
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 0.0, .unmet_volume = 4.0});
+    state.replay_pending();
+
+    const auto audit = state.audit_system_mass_against_reference(baseline, kHWet);
+    const auto diagnostic = state.diagnose_system_mass_against_reference(baseline, kHWet);
+    const auto via_audit = scau::coupling::core::make_system_mass_conservation_diagnostic(audit);
+
+    EXPECT_EQ(diagnostic.status, via_audit.status);
+    EXPECT_DOUBLE_EQ(diagnostic.residual, via_audit.residual);
+    EXPECT_DOUBLE_EQ(diagnostic.baseline_total_mass, via_audit.baseline_total_mass);
+    EXPECT_DOUBLE_EQ(diagnostic.current_total_mass, via_audit.current_total_mass);
+    EXPECT_EQ(diagnostic.status, scau::coupling::core::SystemMassConservationStatus::drifted);
+    EXPECT_DOUBLE_EQ(diagnostic.residual, 4.0);
+}
+
+TEST(CouplingCoreState, DiagnoseAgainstSnapshotMatchesAuditWhenConserved) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.snapshot();
+
+    const auto audit = state.audit_system_mass_against_snapshot(baseline, kHWet);
+    const auto diagnostic = state.diagnose_system_mass_against_snapshot(baseline, kHWet);
+    const auto via_audit = scau::coupling::core::make_system_mass_conservation_diagnostic(audit);
+
+    EXPECT_EQ(diagnostic.status, via_audit.status);
+    EXPECT_DOUBLE_EQ(diagnostic.residual, via_audit.residual);
+    EXPECT_DOUBLE_EQ(diagnostic.baseline_total_mass, via_audit.baseline_total_mass);
+    EXPECT_DOUBLE_EQ(diagnostic.current_total_mass, via_audit.current_total_mass);
+    EXPECT_EQ(diagnostic.status, scau::coupling::core::SystemMassConservationStatus::conserved);
+    EXPECT_DOUBLE_EQ(diagnostic.residual, 0.0);
+}
+
+TEST(CouplingCoreState, DiagnoseAgainstSnapshotMatchesAuditWhenDrifted) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.snapshot();
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 0.0, .unmet_volume = 4.0});
+    state.replay_pending();
+
+    const auto audit = state.audit_system_mass_against_snapshot(baseline, kHWet);
+    const auto diagnostic = state.diagnose_system_mass_against_snapshot(baseline, kHWet);
+    const auto via_audit = scau::coupling::core::make_system_mass_conservation_diagnostic(audit);
+
+    EXPECT_EQ(diagnostic.status, via_audit.status);
+    EXPECT_DOUBLE_EQ(diagnostic.residual, via_audit.residual);
+    EXPECT_DOUBLE_EQ(diagnostic.baseline_total_mass, via_audit.baseline_total_mass);
+    EXPECT_DOUBLE_EQ(diagnostic.current_total_mass, via_audit.current_total_mass);
+    EXPECT_EQ(diagnostic.status, scau::coupling::core::SystemMassConservationStatus::drifted);
+    EXPECT_DOUBLE_EQ(diagnostic.residual, 4.0);
+}
