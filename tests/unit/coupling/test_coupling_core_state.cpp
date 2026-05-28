@@ -1735,3 +1735,107 @@ TEST(CouplingCoreState, GateActionAgainstSnapshotMatchesDiagnoseWhenDrifted) {
     EXPECT_DOUBLE_EQ(gate_decision.diagnostic.current_total_mass, via_diagnostic.diagnostic.current_total_mass);
     EXPECT_EQ(gate_decision.action, scau::coupling::core::SystemMassGateAction::abort_run);
 }
+
+TEST(CouplingCoreState, AuditAgainstReferencePreservesBaselineAndCurrentWhenConserved) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.compute_system_mass(kHWet);
+
+    const auto audit = state.audit_system_mass_against_reference(baseline, kHWet);
+    const auto current = state.compute_system_mass(kHWet);
+
+    EXPECT_DOUBLE_EQ(audit.baseline.surface_mass, baseline.surface_mass);
+    EXPECT_DOUBLE_EQ(audit.baseline.deficit_mass, baseline.deficit_mass);
+    EXPECT_DOUBLE_EQ(audit.baseline.total_mass, baseline.total_mass);
+    EXPECT_EQ(audit.baseline.wet_cell_count, baseline.wet_cell_count);
+    EXPECT_DOUBLE_EQ(audit.current.surface_mass, current.surface_mass);
+    EXPECT_DOUBLE_EQ(audit.current.deficit_mass, current.deficit_mass);
+    EXPECT_DOUBLE_EQ(audit.current.total_mass, current.total_mass);
+    EXPECT_EQ(audit.current.wet_cell_count, current.wet_cell_count);
+    EXPECT_TRUE(audit.conserved);
+    EXPECT_DOUBLE_EQ(audit.residual, 0.0);
+}
+
+TEST(CouplingCoreState, AuditAgainstReferencePreservesBaselineAndCurrentWhenDrifted) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.compute_system_mass(kHWet);
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 0.0, .unmet_volume = 4.0});
+    state.replay_pending();
+
+    const auto audit = state.audit_system_mass_against_reference(baseline, kHWet);
+    const auto current = state.compute_system_mass(kHWet);
+
+    EXPECT_DOUBLE_EQ(audit.baseline.total_mass, baseline.total_mass);
+    EXPECT_DOUBLE_EQ(audit.current.total_mass, current.total_mass);
+    EXPECT_FALSE(audit.conserved);
+    EXPECT_DOUBLE_EQ(audit.residual, current.total_mass - baseline.total_mass);
+    EXPECT_DOUBLE_EQ(audit.residual, 4.0);
+}
+
+TEST(CouplingCoreState, AuditAgainstSnapshotPreservesBaselineAndCurrentWhenConserved) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto snap = state.snapshot();
+
+    const auto audit = state.audit_system_mass_against_snapshot(snap, kHWet);
+    const auto snap_baseline = snap.compute_system_mass(kHWet);
+    const auto current = state.compute_system_mass(kHWet);
+
+    EXPECT_DOUBLE_EQ(audit.baseline.surface_mass, snap_baseline.surface_mass);
+    EXPECT_DOUBLE_EQ(audit.baseline.deficit_mass, snap_baseline.deficit_mass);
+    EXPECT_DOUBLE_EQ(audit.baseline.total_mass, snap_baseline.total_mass);
+    EXPECT_EQ(audit.baseline.wet_cell_count, snap_baseline.wet_cell_count);
+    EXPECT_DOUBLE_EQ(audit.current.surface_mass, current.surface_mass);
+    EXPECT_DOUBLE_EQ(audit.current.deficit_mass, current.deficit_mass);
+    EXPECT_DOUBLE_EQ(audit.current.total_mass, current.total_mass);
+    EXPECT_EQ(audit.current.wet_cell_count, current.wet_cell_count);
+    EXPECT_TRUE(audit.conserved);
+    EXPECT_DOUBLE_EQ(audit.residual, 0.0);
+}
+
+TEST(CouplingCoreState, AuditAgainstSnapshotPreservesBaselineAndCurrentWhenDrifted) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto snap = state.snapshot();
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 0.0, .unmet_volume = 4.0});
+    state.replay_pending();
+
+    const auto audit = state.audit_system_mass_against_snapshot(snap, kHWet);
+    const auto snap_baseline = snap.compute_system_mass(kHWet);
+    const auto current = state.compute_system_mass(kHWet);
+
+    EXPECT_DOUBLE_EQ(audit.baseline.total_mass, snap_baseline.total_mass);
+    EXPECT_DOUBLE_EQ(audit.current.total_mass, current.total_mass);
+    EXPECT_FALSE(audit.conserved);
+    EXPECT_DOUBLE_EQ(audit.residual, current.total_mass - snap_baseline.total_mass);
+    EXPECT_DOUBLE_EQ(audit.residual, 4.0);
+}
