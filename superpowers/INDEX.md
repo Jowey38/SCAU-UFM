@@ -53,6 +53,7 @@
 | `superpowers/specs/2026-06-02-m166-passive-behavior-specific-evidence-dto-completion-rollup.md` | Passive behavior-specific evidence DTO completion rollup；汇总 passive behavior-specific evidence DTO 完成证据。 |
 | `superpowers/specs/2026-06-02-m173-evidence-consumption-to-runtime-evidence-no-mutation-rollup.md` | Evidence consumption to runtime evidence no-mutation rollup；汇总 evidence consumption 到 runtime evidence 的无 mutation 阶段证据。 |
 | `superpowers/specs/2026-06-02-m177-dry-run-stage-rollup.md` | Dry-run stage rollup；汇总 dry-run 阶段证据，仍不等同于真实外部引擎或发布 gate 证据。 |
+| `superpowers/specs/2026-06-03-m183-real-executor-fixture-readiness-rollup.md` | M178-M182 real executor fixture readiness rollup；汇总 real scheduler mutation executor 前置 DTO、fixture 与 postcondition helper 证据，仍不构成真实 executor 实现证据。 |
 
 ## 历史记录规则
 
