@@ -7,6 +7,16 @@ target_link_libraries(test_coupling_core_state
 )
 add_test(NAME test_coupling_core_state COMMAND test_coupling_core_state)
 
+add_executable(test_coupling_adapter_boundaries test_coupling_adapter_boundaries.cpp)
+target_link_libraries(test_coupling_adapter_boundaries
+    PRIVATE
+        scau::coupling_drainage
+        scau::coupling_river
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_adapter_boundaries COMMAND test_coupling_adapter_boundaries)
+
 add_executable(test_coupling_flow_limit test_coupling_flow_limit.cpp)
 target_link_libraries(test_coupling_flow_limit
     PRIVATE
