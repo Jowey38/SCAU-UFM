@@ -155,6 +155,19 @@ struct SystemMassRuntimeControlResult {
 [[nodiscard]] SystemMassRuntimeControlResult consume_system_mass_runtime_control_decision(
     const SystemMassRuntimeControlDecision& decision);
 
+enum class SystemMassRuntimeOperatorActionState {
+    continue_run,
+    abort_requested,
+};
+
+struct SystemMassRuntimeOperatorAction {
+    SystemMassRuntimeControlResult control_result{};
+    SystemMassRuntimeOperatorActionState state{SystemMassRuntimeOperatorActionState::continue_run};
+};
+
+[[nodiscard]] SystemMassRuntimeOperatorAction make_system_mass_runtime_operator_action(
+    const SystemMassRuntimeControlResult& control_result);
+
 [[nodiscard]] SystemMassRuntimeAbortHandlingState classify_system_mass_runtime_abort_handling(
     const SystemMassRuntimeGateOutcome& outcome);
 

@@ -2295,3 +2295,267 @@ TEST(CouplingCoreState, RuntimeControlConsumerAgainstSnapshotAbortsWhenMassDrift
     EXPECT_DOUBLE_EQ(result.decision.gate_outcome.decision.diagnostic.current_total_mass, 45.0);
     EXPECT_EQ(result.decision.handling_state, scau::coupling::core::SystemMassRuntimeAbortHandlingState::abort);
 }
+
+TEST(CouplingCoreState, RuntimeOperatorActionAgainstReferenceContinuesWhenMassIsConserved) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 40.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.compute_system_mass(kHWet);
+    const auto decision = state.decide_system_mass_runtime_control_against_reference(baseline, kHWet);
+    const auto result = scau::coupling::core::consume_system_mass_runtime_control_decision(decision);
+
+    const auto action = scau::coupling::core::make_system_mass_runtime_operator_action(result);
+
+    EXPECT_EQ(action.state, scau::coupling::core::SystemMassRuntimeOperatorActionState::continue_run);
+    EXPECT_EQ(action.control_result.state, scau::coupling::core::SystemMassRuntimeControlState::continue_run);
+    EXPECT_FALSE(action.control_result.decision.should_abort);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.status, scau::coupling::core::SystemMassRuntimeGateStatus::running);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.action, scau::coupling::core::SystemMassGateAction::continue_run);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.status, scau::coupling::core::SystemMassConservationStatus::conserved);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.residual, 0.0);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass, 41.0);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass, 41.0);
+    EXPECT_EQ(action.control_result.decision.handling_state, scau::coupling::core::SystemMassRuntimeAbortHandlingState::continue_run);
+}
+
+TEST(CouplingCoreState, RuntimeOperatorActionAgainstReferenceRequestsAbortWhenMassDrifted) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 40.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.compute_system_mass(kHWet);
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 0.0, .unmet_volume = 4.0});
+    state.replay_pending();
+    const auto decision = state.decide_system_mass_runtime_control_against_reference(baseline, kHWet);
+    const auto result = scau::coupling::core::consume_system_mass_runtime_control_decision(decision);
+
+    const auto action = scau::coupling::core::make_system_mass_runtime_operator_action(result);
+
+    EXPECT_EQ(action.state, scau::coupling::core::SystemMassRuntimeOperatorActionState::abort_requested);
+    EXPECT_EQ(action.control_result.state, scau::coupling::core::SystemMassRuntimeControlState::abort);
+    EXPECT_TRUE(action.control_result.decision.should_abort);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.status, scau::coupling::core::SystemMassRuntimeGateStatus::abort);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.action, scau::coupling::core::SystemMassGateAction::abort_run);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.status, scau::coupling::core::SystemMassConservationStatus::drifted);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.residual, 4.0);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass, 41.0);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass, 45.0);
+    EXPECT_EQ(action.control_result.decision.handling_state, scau::coupling::core::SystemMassRuntimeAbortHandlingState::abort);
+}
+
+TEST(CouplingCoreState, RuntimeOperatorActionAgainstSnapshotContinuesWhenMassIsConserved) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 40.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.snapshot();
+    const auto decision = state.decide_system_mass_runtime_control_against_snapshot(baseline, kHWet);
+    const auto result = scau::coupling::core::consume_system_mass_runtime_control_decision(decision);
+
+    const auto action = scau::coupling::core::make_system_mass_runtime_operator_action(result);
+
+    EXPECT_EQ(action.state, scau::coupling::core::SystemMassRuntimeOperatorActionState::continue_run);
+    EXPECT_EQ(action.control_result.state, scau::coupling::core::SystemMassRuntimeControlState::continue_run);
+    EXPECT_FALSE(action.control_result.decision.should_abort);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.status, scau::coupling::core::SystemMassRuntimeGateStatus::running);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.action, scau::coupling::core::SystemMassGateAction::continue_run);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.status, scau::coupling::core::SystemMassConservationStatus::conserved);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.residual, 0.0);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass, 41.0);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass, 41.0);
+    EXPECT_EQ(action.control_result.decision.handling_state, scau::coupling::core::SystemMassRuntimeAbortHandlingState::continue_run);
+}
+
+TEST(CouplingCoreState, RuntimeOperatorActionAgainstSnapshotRequestsAbortWhenMassDrifted) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 40.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.snapshot();
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 0.0, .unmet_volume = 4.0});
+    state.replay_pending();
+    const auto decision = state.decide_system_mass_runtime_control_against_snapshot(baseline, kHWet);
+    const auto result = scau::coupling::core::consume_system_mass_runtime_control_decision(decision);
+
+    const auto action = scau::coupling::core::make_system_mass_runtime_operator_action(result);
+
+    EXPECT_EQ(action.state, scau::coupling::core::SystemMassRuntimeOperatorActionState::abort_requested);
+    EXPECT_EQ(action.control_result.state, scau::coupling::core::SystemMassRuntimeControlState::abort);
+    EXPECT_TRUE(action.control_result.decision.should_abort);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.status, scau::coupling::core::SystemMassRuntimeGateStatus::abort);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.action, scau::coupling::core::SystemMassGateAction::abort_run);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.status, scau::coupling::core::SystemMassConservationStatus::drifted);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.residual, 4.0);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass, 41.0);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass, 45.0);
+    EXPECT_EQ(action.control_result.decision.handling_state, scau::coupling::core::SystemMassRuntimeAbortHandlingState::abort);
+}
+
+TEST(CouplingCoreState, RuntimeOperatorActionAgainstReferenceMatchesAuditChainWhenConserved) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 40.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.compute_system_mass(kHWet);
+
+    const auto audit = state.audit_system_mass_against_reference(baseline, kHWet);
+    const auto decision = state.decide_system_mass_runtime_control_against_reference(baseline, kHWet);
+    const auto result = scau::coupling::core::consume_system_mass_runtime_control_decision(decision);
+    const auto action = scau::coupling::core::make_system_mass_runtime_operator_action(result);
+    const auto via_audit = scau::coupling::core::make_system_mass_runtime_operator_action(
+        scau::coupling::core::consume_system_mass_runtime_control_decision(
+            scau::coupling::core::make_system_mass_runtime_control_decision(
+                scau::coupling::core::make_system_mass_runtime_gate_outcome(
+                    scau::coupling::core::decide_system_mass_gate_action(
+                        scau::coupling::core::make_system_mass_conservation_diagnostic(audit))))));
+
+    EXPECT_EQ(action.state, via_audit.state);
+    EXPECT_EQ(action.control_result.state, via_audit.control_result.state);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.status, via_audit.control_result.decision.gate_outcome.status);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.action, via_audit.control_result.decision.gate_outcome.decision.action);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.status, via_audit.control_result.decision.gate_outcome.decision.diagnostic.status);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.residual, via_audit.control_result.decision.gate_outcome.decision.diagnostic.residual);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass, via_audit.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass, via_audit.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass);
+    EXPECT_EQ(action.control_result.decision.handling_state, via_audit.control_result.decision.handling_state);
+    EXPECT_EQ(action.control_result.decision.should_abort, via_audit.control_result.decision.should_abort);
+    EXPECT_EQ(action.state, scau::coupling::core::SystemMassRuntimeOperatorActionState::continue_run);
+}
+
+TEST(CouplingCoreState, RuntimeOperatorActionAgainstReferenceMatchesAuditChainWhenDrifted) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 40.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.compute_system_mass(kHWet);
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 0.0, .unmet_volume = 4.0});
+    state.replay_pending();
+
+    const auto audit = state.audit_system_mass_against_reference(baseline, kHWet);
+    const auto decision = state.decide_system_mass_runtime_control_against_reference(baseline, kHWet);
+    const auto result = scau::coupling::core::consume_system_mass_runtime_control_decision(decision);
+    const auto action = scau::coupling::core::make_system_mass_runtime_operator_action(result);
+    const auto via_audit = scau::coupling::core::make_system_mass_runtime_operator_action(
+        scau::coupling::core::consume_system_mass_runtime_control_decision(
+            scau::coupling::core::make_system_mass_runtime_control_decision(
+                scau::coupling::core::make_system_mass_runtime_gate_outcome(
+                    scau::coupling::core::decide_system_mass_gate_action(
+                        scau::coupling::core::make_system_mass_conservation_diagnostic(audit))))));
+
+    EXPECT_EQ(action.state, via_audit.state);
+    EXPECT_EQ(action.control_result.state, via_audit.control_result.state);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.status, via_audit.control_result.decision.gate_outcome.status);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.action, via_audit.control_result.decision.gate_outcome.decision.action);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.status, via_audit.control_result.decision.gate_outcome.decision.diagnostic.status);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.residual, via_audit.control_result.decision.gate_outcome.decision.diagnostic.residual);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass, via_audit.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass, via_audit.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass);
+    EXPECT_EQ(action.control_result.decision.handling_state, via_audit.control_result.decision.handling_state);
+    EXPECT_EQ(action.control_result.decision.should_abort, via_audit.control_result.decision.should_abort);
+    EXPECT_EQ(action.state, scau::coupling::core::SystemMassRuntimeOperatorActionState::abort_requested);
+}
+
+TEST(CouplingCoreState, RuntimeOperatorActionAgainstSnapshotMatchesAuditChainWhenConserved) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 40.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto snap = state.snapshot();
+
+    const auto audit = state.audit_system_mass_against_snapshot(snap, kHWet);
+    const auto decision = state.decide_system_mass_runtime_control_against_snapshot(snap, kHWet);
+    const auto result = scau::coupling::core::consume_system_mass_runtime_control_decision(decision);
+    const auto action = scau::coupling::core::make_system_mass_runtime_operator_action(result);
+    const auto via_audit = scau::coupling::core::make_system_mass_runtime_operator_action(
+        scau::coupling::core::consume_system_mass_runtime_control_decision(
+            scau::coupling::core::make_system_mass_runtime_control_decision(
+                scau::coupling::core::make_system_mass_runtime_gate_outcome(
+                    scau::coupling::core::decide_system_mass_gate_action(
+                        scau::coupling::core::make_system_mass_conservation_diagnostic(audit))))));
+
+    EXPECT_EQ(action.state, via_audit.state);
+    EXPECT_EQ(action.control_result.state, via_audit.control_result.state);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.status, via_audit.control_result.decision.gate_outcome.status);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.action, via_audit.control_result.decision.gate_outcome.decision.action);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.status, via_audit.control_result.decision.gate_outcome.decision.diagnostic.status);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.residual, via_audit.control_result.decision.gate_outcome.decision.diagnostic.residual);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass, via_audit.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass, via_audit.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass);
+    EXPECT_EQ(action.control_result.decision.handling_state, via_audit.control_result.decision.handling_state);
+    EXPECT_EQ(action.control_result.decision.should_abort, via_audit.control_result.decision.should_abort);
+    EXPECT_EQ(action.state, scau::coupling::core::SystemMassRuntimeOperatorActionState::continue_run);
+}
+
+TEST(CouplingCoreState, RuntimeOperatorActionAgainstSnapshotMatchesAuditChainWhenDrifted) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 40.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto snap = state.snapshot();
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 0.0, .unmet_volume = 4.0});
+    state.replay_pending();
+
+    const auto audit = state.audit_system_mass_against_snapshot(snap, kHWet);
+    const auto decision = state.decide_system_mass_runtime_control_against_snapshot(snap, kHWet);
+    const auto result = scau::coupling::core::consume_system_mass_runtime_control_decision(decision);
+    const auto action = scau::coupling::core::make_system_mass_runtime_operator_action(result);
+    const auto via_audit = scau::coupling::core::make_system_mass_runtime_operator_action(
+        scau::coupling::core::consume_system_mass_runtime_control_decision(
+            scau::coupling::core::make_system_mass_runtime_control_decision(
+                scau::coupling::core::make_system_mass_runtime_gate_outcome(
+                    scau::coupling::core::decide_system_mass_gate_action(
+                        scau::coupling::core::make_system_mass_conservation_diagnostic(audit))))));
+
+    EXPECT_EQ(action.state, via_audit.state);
+    EXPECT_EQ(action.control_result.state, via_audit.control_result.state);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.status, via_audit.control_result.decision.gate_outcome.status);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.action, via_audit.control_result.decision.gate_outcome.decision.action);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.status, via_audit.control_result.decision.gate_outcome.decision.diagnostic.status);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.residual, via_audit.control_result.decision.gate_outcome.decision.diagnostic.residual);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass, via_audit.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass, via_audit.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass);
+    EXPECT_EQ(action.control_result.decision.handling_state, via_audit.control_result.decision.handling_state);
+    EXPECT_EQ(action.control_result.decision.should_abort, via_audit.control_result.decision.should_abort);
+    EXPECT_EQ(action.state, scau::coupling::core::SystemMassRuntimeOperatorActionState::abort_requested);
+}

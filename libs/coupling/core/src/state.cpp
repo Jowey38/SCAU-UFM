@@ -319,6 +319,16 @@ SystemMassRuntimeControlResult consume_system_mass_runtime_control_decision(
     };
 }
 
+SystemMassRuntimeOperatorAction make_system_mass_runtime_operator_action(
+    const SystemMassRuntimeControlResult& control_result) {
+    return SystemMassRuntimeOperatorAction{
+        .control_result = control_result,
+        .state = control_result.state == SystemMassRuntimeControlState::abort
+            ? SystemMassRuntimeOperatorActionState::abort_requested
+            : SystemMassRuntimeOperatorActionState::continue_run,
+    };
+}
+
 MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume) {
     if (account.volume < 0.0) {
         throw std::invalid_argument("deficit volume must be non-negative");
