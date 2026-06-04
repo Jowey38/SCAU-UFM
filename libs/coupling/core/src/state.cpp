@@ -238,6 +238,26 @@ FaultControllerPassiveStateClassification classify_fault_controller_passive_stat
 
 
 
+FaultControllerPassiveTransition make_fault_controller_passive_transition(
+    FaultControllerPassiveStateLabel previous_state,
+    const FaultControllerPassiveStateClassification& classification) {
+    return FaultControllerPassiveTransition{
+        .classification = classification,
+        .previous_state = previous_state,
+        .next_state = classification.state,
+        .reason = classification.state == FaultControllerPassiveStateLabel::review_required
+            ? FaultControllerPassiveTransitionReason::fault_detected_review_required
+            : FaultControllerPassiveTransitionReason::nominal_health,
+        .isolation_requested = false,
+        .reconnect_requested = false,
+        .abort_requested = false,
+        .runtime_action_executed = false,
+        .scheduler_control_enabled = false,
+    };
+}
+
+
+
 FlowLimit compute_flow_limit(const ExchangeCellState& cell, double dt_sub) {
     if (!std::isfinite(dt_sub) || dt_sub <= 0.0) {
         throw std::invalid_argument("dt_sub must be finite and positive");

@@ -166,6 +166,23 @@ struct FaultControllerPassiveStateClassification {
     bool abort_enabled{false};
 };
 
+enum class FaultControllerPassiveTransitionReason {
+    nominal_health,
+    fault_detected_review_required,
+};
+
+struct FaultControllerPassiveTransition {
+    FaultControllerPassiveStateClassification classification{};
+    FaultControllerPassiveStateLabel previous_state{FaultControllerPassiveStateLabel::running};
+    FaultControllerPassiveStateLabel next_state{FaultControllerPassiveStateLabel::running};
+    FaultControllerPassiveTransitionReason reason{FaultControllerPassiveTransitionReason::nominal_health};
+    bool isolation_requested{false};
+    bool reconnect_requested{false};
+    bool abort_requested{false};
+    bool runtime_action_executed{false};
+    bool scheduler_control_enabled{false};
+};
+
 [[nodiscard]] FaultControllerDiagnostic make_fault_controller_diagnostic(
     const EngineHealthAggregate& health);
 [[nodiscard]] FaultControllerProposedAction propose_fault_controller_action(
@@ -176,6 +193,9 @@ struct FaultControllerPassiveStateClassification {
     const MockCouplingSchedulerFaultObservation& observation);
 [[nodiscard]] FaultControllerPassiveStateClassification classify_fault_controller_passive_state(
     const MockCouplingSchedulerFaultConsumption& consumption);
+[[nodiscard]] FaultControllerPassiveTransition make_fault_controller_passive_transition(
+    FaultControllerPassiveStateLabel previous_state,
+    const FaultControllerPassiveStateClassification& classification);
 
 [[nodiscard]] ExchangeDecision evaluate_exchange(
     const ExchangeCellState& cell,
