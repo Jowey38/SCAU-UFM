@@ -67,6 +67,10 @@ struct SharedExchangeDecision {
     double priority_weight{1.0};
 };
 
+struct MockCouplingSchedulerStepResult {
+    std::vector<SharedExchangeDecision> decisions{};
+};
+
 struct EngineReport {
     bool healthy{true};
     std::string engine_id{};
@@ -387,6 +391,10 @@ public:
     void record_pipeline_decision(const ExchangePipelineDecision& decision);
     ExchangePipelineDecision apply_exchange(std::size_t cell_index, const ExchangeRequest& request);
     std::vector<SharedExchangeDecision> apply_shared_exchange(
+        std::size_t cell_index,
+        const std::vector<SharedExchangeIntent>& intents,
+        double dt_sub);
+    MockCouplingSchedulerStepResult run_mock_coupling_scheduler_step(
         std::size_t cell_index,
         const std::vector<SharedExchangeIntent>& intents,
         double dt_sub);

@@ -36,6 +36,16 @@ target_link_libraries(test_coupling_shared_replay
 )
 add_test(NAME test_coupling_shared_replay COMMAND test_coupling_shared_replay)
 
+add_executable(test_coupling_mock_scheduler test_coupling_mock_scheduler.cpp)
+target_link_libraries(test_coupling_mock_scheduler
+    PRIVATE
+        scau::coupling_drainage
+        scau::coupling_river
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_mock_scheduler COMMAND test_coupling_mock_scheduler)
+
 add_executable(test_coupling_engine_report test_coupling_engine_report.cpp)
 target_link_libraries(test_coupling_engine_report
     PRIVATE

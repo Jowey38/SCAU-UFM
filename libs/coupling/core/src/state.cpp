@@ -857,4 +857,13 @@ std::vector<SharedExchangeDecision> CouplingState::apply_shared_exchange(
     return decisions;
 }
 
+MockCouplingSchedulerStepResult CouplingState::run_mock_coupling_scheduler_step(
+    std::size_t cell_index,
+    const std::vector<SharedExchangeIntent>& intents,
+    double dt_sub) {
+    auto decisions = apply_shared_exchange(cell_index, intents, dt_sub);
+    replay_pending();
+    return MockCouplingSchedulerStepResult{.decisions = std::move(decisions)};
+}
+
 }  // namespace scau::coupling::core
