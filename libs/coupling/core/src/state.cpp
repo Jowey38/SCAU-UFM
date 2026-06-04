@@ -333,6 +333,84 @@ FaultControllerBlockedAction make_fault_controller_blocked_action(
 
 
 
+FaultControllerSchedulerControlRequest make_fault_controller_scheduler_control_request(
+    const FaultControllerBlockedAction& blocked_action) {
+    const bool control_requested = blocked_action.reason == FaultControllerBlockedActionReason::operator_review_required;
+    return FaultControllerSchedulerControlRequest{
+        .outcome = blocked_action.outcome,
+        .blocked_action = blocked_action,
+        .requested_kind = control_requested
+            ? FaultControllerSchedulerControlKind::observe_only
+            : FaultControllerSchedulerControlKind::none,
+        .status = control_requested
+            ? FaultControllerSchedulerControlStatus::blocked_boundary_absent
+            : FaultControllerSchedulerControlStatus::not_requested,
+        .reason = control_requested
+            ? FaultControllerSchedulerControlReason::scheduler_control_boundary_absent
+            : FaultControllerSchedulerControlReason::no_scheduler_control_requested,
+        .target_engine_id = blocked_action.outcome.audit.transition.classification.consumption.observation.action.diagnostic.health.unhealthy_count > 0U
+            ? "fault_controller_review"
+            : "",
+        .scheduler_control_boundary_available = false,
+        .threshold_evidence_complete = false,
+        .operator_approved = false,
+        .rollback_context_available = false,
+        .replay_policy_available = false,
+        .mass_audit_policy_available = false,
+        .scheduler_control_allowed = false,
+        .scheduler_control_used = false,
+        .adapter_call_allowed = false,
+        .exchange_requests_paused = false,
+        .target_engine_request_skipped = false,
+        .replay_held = false,
+        .mass_audit_forced = false,
+        .scheduler_state_mutated = false,
+        .release_gate_action_executed = false,
+    };
+}
+
+
+
+FaultControllerSchedulerControlResult make_fault_controller_scheduler_control_result(
+    const FaultControllerSchedulerControlRequest& request) {
+    const bool control_requested = request.requested_kind != FaultControllerSchedulerControlKind::none;
+    return FaultControllerSchedulerControlResult{
+        .request = request,
+        .attempted_kind = request.requested_kind,
+        .status = control_requested
+            ? FaultControllerSchedulerControlResultStatus::blocked_boundary_absent
+            : FaultControllerSchedulerControlResultStatus::not_requested,
+        .reason = control_requested
+            ? FaultControllerSchedulerControlResultReason::scheduler_control_boundary_absent
+            : FaultControllerSchedulerControlResultReason::no_scheduler_control_requested,
+        .phase_before_control = "passive_scheduler_control_request_recorded",
+        .phase_after_control = "passive_scheduler_control_result_recorded",
+        .target_engine_id = request.target_engine_id,
+        .scheduler_control_boundary_available = request.scheduler_control_boundary_available,
+        .threshold_evidence_complete = request.threshold_evidence_complete,
+        .operator_approved = request.operator_approved,
+        .rollback_context_available = request.rollback_context_available,
+        .replay_policy_available = request.replay_policy_available,
+        .mass_audit_policy_available = request.mass_audit_policy_available,
+        .scheduler_control_used = false,
+        .exchange_requests_paused = false,
+        .target_engine_request_skipped = false,
+        .replay_held = false,
+        .mass_audit_forced = false,
+        .scheduler_state_mutated = false,
+        .adapter_call_attempted = false,
+        .adapter_call_succeeded = false,
+        .adapter_call_failed = false,
+        .rollback_required = false,
+        .replay_required = false,
+        .mass_audit_required = false,
+        .operator_review_required = request.outcome.operator_review_required,
+        .release_gate_action_executed = false,
+    };
+}
+
+
+
 FlowLimit compute_flow_limit(const ExchangeCellState& cell, double dt_sub) {
     if (!std::isfinite(dt_sub) || dt_sub <= 0.0) {
         throw std::invalid_argument("dt_sub must be finite and positive");

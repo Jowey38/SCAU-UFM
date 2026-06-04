@@ -209,6 +209,42 @@ target_link_libraries(test_coupling_fault_controller_blocked_action_ordering
 )
 add_test(NAME test_coupling_fault_controller_blocked_action_ordering COMMAND test_coupling_fault_controller_blocked_action_ordering)
 
+add_executable(test_coupling_fault_controller_scheduler_control_request test_coupling_fault_controller_scheduler_control_request.cpp)
+target_link_libraries(test_coupling_fault_controller_scheduler_control_request
+    PRIVATE
+        scau::coupling_core
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_fault_controller_scheduler_control_request COMMAND test_coupling_fault_controller_scheduler_control_request)
+
+add_executable(test_coupling_fault_controller_scheduler_control_request_ordering test_coupling_fault_controller_scheduler_control_request_ordering.cpp)
+target_link_libraries(test_coupling_fault_controller_scheduler_control_request_ordering
+    PRIVATE
+        scau::coupling_core
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_fault_controller_scheduler_control_request_ordering COMMAND test_coupling_fault_controller_scheduler_control_request_ordering)
+
+add_executable(test_coupling_fault_controller_scheduler_control_result test_coupling_fault_controller_scheduler_control_result.cpp)
+target_link_libraries(test_coupling_fault_controller_scheduler_control_result
+    PRIVATE
+        scau::coupling_core
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_fault_controller_scheduler_control_result COMMAND test_coupling_fault_controller_scheduler_control_result)
+
+add_executable(test_coupling_fault_controller_scheduler_control_result_ordering test_coupling_fault_controller_scheduler_control_result_ordering.cpp)
+target_link_libraries(test_coupling_fault_controller_scheduler_control_result_ordering
+    PRIVATE
+        scau::coupling_core
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_fault_controller_scheduler_control_result_ordering COMMAND test_coupling_fault_controller_scheduler_control_result_ordering)
+
 add_executable(test_coupling_flow_limit test_coupling_flow_limit.cpp)
 target_link_libraries(test_coupling_flow_limit
     PRIVATE

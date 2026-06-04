@@ -261,6 +261,120 @@ struct FaultControllerBlockedAction {
     bool release_gate_action_allowed{false};
 };
 
+enum class FaultControllerSchedulerControlKind {
+    none,
+    observe_only,
+};
+
+enum class FaultControllerSchedulerControlStatus {
+    not_requested,
+    blocked_boundary_absent,
+};
+
+enum class FaultControllerSchedulerControlReason {
+    no_scheduler_control_requested,
+    scheduler_control_boundary_absent,
+};
+
+struct FaultControllerSchedulerControlRequest {
+    FaultControllerPassiveActionOutcome outcome{};
+    FaultControllerBlockedAction blocked_action{};
+    FaultControllerSchedulerControlKind requested_kind{FaultControllerSchedulerControlKind::none};
+    FaultControllerSchedulerControlStatus status{FaultControllerSchedulerControlStatus::not_requested};
+    FaultControllerSchedulerControlReason reason{FaultControllerSchedulerControlReason::no_scheduler_control_requested};
+    std::string target_engine_id{};
+    bool scheduler_control_boundary_available{false};
+    bool threshold_evidence_complete{false};
+    bool operator_approved{false};
+    bool rollback_context_available{false};
+    bool replay_policy_available{false};
+    bool mass_audit_policy_available{false};
+    bool scheduler_control_allowed{false};
+    bool scheduler_control_used{false};
+    bool adapter_call_allowed{false};
+    bool exchange_requests_paused{false};
+    bool target_engine_request_skipped{false};
+    bool replay_held{false};
+    bool mass_audit_forced{false};
+    bool scheduler_state_mutated{false};
+    bool release_gate_action_executed{false};
+};
+
+enum class FaultControllerSchedulerControlResultStatus {
+    not_requested,
+    blocked_boundary_absent,
+};
+
+enum class FaultControllerSchedulerControlResultReason {
+    no_scheduler_control_requested,
+    scheduler_control_boundary_absent,
+};
+
+struct FaultControllerSchedulerControlResult {
+    FaultControllerSchedulerControlRequest request{};
+    FaultControllerSchedulerControlKind attempted_kind{FaultControllerSchedulerControlKind::none};
+    FaultControllerSchedulerControlResultStatus status{FaultControllerSchedulerControlResultStatus::not_requested};
+    FaultControllerSchedulerControlResultReason reason{FaultControllerSchedulerControlResultReason::no_scheduler_control_requested};
+    std::string phase_before_control{};
+    std::string phase_after_control{};
+    std::string target_engine_id{};
+    bool scheduler_control_boundary_available{false};
+    bool threshold_evidence_complete{false};
+    bool operator_approved{false};
+    bool rollback_context_available{false};
+    bool replay_policy_available{false};
+    bool mass_audit_policy_available{false};
+    bool scheduler_control_used{false};
+    bool exchange_requests_paused{false};
+    bool target_engine_request_skipped{false};
+    bool replay_held{false};
+    bool mass_audit_forced{false};
+    bool scheduler_state_mutated{false};
+    bool adapter_call_attempted{false};
+    bool adapter_call_succeeded{false};
+    bool adapter_call_failed{false};
+    bool rollback_required{false};
+    bool replay_required{false};
+    bool mass_audit_required{false};
+    bool operator_review_required{false};
+    bool release_gate_action_executed{false};
+};
+
+enum class FaultControllerSchedulerPhase {
+    health_collection,
+    health_classification,
+    health_aggregation,
+    fault_diagnostic_derivation,
+    proposed_action_derivation,
+    fault_action_observation,
+    fault_action_consumption,
+    passive_state_classification,
+    passive_transition_creation,
+    passive_action_audit_creation,
+    passive_action_outcome_creation,
+    blocked_action_creation,
+    scheduler_control_request_creation,
+    scheduler_control_result_creation,
+    exchange_request_preparation,
+    shared_cell_arbitration,
+    exchange_acceptance,
+    replay,
+    mass_audit,
+    post_step_reporting,
+};
+
+enum class FaultControllerSchedulerPhaseCategory {
+    passive_provenance,
+    scheduling_conservation,
+};
+
+enum class FaultControllerSchedulerConservationImpact {
+    none,
+    known_no_change,
+    unknown,
+};
+
+
 [[nodiscard]] FaultControllerDiagnostic make_fault_controller_diagnostic(
     const EngineHealthAggregate& health);
 [[nodiscard]] FaultControllerProposedAction propose_fault_controller_action(
@@ -280,6 +394,10 @@ struct FaultControllerBlockedAction {
     const FaultControllerPassiveActionAuditRecord& audit);
 [[nodiscard]] FaultControllerBlockedAction make_fault_controller_blocked_action(
     const FaultControllerPassiveActionOutcome& outcome);
+[[nodiscard]] FaultControllerSchedulerControlRequest make_fault_controller_scheduler_control_request(
+    const FaultControllerBlockedAction& blocked_action);
+[[nodiscard]] FaultControllerSchedulerControlResult make_fault_controller_scheduler_control_result(
+    const FaultControllerSchedulerControlRequest& request);
 
 [[nodiscard]] ExchangeDecision evaluate_exchange(
     const ExchangeCellState& cell,
