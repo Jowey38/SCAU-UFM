@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <string>
 #include <vector>
 
 namespace scau::coupling::core {
@@ -9,12 +10,28 @@ struct MassDeficitAccount {
     double volume{0.0};
 };
 
+enum class SharedExchangeEngine {
+    drainage,
+    river,
+};
+
+struct SharedExchangeEndpoint {
+    SharedExchangeEngine engine{SharedExchangeEngine::drainage};
+    std::size_t node_id{0U};
+};
+
+struct SharedExchangeEndpointDeficit {
+    SharedExchangeEndpoint endpoint{};
+    MassDeficitAccount mass_deficit_account{};
+};
+
 struct ExchangeCellState {
     double volume{0.0};
     MassDeficitAccount mass_deficit_account{};
     double phi_t{0.0};
     double h{0.0};
     double area{0.0};
+    std::vector<SharedExchangeEndpointDeficit> shared_deficit_accounts{};
 };
 
 struct FlowLimit {
@@ -23,6 +40,12 @@ struct FlowLimit {
 };
 
 [[nodiscard]] FlowLimit compute_flow_limit(const ExchangeCellState& cell, double dt_sub);
+
+struct SharedExchangeIntent {
+    SharedExchangeEndpoint endpoint{};
+    double q_request{0.0};
+    double priority_weight{1.0};
+};
 
 struct ExchangeRequest {
     double q_request{0.0};
@@ -37,9 +60,28 @@ struct ExchangeDecision {
     double v_unmet{0.0};
 };
 
+struct SharedExchangeDecision {
+    SharedExchangeEndpoint endpoint{};
+    ExchangeDecision exchange{};
+    FlowLimit allocated_limit{};
+    double priority_weight{1.0};
+};
+
+struct EngineReport {
+    bool healthy{true};
+    std::string engine_id{};
+    std::string error_code{};
+    double elapsed_time{0.0};
+};
+
 [[nodiscard]] ExchangeDecision evaluate_exchange(
     const ExchangeCellState& cell,
     const ExchangeRequest& request);
+
+[[nodiscard]] std::vector<SharedExchangeDecision> evaluate_shared_exchange(
+    const ExchangeCellState& cell,
+    const std::vector<SharedExchangeIntent>& intents,
+    double dt_sub);
 
 struct DrainSplit {
     int micro_steps{1};
@@ -64,9 +106,21 @@ struct ExchangePipelineDecision {
     bool negative_depth_fix_engaged{false};
 };
 
+struct SharedExchangePipelineDecision {
+    std::vector<SharedExchangeDecision> decisions{};
+    DrainSplit drain_split{};
+    bool drain_split_engaged{false};
+    bool negative_depth_fix_engaged{false};
+};
+
 [[nodiscard]] ExchangePipelineDecision evaluate_exchange_pipeline(
     const ExchangeCellState& cell,
     const ExchangeRequest& request);
+
+[[nodiscard]] SharedExchangePipelineDecision evaluate_shared_exchange_pipeline(
+    const ExchangeCellState& cell,
+    const std::vector<SharedExchangeIntent>& intents,
+    double dt_sub);
 
 struct ExchangeConservationAudit {
     double request_volume{0.0};
@@ -204,11 +258,24 @@ struct SystemMassRuntimeOperatorAction {
 [[nodiscard]] MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_volume);
 [[nodiscard]] MassDeficitAccount apply_repayment(const MassDeficitAccount& account, double applied_volume);
 
+enum class ExchangeDirection {
+    surface_to_engine,
+    engine_to_surface,
+};
+
+struct SharedExchangeEndpointEvent {
+    SharedExchangeEndpoint endpoint{};
+    double unmet_volume{0.0};
+    double repayment_volume{0.0};
+};
+
 struct CouplingEvent {
     std::size_t exchange_cell_index{0U};
+    ExchangeDirection direction{ExchangeDirection::surface_to_engine};
     double volume_delta{0.0};
     double unmet_volume{0.0};
     double repayment_volume{0.0};
+    std::vector<SharedExchangeEndpointEvent> shared_endpoint_events{};
 };
 
 struct RuntimeCounters {
@@ -220,15 +287,20 @@ class CouplingSnapshot {
 public:
     [[nodiscard]] const std::vector<ExchangeCellState>& cells() const noexcept;
     [[nodiscard]] const RuntimeCounters& runtime_counters() const noexcept;
+    [[nodiscard]] const std::vector<CouplingEvent>& pending_events() const noexcept;
     [[nodiscard]] SystemMassAudit compute_system_mass(double h_wet) const;
 
 private:
     friend class CouplingState;
 
-    CouplingSnapshot(std::vector<ExchangeCellState> cells, RuntimeCounters counters);
+    CouplingSnapshot(
+        std::vector<ExchangeCellState> cells,
+        RuntimeCounters counters,
+        std::vector<CouplingEvent> pending_events);
 
     std::vector<ExchangeCellState> cells_;
     RuntimeCounters runtime_counters_;
+    std::vector<CouplingEvent> pending_events_;
 };
 
 class CouplingState {
@@ -287,6 +359,10 @@ public:
     void replay_pending();
     void record_pipeline_decision(const ExchangePipelineDecision& decision);
     ExchangePipelineDecision apply_exchange(std::size_t cell_index, const ExchangeRequest& request);
+    std::vector<SharedExchangeDecision> apply_shared_exchange(
+        std::size_t cell_index,
+        const std::vector<SharedExchangeIntent>& intents,
+        double dt_sub);
 
 private:
     std::vector<ExchangeCellState> cells_;

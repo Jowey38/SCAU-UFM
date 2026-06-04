@@ -6,20 +6,134 @@
 #include <utility>
 
 namespace scau::coupling::core {
+namespace {
+
+bool same_endpoint(
+    const SharedExchangeEndpoint& lhs,
+    const SharedExchangeEndpoint& rhs) noexcept {
+    return lhs.engine == rhs.engine && lhs.node_id == rhs.node_id;
+}
+
+
+
+MassDeficitAccount endpoint_deficit_account(
+    const ExchangeCellState& cell,
+    const SharedExchangeEndpoint& endpoint) {
+    for (const auto& shared_deficit : cell.shared_deficit_accounts) {
+        if (same_endpoint(shared_deficit.endpoint, endpoint)) {
+            return shared_deficit.mass_deficit_account;
+        }
+    }
+    return {};
+}
+
+
+
+void upsert_endpoint_deficit_account(
+    ExchangeCellState& cell,
+    const SharedExchangeEndpoint& endpoint,
+    const MassDeficitAccount& account) {
+    for (auto& shared_deficit : cell.shared_deficit_accounts) {
+        if (same_endpoint(shared_deficit.endpoint, endpoint)) {
+            shared_deficit.mass_deficit_account = account;
+            return;
+        }
+    }
+    cell.shared_deficit_accounts.push_back({
+        .endpoint = endpoint,
+        .mass_deficit_account = account,
+    });
+}
+
+
+
+void validate_exchange_cell_state(const ExchangeCellState& cell) {
+    if (!std::isfinite(cell.volume)) {
+        throw std::invalid_argument("cell volume must be finite");
+    }
+    if (!std::isfinite(cell.phi_t) || cell.phi_t < 0.0) {
+        throw std::invalid_argument("phi_t must be finite and non-negative");
+    }
+    if (!std::isfinite(cell.h) || cell.h < 0.0) {
+        throw std::invalid_argument("h must be finite and non-negative");
+    }
+    if (!std::isfinite(cell.area) || cell.area < 0.0) {
+        throw std::invalid_argument("area must be finite and non-negative");
+    }
+    if (!std::isfinite(cell.mass_deficit_account.volume) || cell.mass_deficit_account.volume < 0.0) {
+        throw std::invalid_argument("deficit volume must be finite and non-negative");
+    }
+    for (const auto& shared_deficit : cell.shared_deficit_accounts) {
+        if (!std::isfinite(shared_deficit.mass_deficit_account.volume) ||
+            shared_deficit.mass_deficit_account.volume < 0.0) {
+            throw std::invalid_argument("shared deficit volume must be finite and non-negative");
+        }
+    }
+}
+
+
+
+void validate_exchange_decision(const ExchangeDecision& decision) {
+    if (!std::isfinite(decision.q_granted) || decision.q_granted < 0.0) {
+        throw std::invalid_argument("q_granted must be finite and non-negative");
+    }
+    if (!std::isfinite(decision.v_granted) || decision.v_granted < 0.0) {
+        throw std::invalid_argument("v_granted must be finite and non-negative");
+    }
+    if (!std::isfinite(decision.q_repay) || decision.q_repay < 0.0) {
+        throw std::invalid_argument("q_repay must be finite and non-negative");
+    }
+    if (!std::isfinite(decision.v_repay) || decision.v_repay < 0.0) {
+        throw std::invalid_argument("v_repay must be finite and non-negative");
+    }
+    if (!std::isfinite(decision.v_unmet) || decision.v_unmet < 0.0) {
+        throw std::invalid_argument("v_unmet must be finite and non-negative");
+    }
+}
+
+
+
+void apply_volume_delta_to_cell(
+    ExchangeCellState& cell,
+    ExchangeDirection direction,
+    double volume_delta) {
+    validate_exchange_cell_state(cell);
+    if (!std::isfinite(volume_delta)) {
+        throw std::invalid_argument("volume_delta must be finite");
+    }
+
+    const double signed_volume_delta = direction == ExchangeDirection::surface_to_engine
+        ? -volume_delta
+        : volume_delta;
+    const double updated_volume = cell.volume + signed_volume_delta;
+    if (!std::isfinite(updated_volume) || updated_volume < 0.0) {
+        throw std::invalid_argument("replayed volume would produce invalid cell volume");
+    }
+
+    double updated_h = cell.h;
+    const double storage_area = cell.phi_t * cell.area;
+    if (storage_area > 0.0) {
+        updated_h = cell.h + signed_volume_delta / storage_area;
+        if (!std::isfinite(updated_h) || updated_h < 0.0) {
+            throw std::invalid_argument("replayed volume would produce invalid water depth");
+        }
+    } else if (volume_delta != 0.0) {
+        throw std::invalid_argument("zero-storage cell cannot replay nonzero volume delta");
+    }
+
+    cell.volume = updated_volume;
+    cell.h = updated_h;
+}
+
+
+
+}  // namespace
 
 FlowLimit compute_flow_limit(const ExchangeCellState& cell, double dt_sub) {
-    if (dt_sub <= 0.0) {
-        throw std::invalid_argument("dt_sub must be positive");
+    if (!std::isfinite(dt_sub) || dt_sub <= 0.0) {
+        throw std::invalid_argument("dt_sub must be finite and positive");
     }
-    if (cell.phi_t < 0.0) {
-        throw std::invalid_argument("phi_t must be non-negative");
-    }
-    if (cell.h < 0.0) {
-        throw std::invalid_argument("h must be non-negative");
-    }
-    if (cell.area < 0.0) {
-        throw std::invalid_argument("area must be non-negative");
-    }
+    validate_exchange_cell_state(cell);
 
     const double v_limit = 0.9 * cell.phi_t * cell.h * cell.area;
     return FlowLimit{
@@ -29,12 +143,10 @@ FlowLimit compute_flow_limit(const ExchangeCellState& cell, double dt_sub) {
 }
 
 ExchangeDecision evaluate_exchange(const ExchangeCellState& cell, const ExchangeRequest& request) {
-    if (request.q_request < 0.0) {
-        throw std::invalid_argument("q_request must be non-negative");
+    if (!std::isfinite(request.q_request) || request.q_request < 0.0) {
+        throw std::invalid_argument("q_request must be finite and non-negative");
     }
-    if (cell.mass_deficit_account.volume < 0.0) {
-        throw std::invalid_argument("deficit volume must be non-negative");
-    }
+    validate_exchange_cell_state(cell);
 
     const auto limit = compute_flow_limit(cell, request.dt_sub);
     const double q_repay = std::min(cell.mass_deficit_account.volume / request.dt_sub, limit.q_limit);
@@ -52,41 +164,110 @@ ExchangeDecision evaluate_exchange(const ExchangeCellState& cell, const Exchange
     };
 }
 
-DrainSplit split_drain(const ExchangeCellState& cell, const ExchangeDecision& decision, double dt_sub) {
-    if (dt_sub <= 0.0) {
-        throw std::invalid_argument("dt_sub must be positive");
+std::vector<SharedExchangeDecision> evaluate_shared_exchange(
+    const ExchangeCellState& cell,
+    const std::vector<SharedExchangeIntent>& intents,
+    double dt_sub) {
+    if (!std::isfinite(dt_sub) || dt_sub <= 0.0) {
+        throw std::invalid_argument("dt_sub must be finite and positive");
     }
-    if (cell.phi_t < 0.0) {
-        throw std::invalid_argument("phi_t must be non-negative");
-    }
-    if (cell.h < 0.0) {
-        throw std::invalid_argument("h must be non-negative");
-    }
-    if (cell.area < 0.0) {
-        throw std::invalid_argument("area must be non-negative");
-    }
-    if (decision.v_granted < 0.0) {
-        throw std::invalid_argument("v_granted must be non-negative");
+    validate_exchange_cell_state(cell);
+    if (intents.empty()) {
+        return {};
     }
 
+    double total_weight = 0.0;
+    double weighted_request = 0.0;
+    for (const auto& intent : intents) {
+        if (!std::isfinite(intent.q_request) || intent.q_request < 0.0) {
+            throw std::invalid_argument("q_request must be finite and non-negative");
+        }
+        if (!std::isfinite(intent.priority_weight) || intent.priority_weight <= 0.0) {
+            throw std::invalid_argument("priority_weight must be finite and positive");
+        }
+        total_weight += intent.priority_weight;
+        weighted_request += intent.priority_weight * intent.q_request;
+    }
+
+    const auto limit = compute_flow_limit(cell, dt_sub);
+
+    double total_q_repay = 0.0;
+    std::vector<double> repayment_flows;
+    repayment_flows.reserve(intents.size());
+    for (const auto& intent : intents) {
+        const double weight_fraction = intent.priority_weight / total_weight;
+        const FlowLimit allocated_limit{
+            .v_limit = weight_fraction * limit.v_limit,
+            .q_limit = weight_fraction * limit.q_limit,
+        };
+        const double endpoint_repay_request = endpoint_deficit_account(cell, intent.endpoint).volume / dt_sub;
+        const double q_repay = std::min(endpoint_repay_request, allocated_limit.q_limit);
+        repayment_flows.push_back(q_repay);
+        total_q_repay += q_repay;
+    }
+
+    const double remaining_q_limit = std::max(0.0, limit.q_limit - total_q_repay);
+    const double grant_scale = weighted_request > 0.0
+        ? std::clamp(remaining_q_limit / weighted_request, 0.0, 1.0)
+        : 0.0;
+
+    std::vector<SharedExchangeDecision> decisions;
+    decisions.reserve(intents.size());
+    for (std::size_t i = 0; i < intents.size(); ++i) {
+        const auto& intent = intents[i];
+        const double weight_fraction = intent.priority_weight / total_weight;
+        const FlowLimit allocated_limit{
+            .v_limit = weight_fraction * limit.v_limit,
+            .q_limit = weight_fraction * limit.q_limit,
+        };
+        const double q_repay = repayment_flows[i];
+        const double scaled_q = intent.priority_weight * intent.q_request * grant_scale;
+        const double q_granted = std::min(
+            intent.q_request,
+            std::min(std::max(0.0, allocated_limit.q_limit - q_repay), scaled_q));
+        decisions.push_back({
+            .endpoint = intent.endpoint,
+            .exchange = {
+                .q_granted = q_granted,
+                .v_granted = q_granted * dt_sub,
+                .q_repay = q_repay,
+                .v_repay = q_repay * dt_sub,
+                .v_unmet = (intent.q_request - q_granted) * dt_sub,
+            },
+            .allocated_limit = allocated_limit,
+            .priority_weight = intent.priority_weight,
+        });
+    }
+
+    return decisions;
+}
+
+DrainSplit split_drain(const ExchangeCellState& cell, const ExchangeDecision& decision, double dt_sub) {
+    if (!std::isfinite(dt_sub) || dt_sub <= 0.0) {
+        throw std::invalid_argument("dt_sub must be finite and positive");
+    }
+    validate_exchange_cell_state(cell);
+    validate_exchange_decision(decision);
+
+    const double applied_volume = decision.v_granted + decision.v_repay;
     const double threshold = 0.2 * cell.phi_t * cell.h * cell.area;
-    if (decision.v_granted <= threshold) {
+    if (applied_volume <= threshold) {
         return DrainSplit{
             .micro_steps = 1,
             .dt_micro = dt_sub,
-            .v_per_micro_step = decision.v_granted,
+            .v_per_micro_step = applied_volume,
         };
     }
     if (threshold <= 0.0) {
-        throw std::invalid_argument("geometric storage must be positive when v_granted is positive");
+        throw std::invalid_argument("geometric storage must be positive when applied volume is positive");
     }
 
-    const int requested = static_cast<int>(std::ceil(decision.v_granted / threshold));
+    const int requested = static_cast<int>(std::ceil(applied_volume / threshold));
     const int micro_steps = std::min(5, requested);
     return DrainSplit{
         .micro_steps = micro_steps,
         .dt_micro = dt_sub / micro_steps,
-        .v_per_micro_step = decision.v_granted / micro_steps,
+        .v_per_micro_step = applied_volume / micro_steps,
     };
 }
 
@@ -94,33 +275,11 @@ ExchangeDecision enforce_nonnegative_storage(
     const ExchangeCellState& cell,
     const ExchangeDecision& decision,
     double dt_sub) {
-    if (dt_sub <= 0.0) {
-        throw std::invalid_argument("dt_sub must be positive");
+    if (!std::isfinite(dt_sub) || dt_sub <= 0.0) {
+        throw std::invalid_argument("dt_sub must be finite and positive");
     }
-    if (cell.phi_t < 0.0) {
-        throw std::invalid_argument("phi_t must be non-negative");
-    }
-    if (cell.h < 0.0) {
-        throw std::invalid_argument("h must be non-negative");
-    }
-    if (cell.area < 0.0) {
-        throw std::invalid_argument("area must be non-negative");
-    }
-    if (decision.q_granted < 0.0) {
-        throw std::invalid_argument("q_granted must be non-negative");
-    }
-    if (decision.v_granted < 0.0) {
-        throw std::invalid_argument("v_granted must be non-negative");
-    }
-    if (decision.q_repay < 0.0) {
-        throw std::invalid_argument("q_repay must be non-negative");
-    }
-    if (decision.v_repay < 0.0) {
-        throw std::invalid_argument("v_repay must be non-negative");
-    }
-    if (decision.v_unmet < 0.0) {
-        throw std::invalid_argument("v_unmet must be non-negative");
-    }
+    validate_exchange_cell_state(cell);
+    validate_exchange_decision(decision);
 
     const double available_storage = cell.phi_t * cell.h * cell.area;
     if (decision.v_granted <= available_storage) {
@@ -149,6 +308,36 @@ ExchangePipelineDecision evaluate_exchange_pipeline(
         .drain_split = split,
         .drain_split_engaged = split.micro_steps > 1,
         .negative_depth_fix_engaged = nonnegative.v_granted < initial.v_granted,
+    };
+}
+
+SharedExchangePipelineDecision evaluate_shared_exchange_pipeline(
+    const ExchangeCellState& cell,
+    const std::vector<SharedExchangeIntent>& intents,
+    double dt_sub) {
+    const auto initial = evaluate_shared_exchange(cell, intents, dt_sub);
+    if (initial.empty()) {
+        return {};
+    }
+
+    double v_granted = 0.0;
+    double v_repay = 0.0;
+    for (const auto& decision : initial) {
+        v_granted += decision.exchange.v_granted;
+        v_repay += decision.exchange.v_repay;
+    }
+
+    const ExchangeDecision aggregate{
+        .v_granted = v_granted,
+        .v_repay = v_repay,
+    };
+    const auto split = split_drain(cell, aggregate, dt_sub);
+
+    return SharedExchangePipelineDecision{
+        .decisions = initial,
+        .drain_split = split,
+        .drain_split_engaged = split.micro_steps > 1,
+        .negative_depth_fix_engaged = false,
     };
 }
 
@@ -351,8 +540,13 @@ MassDeficitAccount apply_repayment(const MassDeficitAccount& account, double app
     return MassDeficitAccount{.volume = std::max(0.0, account.volume - applied_volume)};
 }
 
-CouplingSnapshot::CouplingSnapshot(std::vector<ExchangeCellState> cells, RuntimeCounters counters)
-    : cells_(std::move(cells)), runtime_counters_(counters) {}
+CouplingSnapshot::CouplingSnapshot(
+    std::vector<ExchangeCellState> cells,
+    RuntimeCounters counters,
+    std::vector<CouplingEvent> pending_events)
+    : cells_(std::move(cells)),
+      runtime_counters_(counters),
+      pending_events_(std::move(pending_events)) {}
 
 const std::vector<ExchangeCellState>& CouplingSnapshot::cells() const noexcept {
     return cells_;
@@ -362,11 +556,19 @@ const RuntimeCounters& CouplingSnapshot::runtime_counters() const noexcept {
     return runtime_counters_;
 }
 
+const std::vector<CouplingEvent>& CouplingSnapshot::pending_events() const noexcept {
+    return pending_events_;
+}
+
 SystemMassAudit CouplingSnapshot::compute_system_mass(double h_wet) const {
     return core::compute_system_mass(cells_, h_wet);
 }
 
-CouplingState::CouplingState(std::vector<ExchangeCellState> cells) : cells_(std::move(cells)) {}
+CouplingState::CouplingState(std::vector<ExchangeCellState> cells) : cells_(std::move(cells)) {
+    for (const auto& cell : cells_) {
+        validate_exchange_cell_state(cell);
+    }
+}
 
 const std::vector<ExchangeCellState>& CouplingState::cells() const noexcept {
     return cells_;
@@ -377,7 +579,7 @@ const RuntimeCounters& CouplingState::runtime_counters() const noexcept {
 }
 
 CouplingSnapshot CouplingState::snapshot() const {
-    return CouplingSnapshot{cells_, runtime_counters_};
+    return CouplingSnapshot{cells_, runtime_counters_, pending_events_};
 }
 
 SystemMassAudit CouplingState::compute_system_mass(double h_wet) const {
@@ -482,21 +684,64 @@ void CouplingState::enqueue_event(CouplingEvent event) {
     if (event.exchange_cell_index >= cells_.size()) {
         throw std::out_of_range("coupling event exchange cell index is out of range");
     }
+    if (!std::isfinite(event.volume_delta) || event.volume_delta < 0.0) {
+        throw std::invalid_argument("coupling event volume_delta must be finite and non-negative");
+    }
+    if (!std::isfinite(event.unmet_volume) || event.unmet_volume < 0.0) {
+        throw std::invalid_argument("coupling event unmet_volume must be finite and non-negative");
+    }
+    if (!std::isfinite(event.repayment_volume) || event.repayment_volume < 0.0) {
+        throw std::invalid_argument("coupling event repayment_volume must be finite and non-negative");
+    }
+    double endpoint_unmet_volume = 0.0;
+    double endpoint_repayment_volume = 0.0;
+    for (const auto& endpoint_event : event.shared_endpoint_events) {
+        if (!std::isfinite(endpoint_event.unmet_volume) || endpoint_event.unmet_volume < 0.0) {
+            throw std::invalid_argument("shared endpoint unmet_volume must be finite and non-negative");
+        }
+        if (!std::isfinite(endpoint_event.repayment_volume) || endpoint_event.repayment_volume < 0.0) {
+            throw std::invalid_argument("shared endpoint repayment_volume must be finite and non-negative");
+        }
+        endpoint_unmet_volume += endpoint_event.unmet_volume;
+        endpoint_repayment_volume += endpoint_event.repayment_volume;
+    }
+    if (!event.shared_endpoint_events.empty()) {
+        if (std::abs(endpoint_unmet_volume - event.unmet_volume) > 1.0e-12) {
+            throw std::invalid_argument("shared endpoint unmet volumes must match aggregate unmet_volume");
+        }
+        if (std::abs(endpoint_repayment_volume - event.repayment_volume) > 1.0e-12) {
+            throw std::invalid_argument("shared endpoint repayment volumes must match aggregate repayment_volume");
+        }
+    }
     pending_events_.push_back(event);
 }
 
 void CouplingState::rollback(const CouplingSnapshot& snapshot) {
     cells_ = snapshot.cells_;
     runtime_counters_ = snapshot.runtime_counters_;
+    pending_events_ = snapshot.pending_events_;
 }
 
 void CouplingState::replay_pending() {
+    auto replayed_cells = cells_;
     for (const auto& event : pending_events_) {
-        auto& cell = cells_[event.exchange_cell_index];
-        cell.volume += event.volume_delta;
-        cell.mass_deficit_account = roll_deficit(cell.mass_deficit_account, event.unmet_volume);
-        cell.mass_deficit_account = apply_repayment(cell.mass_deficit_account, event.repayment_volume);
+        auto& cell = replayed_cells[event.exchange_cell_index];
+        apply_volume_delta_to_cell(cell, event.direction, event.volume_delta);
+        if (event.shared_endpoint_events.empty()) {
+            cell.mass_deficit_account = roll_deficit(cell.mass_deficit_account, event.unmet_volume);
+            cell.mass_deficit_account = apply_repayment(cell.mass_deficit_account, event.repayment_volume);
+        } else {
+            for (const auto& endpoint_event : event.shared_endpoint_events) {
+                auto endpoint_account = endpoint_deficit_account(cell, endpoint_event.endpoint);
+                endpoint_account = roll_deficit(endpoint_account, endpoint_event.unmet_volume);
+                endpoint_account = apply_repayment(endpoint_account, endpoint_event.repayment_volume);
+                upsert_endpoint_deficit_account(cell, endpoint_event.endpoint, endpoint_account);
+            }
+        }
+        validate_exchange_cell_state(cell);
     }
+
+    cells_ = std::move(replayed_cells);
     pending_events_.clear();
 }
 
@@ -520,7 +765,8 @@ ExchangePipelineDecision CouplingState::apply_exchange(
 
     enqueue_event(CouplingEvent{
         .exchange_cell_index = cell_index,
-        .volume_delta = decision.exchange.v_granted,
+        .direction = ExchangeDirection::surface_to_engine,
+        .volume_delta = decision.exchange.v_granted + decision.exchange.v_repay,
         .unmet_volume = decision.exchange.v_unmet,
         .repayment_volume = decision.exchange.v_repay,
     });
@@ -528,6 +774,55 @@ ExchangePipelineDecision CouplingState::apply_exchange(
     record_pipeline_decision(decision);
 
     return decision;
+}
+
+std::vector<SharedExchangeDecision> CouplingState::apply_shared_exchange(
+    std::size_t cell_index,
+    const std::vector<SharedExchangeIntent>& intents,
+    double dt_sub) {
+    if (cell_index >= cells_.size()) {
+        throw std::out_of_range("apply_shared_exchange cell index is out of range");
+    }
+
+    const auto pipeline = evaluate_shared_exchange_pipeline(cells_[cell_index], intents, dt_sub);
+    if (pipeline.decisions.empty()) {
+        return pipeline.decisions;
+    }
+    const auto decisions = pipeline.decisions;
+
+    double volume_delta = 0.0;
+    double unmet_volume = 0.0;
+    double repayment_volume = 0.0;
+    std::vector<SharedExchangeEndpointEvent> endpoint_events;
+    endpoint_events.reserve(decisions.size());
+    for (const auto& decision : decisions) {
+        volume_delta += decision.exchange.v_granted + decision.exchange.v_repay;
+        unmet_volume += decision.exchange.v_unmet;
+        repayment_volume += decision.exchange.v_repay;
+        endpoint_events.push_back({
+            .endpoint = decision.endpoint,
+            .unmet_volume = decision.exchange.v_unmet,
+            .repayment_volume = decision.exchange.v_repay,
+        });
+    }
+
+    enqueue_event(CouplingEvent{
+        .exchange_cell_index = cell_index,
+        .direction = ExchangeDirection::surface_to_engine,
+        .volume_delta = volume_delta,
+        .unmet_volume = unmet_volume,
+        .repayment_volume = repayment_volume,
+        .shared_endpoint_events = std::move(endpoint_events),
+    });
+
+    if (pipeline.drain_split_engaged) {
+        ++runtime_counters_.count_drain_split;
+    }
+    if (pipeline.negative_depth_fix_engaged) {
+        ++runtime_counters_.count_negative_depth_fix;
+    }
+
+    return decisions;
 }
 
 }  // namespace scau::coupling::core

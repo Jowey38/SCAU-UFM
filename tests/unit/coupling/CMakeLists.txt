@@ -17,6 +17,25 @@ target_link_libraries(test_coupling_adapter_boundaries
 )
 add_test(NAME test_coupling_adapter_boundaries COMMAND test_coupling_adapter_boundaries)
 
+add_executable(test_coupling_shared_exchange test_coupling_shared_exchange.cpp)
+target_link_libraries(test_coupling_shared_exchange
+    PRIVATE
+        scau::coupling_drainage
+        scau::coupling_river
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_shared_exchange COMMAND test_coupling_shared_exchange)
+
+add_executable(test_coupling_shared_replay test_coupling_shared_replay.cpp)
+target_link_libraries(test_coupling_shared_replay
+    PRIVATE
+        scau::coupling_core
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_shared_replay COMMAND test_coupling_shared_replay)
+
 add_executable(test_coupling_flow_limit test_coupling_flow_limit.cpp)
 target_link_libraries(test_coupling_flow_limit
     PRIVATE
