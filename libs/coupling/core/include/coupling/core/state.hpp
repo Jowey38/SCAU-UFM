@@ -152,6 +152,20 @@ struct MockCouplingSchedulerFaultConsumption {
     bool executed_abort{false};
 };
 
+enum class FaultControllerPassiveStateLabel {
+    running,
+    review_required,
+};
+
+struct FaultControllerPassiveStateClassification {
+    MockCouplingSchedulerFaultConsumption consumption{};
+    FaultControllerPassiveStateLabel state{FaultControllerPassiveStateLabel::running};
+    bool scheduler_control_enabled{false};
+    bool isolation_enabled{false};
+    bool reconnect_enabled{false};
+    bool abort_enabled{false};
+};
+
 [[nodiscard]] FaultControllerDiagnostic make_fault_controller_diagnostic(
     const EngineHealthAggregate& health);
 [[nodiscard]] FaultControllerProposedAction propose_fault_controller_action(
@@ -160,6 +174,8 @@ struct MockCouplingSchedulerFaultConsumption {
     const FaultControllerProposedAction& action);
 [[nodiscard]] MockCouplingSchedulerFaultConsumption consume_mock_scheduler_fault_action(
     const MockCouplingSchedulerFaultObservation& observation);
+[[nodiscard]] FaultControllerPassiveStateClassification classify_fault_controller_passive_state(
+    const MockCouplingSchedulerFaultConsumption& consumption);
 
 [[nodiscard]] ExchangeDecision evaluate_exchange(
     const ExchangeCellState& cell,

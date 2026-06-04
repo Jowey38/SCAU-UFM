@@ -119,6 +119,24 @@ target_link_libraries(test_coupling_mock_scheduler_fault_consumption_ordering
 )
 add_test(NAME test_coupling_mock_scheduler_fault_consumption_ordering COMMAND test_coupling_mock_scheduler_fault_consumption_ordering)
 
+add_executable(test_coupling_fault_controller_passive_state test_coupling_fault_controller_passive_state.cpp)
+target_link_libraries(test_coupling_fault_controller_passive_state
+    PRIVATE
+        scau::coupling_core
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_fault_controller_passive_state COMMAND test_coupling_fault_controller_passive_state)
+
+add_executable(test_coupling_fault_controller_passive_state_ordering test_coupling_fault_controller_passive_state_ordering.cpp)
+target_link_libraries(test_coupling_fault_controller_passive_state_ordering
+    PRIVATE
+        scau::coupling_core
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_fault_controller_passive_state_ordering COMMAND test_coupling_fault_controller_passive_state_ordering)
+
 add_executable(test_coupling_flow_limit test_coupling_flow_limit.cpp)
 target_link_libraries(test_coupling_flow_limit
     PRIVATE

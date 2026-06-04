@@ -222,6 +222,22 @@ MockCouplingSchedulerFaultConsumption consume_mock_scheduler_fault_action(
 
 
 
+FaultControllerPassiveStateClassification classify_fault_controller_passive_state(
+    const MockCouplingSchedulerFaultConsumption& consumption) {
+    return FaultControllerPassiveStateClassification{
+        .consumption = consumption,
+        .state = consumption.consumed_state == FaultControllerProposedActionState::review_required
+            ? FaultControllerPassiveStateLabel::review_required
+            : FaultControllerPassiveStateLabel::running,
+        .scheduler_control_enabled = false,
+        .isolation_enabled = false,
+        .reconnect_enabled = false,
+        .abort_enabled = false,
+    };
+}
+
+
+
 FlowLimit compute_flow_limit(const ExchangeCellState& cell, double dt_sub) {
     if (!std::isfinite(dt_sub) || dt_sub <= 0.0) {
         throw std::invalid_argument("dt_sub must be finite and positive");
