@@ -131,10 +131,21 @@ struct FaultControllerProposedAction {
     bool execute_abort{false};
 };
 
+struct MockCouplingSchedulerFaultObservation {
+    FaultControllerProposedAction action{};
+    FaultControllerProposedActionState observed_state{FaultControllerProposedActionState::continue_run};
+    bool observed_review_required{false};
+    bool executed_isolation{false};
+    bool executed_reconnect{false};
+    bool executed_abort{false};
+};
+
 [[nodiscard]] FaultControllerDiagnostic make_fault_controller_diagnostic(
     const EngineHealthAggregate& health);
 [[nodiscard]] FaultControllerProposedAction propose_fault_controller_action(
     const FaultControllerDiagnostic& diagnostic);
+[[nodiscard]] MockCouplingSchedulerFaultObservation observe_mock_scheduler_fault_action(
+    const FaultControllerProposedAction& action);
 
 [[nodiscard]] ExchangeDecision evaluate_exchange(
     const ExchangeCellState& cell,

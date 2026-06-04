@@ -191,6 +191,20 @@ FaultControllerProposedAction propose_fault_controller_action(
 
 
 
+MockCouplingSchedulerFaultObservation observe_mock_scheduler_fault_action(
+    const FaultControllerProposedAction& action) {
+    return MockCouplingSchedulerFaultObservation{
+        .action = action,
+        .observed_state = action.state,
+        .observed_review_required = action.state == FaultControllerProposedActionState::review_required,
+        .executed_isolation = false,
+        .executed_reconnect = false,
+        .executed_abort = false,
+    };
+}
+
+
+
 FlowLimit compute_flow_limit(const ExchangeCellState& cell, double dt_sub) {
     if (!std::isfinite(dt_sub) || dt_sub <= 0.0) {
         throw std::invalid_argument("dt_sub must be finite and positive");
