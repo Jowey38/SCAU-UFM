@@ -183,6 +183,35 @@ struct FaultControllerPassiveTransition {
     bool scheduler_control_enabled{false};
 };
 
+enum class FaultControllerPassiveActionAuditKind {
+    none,
+    operator_review,
+};
+
+enum class FaultControllerPassiveActionAuditStage {
+    transition_recorded,
+};
+
+enum class FaultControllerPassiveActionAuditReason {
+    nominal_no_action,
+    review_required_only,
+};
+
+struct FaultControllerPassiveActionAuditRecord {
+    FaultControllerPassiveTransition transition{};
+    FaultControllerPassiveActionAuditKind action_kind{FaultControllerPassiveActionAuditKind::none};
+    FaultControllerPassiveActionAuditStage action_stage{FaultControllerPassiveActionAuditStage::transition_recorded};
+    FaultControllerPassiveActionAuditReason reason{FaultControllerPassiveActionAuditReason::nominal_no_action};
+    bool scheduler_control_enabled{false};
+    bool runtime_action_requested{false};
+    bool runtime_action_executed{false};
+    bool isolation_executed{false};
+    bool reconnect_executed{false};
+    bool abort_executed{false};
+    bool adapter_call_executed{false};
+    bool release_gate_action_executed{false};
+};
+
 [[nodiscard]] FaultControllerDiagnostic make_fault_controller_diagnostic(
     const EngineHealthAggregate& health);
 [[nodiscard]] FaultControllerProposedAction propose_fault_controller_action(
@@ -196,6 +225,8 @@ struct FaultControllerPassiveTransition {
 [[nodiscard]] FaultControllerPassiveTransition make_fault_controller_passive_transition(
     FaultControllerPassiveStateLabel previous_state,
     const FaultControllerPassiveStateClassification& classification);
+[[nodiscard]] FaultControllerPassiveActionAuditRecord make_fault_controller_passive_action_audit_record(
+    const FaultControllerPassiveTransition& transition);
 
 [[nodiscard]] ExchangeDecision evaluate_exchange(
     const ExchangeCellState& cell,

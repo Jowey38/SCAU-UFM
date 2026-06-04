@@ -155,6 +155,24 @@ target_link_libraries(test_coupling_fault_controller_passive_transition_ordering
 )
 add_test(NAME test_coupling_fault_controller_passive_transition_ordering COMMAND test_coupling_fault_controller_passive_transition_ordering)
 
+add_executable(test_coupling_fault_controller_passive_action_audit test_coupling_fault_controller_passive_action_audit.cpp)
+target_link_libraries(test_coupling_fault_controller_passive_action_audit
+    PRIVATE
+        scau::coupling_core
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_fault_controller_passive_action_audit COMMAND test_coupling_fault_controller_passive_action_audit)
+
+add_executable(test_coupling_fault_controller_passive_action_audit_ordering test_coupling_fault_controller_passive_action_audit_ordering.cpp)
+target_link_libraries(test_coupling_fault_controller_passive_action_audit_ordering
+    PRIVATE
+        scau::coupling_core
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_fault_controller_passive_action_audit_ordering COMMAND test_coupling_fault_controller_passive_action_audit_ordering)
+
 add_executable(test_coupling_flow_limit test_coupling_flow_limit.cpp)
 target_link_libraries(test_coupling_flow_limit
     PRIVATE

@@ -258,6 +258,30 @@ FaultControllerPassiveTransition make_fault_controller_passive_transition(
 
 
 
+FaultControllerPassiveActionAuditRecord make_fault_controller_passive_action_audit_record(
+    const FaultControllerPassiveTransition& transition) {
+    return FaultControllerPassiveActionAuditRecord{
+        .transition = transition,
+        .action_kind = transition.next_state == FaultControllerPassiveStateLabel::review_required
+            ? FaultControllerPassiveActionAuditKind::operator_review
+            : FaultControllerPassiveActionAuditKind::none,
+        .action_stage = FaultControllerPassiveActionAuditStage::transition_recorded,
+        .reason = transition.next_state == FaultControllerPassiveStateLabel::review_required
+            ? FaultControllerPassiveActionAuditReason::review_required_only
+            : FaultControllerPassiveActionAuditReason::nominal_no_action,
+        .scheduler_control_enabled = false,
+        .runtime_action_requested = false,
+        .runtime_action_executed = false,
+        .isolation_executed = false,
+        .reconnect_executed = false,
+        .abort_executed = false,
+        .adapter_call_executed = false,
+        .release_gate_action_executed = false,
+    };
+}
+
+
+
 FlowLimit compute_flow_limit(const ExchangeCellState& cell, double dt_sub) {
     if (!std::isfinite(dt_sub) || dt_sub <= 0.0) {
         throw std::invalid_argument("dt_sub must be finite and positive");
