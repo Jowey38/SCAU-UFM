@@ -36,6 +36,25 @@ target_link_libraries(test_coupling_shared_replay
 )
 add_test(NAME test_coupling_shared_replay COMMAND test_coupling_shared_replay)
 
+add_executable(test_coupling_engine_report test_coupling_engine_report.cpp)
+target_link_libraries(test_coupling_engine_report
+    PRIVATE
+        scau::coupling_drainage
+        scau::coupling_river
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_engine_report COMMAND test_coupling_engine_report)
+
+add_executable(test_coupling_engine_health test_coupling_engine_health.cpp)
+target_link_libraries(test_coupling_engine_health
+    PRIVATE
+        scau::coupling_core
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_engine_health COMMAND test_coupling_engine_health)
+
 add_executable(test_coupling_flow_limit test_coupling_flow_limit.cpp)
 target_link_libraries(test_coupling_flow_limit
     PRIVATE

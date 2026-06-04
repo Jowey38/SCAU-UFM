@@ -74,6 +74,33 @@ struct EngineReport {
     double elapsed_time{0.0};
 };
 
+enum class EngineHealthStatus {
+    healthy,
+    unhealthy,
+};
+
+struct EngineHealthDiagnostic {
+    EngineHealthStatus status{EngineHealthStatus::healthy};
+    std::string engine_id{};
+    std::string error_code{};
+    double elapsed_time{0.0};
+};
+
+enum class EngineHealthAggregateStatus {
+    all_healthy,
+    any_unhealthy,
+};
+
+struct EngineHealthAggregate {
+    EngineHealthAggregateStatus status{EngineHealthAggregateStatus::all_healthy};
+    std::size_t report_count{0U};
+    std::size_t unhealthy_count{0U};
+};
+
+[[nodiscard]] EngineHealthDiagnostic classify_engine_health(const EngineReport& report);
+[[nodiscard]] EngineHealthAggregate aggregate_engine_health(
+    const std::vector<EngineHealthDiagnostic>& diagnostics);
+
 [[nodiscard]] ExchangeDecision evaluate_exchange(
     const ExchangeCellState& cell,
     const ExchangeRequest& request);

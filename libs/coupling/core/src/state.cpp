@@ -129,6 +129,38 @@ void apply_volume_delta_to_cell(
 
 }  // namespace
 
+EngineHealthDiagnostic classify_engine_health(const EngineReport& report) {
+    if (!std::isfinite(report.elapsed_time) || report.elapsed_time < 0.0) {
+        throw std::invalid_argument("engine report elapsed_time must be finite and non-negative");
+    }
+    return EngineHealthDiagnostic{
+        .status = report.healthy ? EngineHealthStatus::healthy : EngineHealthStatus::unhealthy,
+        .engine_id = report.engine_id,
+        .error_code = report.error_code,
+        .elapsed_time = report.elapsed_time,
+    };
+}
+
+
+
+EngineHealthAggregate aggregate_engine_health(
+    const std::vector<EngineHealthDiagnostic>& diagnostics) {
+    EngineHealthAggregate aggregate{
+        .report_count = diagnostics.size(),
+    };
+    for (const auto& diagnostic : diagnostics) {
+        if (diagnostic.status == EngineHealthStatus::unhealthy) {
+            ++aggregate.unhealthy_count;
+        }
+    }
+    aggregate.status = aggregate.unhealthy_count == 0U
+        ? EngineHealthAggregateStatus::all_healthy
+        : EngineHealthAggregateStatus::any_unhealthy;
+    return aggregate;
+}
+
+
+
 FlowLimit compute_flow_limit(const ExchangeCellState& cell, double dt_sub) {
     if (!std::isfinite(dt_sub) || dt_sub <= 0.0) {
         throw std::invalid_argument("dt_sub must be finite and positive");
