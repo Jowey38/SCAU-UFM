@@ -314,6 +314,25 @@ FaultControllerPassiveActionOutcome make_fault_controller_passive_action_outcome
 
 
 
+FaultControllerBlockedAction make_fault_controller_blocked_action(
+    const FaultControllerPassiveActionOutcome& outcome) {
+    return FaultControllerBlockedAction{
+        .outcome = outcome,
+        .reason = outcome.operator_review_required
+            ? FaultControllerBlockedActionReason::operator_review_required
+            : FaultControllerBlockedActionReason::no_action_requested,
+        .execution_allowed = false,
+        .scheduler_control_allowed = false,
+        .adapter_call_allowed = false,
+        .isolation_allowed = false,
+        .reconnect_allowed = false,
+        .abort_allowed = false,
+        .release_gate_action_allowed = false,
+    };
+}
+
+
+
 FlowLimit compute_flow_limit(const ExchangeCellState& cell, double dt_sub) {
     if (!std::isfinite(dt_sub) || dt_sub <= 0.0) {
         throw std::invalid_argument("dt_sub must be finite and positive");

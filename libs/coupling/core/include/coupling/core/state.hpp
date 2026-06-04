@@ -244,6 +244,23 @@ struct FaultControllerPassiveActionOutcome {
     bool release_gate_action_executed{false};
 };
 
+enum class FaultControllerBlockedActionReason {
+    no_action_requested,
+    operator_review_required,
+};
+
+struct FaultControllerBlockedAction {
+    FaultControllerPassiveActionOutcome outcome{};
+    FaultControllerBlockedActionReason reason{FaultControllerBlockedActionReason::no_action_requested};
+    bool execution_allowed{false};
+    bool scheduler_control_allowed{false};
+    bool adapter_call_allowed{false};
+    bool isolation_allowed{false};
+    bool reconnect_allowed{false};
+    bool abort_allowed{false};
+    bool release_gate_action_allowed{false};
+};
+
 [[nodiscard]] FaultControllerDiagnostic make_fault_controller_diagnostic(
     const EngineHealthAggregate& health);
 [[nodiscard]] FaultControllerProposedAction propose_fault_controller_action(
@@ -261,6 +278,8 @@ struct FaultControllerPassiveActionOutcome {
     const FaultControllerPassiveTransition& transition);
 [[nodiscard]] FaultControllerPassiveActionOutcome make_fault_controller_passive_action_outcome(
     const FaultControllerPassiveActionAuditRecord& audit);
+[[nodiscard]] FaultControllerBlockedAction make_fault_controller_blocked_action(
+    const FaultControllerPassiveActionOutcome& outcome);
 
 [[nodiscard]] ExchangeDecision evaluate_exchange(
     const ExchangeCellState& cell,
