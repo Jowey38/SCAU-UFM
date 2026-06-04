@@ -101,6 +101,24 @@ target_link_libraries(test_coupling_mock_scheduler_fault_observation_ordering
 )
 add_test(NAME test_coupling_mock_scheduler_fault_observation_ordering COMMAND test_coupling_mock_scheduler_fault_observation_ordering)
 
+add_executable(test_coupling_mock_scheduler_fault_consumption test_coupling_mock_scheduler_fault_consumption.cpp)
+target_link_libraries(test_coupling_mock_scheduler_fault_consumption
+    PRIVATE
+        scau::coupling_core
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_mock_scheduler_fault_consumption COMMAND test_coupling_mock_scheduler_fault_consumption)
+
+add_executable(test_coupling_mock_scheduler_fault_consumption_ordering test_coupling_mock_scheduler_fault_consumption_ordering.cpp)
+target_link_libraries(test_coupling_mock_scheduler_fault_consumption_ordering
+    PRIVATE
+        scau::coupling_core
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_mock_scheduler_fault_consumption_ordering COMMAND test_coupling_mock_scheduler_fault_consumption_ordering)
+
 add_executable(test_coupling_flow_limit test_coupling_flow_limit.cpp)
 target_link_libraries(test_coupling_flow_limit
     PRIVATE

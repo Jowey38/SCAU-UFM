@@ -140,12 +140,26 @@ struct MockCouplingSchedulerFaultObservation {
     bool executed_abort{false};
 };
 
+struct MockCouplingSchedulerFaultConsumption {
+    MockCouplingSchedulerFaultObservation observation{};
+    FaultControllerProposedActionState consumed_state{FaultControllerProposedActionState::continue_run};
+    bool review_required_consumed{false};
+    bool exchange_scheduling_allowed{true};
+    bool replay_allowed{true};
+    bool audit_allowed{true};
+    bool executed_isolation{false};
+    bool executed_reconnect{false};
+    bool executed_abort{false};
+};
+
 [[nodiscard]] FaultControllerDiagnostic make_fault_controller_diagnostic(
     const EngineHealthAggregate& health);
 [[nodiscard]] FaultControllerProposedAction propose_fault_controller_action(
     const FaultControllerDiagnostic& diagnostic);
 [[nodiscard]] MockCouplingSchedulerFaultObservation observe_mock_scheduler_fault_action(
     const FaultControllerProposedAction& action);
+[[nodiscard]] MockCouplingSchedulerFaultConsumption consume_mock_scheduler_fault_action(
+    const MockCouplingSchedulerFaultObservation& observation);
 
 [[nodiscard]] ExchangeDecision evaluate_exchange(
     const ExchangeCellState& cell,

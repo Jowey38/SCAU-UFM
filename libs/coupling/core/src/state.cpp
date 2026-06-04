@@ -205,6 +205,23 @@ MockCouplingSchedulerFaultObservation observe_mock_scheduler_fault_action(
 
 
 
+MockCouplingSchedulerFaultConsumption consume_mock_scheduler_fault_action(
+    const MockCouplingSchedulerFaultObservation& observation) {
+    return MockCouplingSchedulerFaultConsumption{
+        .observation = observation,
+        .consumed_state = observation.observed_state,
+        .review_required_consumed = observation.observed_state == FaultControllerProposedActionState::review_required,
+        .exchange_scheduling_allowed = true,
+        .replay_allowed = true,
+        .audit_allowed = true,
+        .executed_isolation = false,
+        .executed_reconnect = false,
+        .executed_abort = false,
+    };
+}
+
+
+
 FlowLimit compute_flow_limit(const ExchangeCellState& cell, double dt_sub) {
     if (!std::isfinite(dt_sub) || dt_sub <= 0.0) {
         throw std::invalid_argument("dt_sub must be finite and positive");
