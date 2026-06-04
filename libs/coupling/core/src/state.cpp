@@ -161,6 +161,36 @@ EngineHealthAggregate aggregate_engine_health(
 
 
 
+FaultControllerDiagnostic make_fault_controller_diagnostic(
+    const EngineHealthAggregate& health) {
+    return FaultControllerDiagnostic{
+        .status = health.status == EngineHealthAggregateStatus::all_healthy
+            ? FaultControllerDiagnosticStatus::nominal
+            : FaultControllerDiagnosticStatus::fault_detected,
+        .health = health,
+        .should_isolate = false,
+        .should_reconnect = false,
+        .should_abort = false,
+    };
+}
+
+
+
+FaultControllerProposedAction propose_fault_controller_action(
+    const FaultControllerDiagnostic& diagnostic) {
+    return FaultControllerProposedAction{
+        .diagnostic = diagnostic,
+        .state = diagnostic.status == FaultControllerDiagnosticStatus::nominal
+            ? FaultControllerProposedActionState::continue_run
+            : FaultControllerProposedActionState::review_required,
+        .execute_isolation = false,
+        .execute_reconnect = false,
+        .execute_abort = false,
+    };
+}
+
+
+
 FlowLimit compute_flow_limit(const ExchangeCellState& cell, double dt_sub) {
     if (!std::isfinite(dt_sub) || dt_sub <= 0.0) {
         throw std::invalid_argument("dt_sub must be finite and positive");

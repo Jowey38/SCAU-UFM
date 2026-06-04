@@ -65,6 +65,24 @@ target_link_libraries(test_coupling_engine_health
 )
 add_test(NAME test_coupling_engine_health COMMAND test_coupling_engine_health)
 
+add_executable(test_coupling_fault_controller_diagnostic test_coupling_fault_controller_diagnostic.cpp)
+target_link_libraries(test_coupling_fault_controller_diagnostic
+    PRIVATE
+        scau::coupling_core
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_fault_controller_diagnostic COMMAND test_coupling_fault_controller_diagnostic)
+
+add_executable(test_coupling_fault_controller_policy test_coupling_fault_controller_policy.cpp)
+target_link_libraries(test_coupling_fault_controller_policy
+    PRIVATE
+        scau::coupling_core
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_fault_controller_policy COMMAND test_coupling_fault_controller_policy)
+
 add_executable(test_coupling_flow_limit test_coupling_flow_limit.cpp)
 target_link_libraries(test_coupling_flow_limit
     PRIVATE

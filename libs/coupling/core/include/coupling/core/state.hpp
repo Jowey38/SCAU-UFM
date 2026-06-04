@@ -105,6 +105,37 @@ struct EngineHealthAggregate {
 [[nodiscard]] EngineHealthAggregate aggregate_engine_health(
     const std::vector<EngineHealthDiagnostic>& diagnostics);
 
+enum class FaultControllerDiagnosticStatus {
+    nominal,
+    fault_detected,
+};
+
+struct FaultControllerDiagnostic {
+    FaultControllerDiagnosticStatus status{FaultControllerDiagnosticStatus::nominal};
+    EngineHealthAggregate health{};
+    bool should_isolate{false};
+    bool should_reconnect{false};
+    bool should_abort{false};
+};
+
+enum class FaultControllerProposedActionState {
+    continue_run,
+    review_required,
+};
+
+struct FaultControllerProposedAction {
+    FaultControllerDiagnostic diagnostic{};
+    FaultControllerProposedActionState state{FaultControllerProposedActionState::continue_run};
+    bool execute_isolation{false};
+    bool execute_reconnect{false};
+    bool execute_abort{false};
+};
+
+[[nodiscard]] FaultControllerDiagnostic make_fault_controller_diagnostic(
+    const EngineHealthAggregate& health);
+[[nodiscard]] FaultControllerProposedAction propose_fault_controller_action(
+    const FaultControllerDiagnostic& diagnostic);
+
 [[nodiscard]] ExchangeDecision evaluate_exchange(
     const ExchangeCellState& cell,
     const ExchangeRequest& request);
