@@ -212,6 +212,38 @@ struct FaultControllerPassiveActionAuditRecord {
     bool release_gate_action_executed{false};
 };
 
+enum class FaultControllerPassiveActionOutcomeKind {
+    not_requested,
+    operator_review_required,
+};
+
+enum class FaultControllerPassiveActionOutcomeReason {
+    nominal_no_action,
+    review_required_only,
+};
+
+struct FaultControllerPassiveActionOutcome {
+    FaultControllerPassiveActionAuditRecord audit{};
+    FaultControllerPassiveActionOutcomeKind outcome_kind{FaultControllerPassiveActionOutcomeKind::not_requested};
+    FaultControllerPassiveActionOutcomeReason reason{FaultControllerPassiveActionOutcomeReason::nominal_no_action};
+    bool scheduler_control_available{false};
+    bool scheduler_control_used{false};
+    bool adapter_boundary_available{false};
+    bool adapter_call_attempted{false};
+    bool adapter_call_succeeded{false};
+    bool adapter_call_failed{false};
+    bool runtime_action_requested{false};
+    bool runtime_action_attempted{false};
+    bool runtime_action_executed{false};
+    bool runtime_action_skipped{false};
+    bool runtime_action_failed{false};
+    bool operator_review_required{false};
+    bool rollback_required{false};
+    bool replay_required{false};
+    bool mass_audit_required{false};
+    bool release_gate_action_executed{false};
+};
+
 [[nodiscard]] FaultControllerDiagnostic make_fault_controller_diagnostic(
     const EngineHealthAggregate& health);
 [[nodiscard]] FaultControllerProposedAction propose_fault_controller_action(
@@ -227,6 +259,8 @@ struct FaultControllerPassiveActionAuditRecord {
     const FaultControllerPassiveStateClassification& classification);
 [[nodiscard]] FaultControllerPassiveActionAuditRecord make_fault_controller_passive_action_audit_record(
     const FaultControllerPassiveTransition& transition);
+[[nodiscard]] FaultControllerPassiveActionOutcome make_fault_controller_passive_action_outcome(
+    const FaultControllerPassiveActionAuditRecord& audit);
 
 [[nodiscard]] ExchangeDecision evaluate_exchange(
     const ExchangeCellState& cell,

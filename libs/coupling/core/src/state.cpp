@@ -282,6 +282,38 @@ FaultControllerPassiveActionAuditRecord make_fault_controller_passive_action_aud
 
 
 
+FaultControllerPassiveActionOutcome make_fault_controller_passive_action_outcome(
+    const FaultControllerPassiveActionAuditRecord& audit) {
+    const bool review_required = audit.action_kind == FaultControllerPassiveActionAuditKind::operator_review;
+    return FaultControllerPassiveActionOutcome{
+        .audit = audit,
+        .outcome_kind = review_required
+            ? FaultControllerPassiveActionOutcomeKind::operator_review_required
+            : FaultControllerPassiveActionOutcomeKind::not_requested,
+        .reason = review_required
+            ? FaultControllerPassiveActionOutcomeReason::review_required_only
+            : FaultControllerPassiveActionOutcomeReason::nominal_no_action,
+        .scheduler_control_available = false,
+        .scheduler_control_used = false,
+        .adapter_boundary_available = false,
+        .adapter_call_attempted = false,
+        .adapter_call_succeeded = false,
+        .adapter_call_failed = false,
+        .runtime_action_requested = false,
+        .runtime_action_attempted = false,
+        .runtime_action_executed = false,
+        .runtime_action_skipped = false,
+        .runtime_action_failed = false,
+        .operator_review_required = review_required,
+        .rollback_required = false,
+        .replay_required = false,
+        .mass_audit_required = false,
+        .release_gate_action_executed = false,
+    };
+}
+
+
+
 FlowLimit compute_flow_limit(const ExchangeCellState& cell, double dt_sub) {
     if (!std::isfinite(dt_sub) || dt_sub <= 0.0) {
         throw std::invalid_argument("dt_sub must be finite and positive");
