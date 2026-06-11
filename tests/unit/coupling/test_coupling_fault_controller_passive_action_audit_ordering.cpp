@@ -9,10 +9,13 @@ namespace {
 scau::coupling::core::ExchangeCellState make_passive_action_audit_ordering_cell() {
     return {
         .volume = 40.0,
-        .mass_deficit_account = {.volume = 12.0},
         .phi_t = 0.4,
         .h = 2.0,
         .area = 50.0,
+        .shared_deficit_accounts = {
+            {.endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::drainage, .node_id = 10U}, .mass_deficit_account = {.volume = 4.0}},
+            {.endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::river, .node_id = 30U}, .mass_deficit_account = {.volume = 8.0}},
+        },
     };
 }
 
@@ -72,6 +75,17 @@ void expect_same_decisions(
     }
 }
 
+void expect_same_shared_deficit_accounts(
+    const std::vector<scau::coupling::core::SharedExchangeEndpointDeficit>& lhs,
+    const std::vector<scau::coupling::core::SharedExchangeEndpointDeficit>& rhs) {
+    ASSERT_EQ(lhs.size(), rhs.size());
+    for (std::size_t i = 0; i < lhs.size(); ++i) {
+        EXPECT_EQ(lhs[i].endpoint.engine, rhs[i].endpoint.engine);
+        EXPECT_EQ(lhs[i].endpoint.node_id, rhs[i].endpoint.node_id);
+        EXPECT_DOUBLE_EQ(lhs[i].mass_deficit_account.volume, rhs[i].mass_deficit_account.volume);
+    }
+}
+
 }  // namespace
 
 TEST(CouplingFaultControllerPassiveActionAuditOrdering, AuditBeforeSchedulerDoesNotChangeSchedulingReplayOrAudit) {
@@ -114,6 +128,9 @@ TEST(CouplingFaultControllerPassiveActionAuditOrdering, AuditBeforeSchedulerDoes
     EXPECT_DOUBLE_EQ(
         control.cells()[0].mass_deficit_account.volume,
         audited.cells()[0].mass_deficit_account.volume);
+    expect_same_shared_deficit_accounts(
+        control.cells()[0].shared_deficit_accounts,
+        audited.cells()[0].shared_deficit_accounts);
     EXPECT_DOUBLE_EQ(control.cells()[0].h, audited.cells()[0].h);
 
     const auto control_delta = control.audit_system_mass_against_snapshot(control_snapshot, 0.01);
