@@ -1,5 +1,9 @@
 # M101 Shared Cell Mock Coupling Rollup
 
+## Supersession Note
+
+This is a historical M96-M100 rollup. Aggregate shared deficit/replay wording in this file is superseded by `superpowers/specs/2026-06-01-m148-shared-cell-endpoint-deficit-replay-correction-evidence.md`. Current shared-cell physical replay remains cell-aggregate, while shared-cell deficit ledger ownership and replay are endpoint-owned and duplicate shared endpoints fail closed.
+
 ## Scope
 
 M101 rolls up the shared-cell mock coupling work completed from M96 through M100.
@@ -29,7 +33,7 @@ Implemented core behavior:
 - computes canonical `V_limit` / `Q_limit` with the existing flow-limit helper;
 - rejects non-finite or invalid cell geometry, `dt_sub`, requests, priority weights, and deficit volume;
 - splits `V_limit` / `Q_limit` by `priority_weight`;
-- reserves repayment capacity from `mass_deficit_account.volume` before granting new requests;
+- historical pre-M148 behavior reserved repayment capacity from cell-level `mass_deficit_account.volume`; current M148 behavior uses endpoint-owned `shared_deficit_accounts` and rejects duplicate shared endpoints;
 - scales competing new requests by weighted proportional scaling;
 - returns per-engine decisions with granted, unmet, repayment, allocated limit, priority weight, and endpoint metadata.
 
@@ -39,8 +43,8 @@ Implemented core behavior:
 
 - evaluates shared intents against the current cell;
 - returns per-engine shared decisions for adapter/audit consumers;
-- aggregates non-empty decisions into one pending `CouplingEvent`;
-- reuses existing `replay_pending()` behavior for volume, unmet deficit, and repayment accounting;
+- aggregates non-empty decisions into one pending physical `CouplingEvent`;
+- historical pre-M148 behavior reused aggregate `replay_pending()` deficit accounting; current M148 behavior keeps physical volume replay cell-aggregate while carrying `shared_endpoint_events` for endpoint-owned unmet and repayment accounting;
 - treats empty intent lists as a no-op and does not enqueue a zero-valued event.
 
 ### Endpoint metadata
@@ -154,6 +158,8 @@ Review caveat:
 Pending. Record the push commit and GitHub Actions run after the M96-M101 implementation/evidence changes are pushed.
 
 ## Remaining Gaps Before Scheduler/FaultController Work
+
+This section is historical as of M101. Later passive scheduler/fault-controller evidence and the M148 shared deficit/replay correction supersede parts of this status narrative.
 
 Before moving beyond mock shared-cell semantics into scheduler or fault-control behavior, remaining gaps include:
 

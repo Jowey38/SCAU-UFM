@@ -1,5 +1,9 @@
 # M100 Mock Adapter Shared Endpoint Boundary Evidence
 
+## Supersession Note
+
+This is historical pre-M148 mock endpoint-boundary evidence. Mock endpoint helper behavior remains valid, and M148 extends endpoint metadata into endpoint-owned shared deficit ledger/replay semantics with duplicate shared endpoints failing closed. See `superpowers/specs/2026-06-01-m148-shared-cell-endpoint-deficit-replay-correction-evidence.md` for current shared deficit/replay ownership.
+
 ## Scope
 
 M100 documents and tests the mock adapter boundary helpers that connect drainage/river mock adapters to shared exchange endpoint metadata.

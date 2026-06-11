@@ -1,5 +1,9 @@
 # M99 Shared Exchange Endpoint Metadata Evidence
 
+## Supersession Note
+
+This is historical pre-M148 endpoint metadata evidence. Endpoint metadata preservation remains valid, and M148 extends its role to endpoint-owned shared deficit ledger/replay semantics with duplicate shared endpoints failing closed. See `superpowers/specs/2026-06-01-m148-shared-cell-endpoint-deficit-replay-correction-evidence.md` for current deficit/replay ownership.
+
 ## Scope
 
 M99 records and tests the endpoint metadata chain for shared-cell exchange intents and decisions.

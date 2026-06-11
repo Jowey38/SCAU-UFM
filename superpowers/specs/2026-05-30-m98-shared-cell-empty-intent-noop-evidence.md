@@ -1,5 +1,9 @@
 # M98 Shared Cell Empty Intent No-Op Evidence
 
+## Supersession Note
+
+This is historical pre-M148 evidence. Empty-intent no-op behavior remains valid, but any aggregate shared deficit wording is superseded by `superpowers/specs/2026-06-01-m148-shared-cell-endpoint-deficit-replay-correction-evidence.md`. Current shared-cell deficit ledger ownership and replay are endpoint-owned and duplicate shared endpoints fail closed.
+
 ## Scope
 
 M98 tightens the M97 shared-cell replay helper by making empty shared-exchange intent lists an explicit no-op at the `CouplingState` layer.

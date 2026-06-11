@@ -1,5 +1,9 @@
 # M97 Shared Cell Replay Audit Evidence
 
+## Supersession Note
+
+This is historical pre-M148 evidence. Aggregate shared deficit wording in this file, including replay into a single cell-level `mass_deficit_account`, is superseded by `superpowers/specs/2026-06-01-m148-shared-cell-endpoint-deficit-replay-correction-evidence.md`. Current shared-cell physical replay remains cell-aggregate, but deficit ledger ownership and replay are endpoint-owned and duplicate shared endpoints fail closed.
+
 ## Scope
 
 M97 connects the M96 shared-cell multi-engine arbitration result to `CouplingState` pending/replay semantics.

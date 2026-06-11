@@ -1,5 +1,9 @@
 # M96 Shared Cell Multi-Engine Arbitration Evidence
 
+## Supersession Note
+
+This is historical pre-M148 evidence. Aggregate shared deficit wording in this file, including cell-level `mass_deficit_account` repayment and priority-weight repayment redistribution, is superseded by `superpowers/specs/2026-06-01-m148-shared-cell-endpoint-deficit-replay-correction-evidence.md`. Current shared-cell deficit ownership is endpoint-owned and duplicate shared endpoints fail closed.
+
 ## Scope
 
 M96 adds a CouplingLib core-owned shared-cell arbitration helper for the mock-only drainage/river coupling stage.
