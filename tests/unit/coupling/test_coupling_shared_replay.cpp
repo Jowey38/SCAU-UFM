@@ -87,7 +87,7 @@ TEST(CouplingSharedReplay, SharedExchangeReplayIsDeterministicAfterRollback) {
     fresh.replay_pending();
 
     const auto snapshot = rolled_back.snapshot();
-    rolled_back.enqueue_event({.exchange_cell_index = 0U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 999.0, .unmet_volume = 999.0});
+    rolled_back.enqueue_event({.exchange_cell_index = 0U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 999.0});
     rolled_back.replay_pending();
     rolled_back.rollback(snapshot);
     rolled_back.apply_shared_exchange(0U, make_shared_intents(), 4.0);
@@ -139,6 +139,103 @@ TEST(CouplingSharedReplay, SnapshotCapturesPendingSharedExchangeEventForReplay) 
     EXPECT_EQ(snapshot.pending_events()[0].shared_endpoint_events[1].endpoint.node_id, 30U);
     EXPECT_DOUBLE_EQ(snapshot.pending_events()[0].shared_endpoint_events[1].unmet_volume, 24.0);
     EXPECT_DOUBLE_EQ(snapshot.pending_events()[0].shared_endpoint_events[1].repayment_volume, 8.0);
+}
+
+TEST(CouplingSharedReplay, SameEngineDifferentNodeDeficitReplayUpdatesOwningEndpointOnly) {
+    scau::coupling::core::CouplingState state{{{
+        .volume = 40.0,
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+        .shared_deficit_accounts = {
+            {
+                .endpoint = {
+                    .engine = scau::coupling::core::SharedExchangeEngine::drainage,
+                    .node_id = 10U,
+                },
+                .mass_deficit_account = {.volume = 4.0},
+            },
+            {
+                .endpoint = {
+                    .engine = scau::coupling::core::SharedExchangeEngine::drainage,
+                    .node_id = 11U,
+                },
+                .mass_deficit_account = {.volume = 0.0},
+            },
+        },
+    }}};
+
+    state.apply_shared_exchange(
+        0U,
+        {
+            {
+                .endpoint = {
+                    .engine = scau::coupling::core::SharedExchangeEngine::drainage,
+                    .node_id = 10U,
+                },
+                .q_request = 0.0,
+                .priority_weight = 1.0,
+            },
+            {
+                .endpoint = {
+                    .engine = scau::coupling::core::SharedExchangeEngine::drainage,
+                    .node_id = 11U,
+                },
+                .q_request = 0.0,
+                .priority_weight = 1.0,
+            },
+        },
+        4.0);
+    state.replay_pending();
+
+    ASSERT_EQ(state.cells()[0].shared_deficit_accounts.size(), 2U);
+    EXPECT_DOUBLE_EQ(state.cells()[0].shared_deficit_accounts[0].mass_deficit_account.volume, 0.0);
+    EXPECT_DOUBLE_EQ(state.cells()[0].shared_deficit_accounts[1].mass_deficit_account.volume, 0.0);
+}
+
+TEST(CouplingSharedReplay, ZeroStorageSharedExchangeReplayPreservesMetadataAndDoesNotThrow) {
+    scau::coupling::core::CouplingState state{{{
+        .volume = 0.0,
+        .phi_t = 0.4,
+        .h = 0.0,
+        .area = 50.0,
+    }}};
+
+    const auto decisions = state.apply_shared_exchange(
+        0U,
+        {
+            {
+                .endpoint = {
+                    .engine = scau::coupling::core::SharedExchangeEngine::drainage,
+                    .node_id = 10U,
+                },
+                .q_request = 1.0,
+                .priority_weight = 1.0,
+            },
+        },
+        4.0);
+    const auto snapshot = state.snapshot();
+    state.replay_pending();
+
+    ASSERT_EQ(decisions.size(), 1U);
+    EXPECT_DOUBLE_EQ(decisions[0].exchange.v_granted, 0.0);
+    EXPECT_DOUBLE_EQ(decisions[0].exchange.v_repay, 0.0);
+    EXPECT_DOUBLE_EQ(decisions[0].exchange.v_unmet, 4.0);
+    ASSERT_EQ(snapshot.pending_events().size(), 1U);
+    EXPECT_DOUBLE_EQ(snapshot.pending_events()[0].volume_delta, 0.0);
+    EXPECT_DOUBLE_EQ(snapshot.pending_events()[0].unmet_volume, 4.0);
+    EXPECT_DOUBLE_EQ(snapshot.pending_events()[0].repayment_volume, 0.0);
+    ASSERT_EQ(snapshot.pending_events()[0].shared_endpoint_events.size(), 1U);
+    EXPECT_EQ(
+        snapshot.pending_events()[0].shared_endpoint_events[0].endpoint.engine,
+        scau::coupling::core::SharedExchangeEngine::drainage);
+    EXPECT_EQ(snapshot.pending_events()[0].shared_endpoint_events[0].endpoint.node_id, 10U);
+    EXPECT_DOUBLE_EQ(snapshot.pending_events()[0].shared_endpoint_events[0].unmet_volume, 4.0);
+    EXPECT_DOUBLE_EQ(snapshot.pending_events()[0].shared_endpoint_events[0].repayment_volume, 0.0);
+    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 0.0);
+    EXPECT_DOUBLE_EQ(state.cells()[0].h, 0.0);
+    ASSERT_EQ(state.cells()[0].shared_deficit_accounts.size(), 1U);
+    EXPECT_DOUBLE_EQ(state.cells()[0].shared_deficit_accounts[0].mass_deficit_account.volume, 4.0);
 }
 
 TEST(CouplingSharedReplay, EmptySharedExchangeIntentsDoNotEnqueueNoOpEvent) {

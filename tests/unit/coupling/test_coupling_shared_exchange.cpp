@@ -47,8 +47,8 @@ TEST(CouplingSharedExchange, ScalesCompetingRequestsByPriorityWeight) {
     const auto decisions = scau::coupling::core::evaluate_shared_exchange(
         make_shared_cell(),
         {
-            {.q_request = 10.0, .priority_weight = 1.0},
-            {.q_request = 10.0, .priority_weight = 2.0},
+            {.endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::drainage, .node_id = 10U}, .q_request = 10.0, .priority_weight = 1.0},
+            {.endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::river, .node_id = 30U}, .q_request = 10.0, .priority_weight = 2.0},
         },
         4.0);
 
@@ -68,8 +68,8 @@ TEST(CouplingSharedExchange, PreservesZeroRequestAndReportsUnmetVolume) {
     const auto decisions = scau::coupling::core::evaluate_shared_exchange(
         make_shared_cell(),
         {
-            {.q_request = 0.0, .priority_weight = 1.0},
-            {.q_request = 10.0, .priority_weight = 2.0},
+            {.endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::drainage, .node_id = 10U}, .q_request = 0.0, .priority_weight = 1.0},
+            {.endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::river, .node_id = 30U}, .q_request = 10.0, .priority_weight = 2.0},
         },
         4.0);
 
@@ -176,12 +176,72 @@ TEST(CouplingSharedExchange, SharedDeficitRepaymentUsesEndpointOwnershipNotCurre
     EXPECT_DOUBLE_EQ(decisions[1].exchange.v_repay, 0.0);
 }
 
+TEST(CouplingSharedExchange, SharedDeficitOwnershipDistinguishesSameEngineNodeIds) {
+    auto cell = make_shared_cell();
+    cell.shared_deficit_accounts = {
+        {
+            .endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::drainage, .node_id = 10U},
+            .mass_deficit_account = {.volume = 12.0},
+        },
+    };
+
+    const auto decisions = scau::coupling::core::evaluate_shared_exchange(
+        cell,
+        {
+            {.endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::drainage, .node_id = 10U}, .q_request = 0.0, .priority_weight = 1.0},
+            {.endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::drainage, .node_id = 11U}, .q_request = 0.0, .priority_weight = 1.0},
+        },
+        4.0);
+
+    ASSERT_EQ(decisions.size(), 2U);
+    EXPECT_DOUBLE_EQ(decisions[0].exchange.q_repay, 3.0);
+    EXPECT_DOUBLE_EQ(decisions[0].exchange.v_repay, 12.0);
+    EXPECT_DOUBLE_EQ(decisions[1].exchange.q_repay, 0.0);
+    EXPECT_DOUBLE_EQ(decisions[1].exchange.v_repay, 0.0);
+}
+
+TEST(CouplingSharedExchange, RejectsDuplicateSharedIntentEndpoints) {
+    EXPECT_THROW(
+        static_cast<void>(scau::coupling::core::evaluate_shared_exchange(
+            make_shared_cell(),
+            {
+                {.endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::drainage, .node_id = 10U}, .q_request = 1.0, .priority_weight = 1.0},
+                {.endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::drainage, .node_id = 10U}, .q_request = 2.0, .priority_weight = 2.0},
+            },
+            4.0)),
+        std::invalid_argument);
+}
+
+TEST(CouplingSharedExchange, RejectsDuplicateSharedDeficitAccountEndpoints) {
+    auto cell = make_shared_cell();
+    cell.shared_deficit_accounts = {
+        {
+            .endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::drainage, .node_id = 10U},
+            .mass_deficit_account = {.volume = 4.0},
+        },
+        {
+            .endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::drainage, .node_id = 10U},
+            .mass_deficit_account = {.volume = 8.0},
+        },
+    };
+
+    EXPECT_THROW(
+        static_cast<void>(scau::coupling::core::evaluate_shared_exchange(
+            cell,
+            {{.endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::drainage, .node_id = 10U}, .q_request = 1.0, .priority_weight = 1.0}},
+            4.0)),
+        std::invalid_argument);
+    EXPECT_THROW(
+        static_cast<void>(scau::coupling::core::CouplingState{{cell}}),
+        std::invalid_argument);
+}
+
 TEST(CouplingSharedExchange, SharedPipelineSplitsAggregateAppliedVolumeAboveThreshold) {
     const auto pipeline = scau::coupling::core::evaluate_shared_exchange_pipeline(
         make_shared_cell(),
         {
-            {.q_request = 10.0, .priority_weight = 1.0},
-            {.q_request = 10.0, .priority_weight = 2.0},
+            {.endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::drainage, .node_id = 10U}, .q_request = 10.0, .priority_weight = 1.0},
+            {.endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::river, .node_id = 30U}, .q_request = 10.0, .priority_weight = 2.0},
         },
         4.0);
 
@@ -225,8 +285,8 @@ TEST(CouplingSharedExchange, AsymmetricRequestsNeverGrantAboveRequestOrGlobalLim
     const auto decisions = scau::coupling::core::evaluate_shared_exchange(
         make_shared_cell(),
         {
-            {.q_request = 1.0, .priority_weight = 10.0},
-            {.q_request = 100.0, .priority_weight = 1.0},
+            {.endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::drainage, .node_id = 10U}, .q_request = 1.0, .priority_weight = 10.0},
+            {.endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::river, .node_id = 30U}, .q_request = 100.0, .priority_weight = 1.0},
         },
         4.0);
 
@@ -243,8 +303,8 @@ TEST(CouplingSharedExchange, ZeroStorageSharedCellGrantsNoNewRequest) {
     const auto decisions = scau::coupling::core::evaluate_shared_exchange(
         cell,
         {
-            {.q_request = 1.0, .priority_weight = 1.0},
-            {.q_request = 2.0, .priority_weight = 2.0},
+            {.endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::drainage, .node_id = 10U}, .q_request = 1.0, .priority_weight = 1.0},
+            {.endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::river, .node_id = 30U}, .q_request = 2.0, .priority_weight = 2.0},
         },
         4.0);
 
@@ -273,6 +333,27 @@ TEST(CouplingSharedExchange, EmptyIntentListStillValidatesCellInputs) {
             cell,
             std::vector<scau::coupling::core::SharedExchangeIntent>{},
             4.0)),
+        std::invalid_argument);
+}
+
+TEST(CouplingSharedExchange, RejectsMixedAggregateAndSharedEndpointDeficits) {
+    auto cell = make_shared_cell();
+    cell.mass_deficit_account.volume = 1.0;
+    cell.shared_deficit_accounts = {
+        {
+            .endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::drainage, .node_id = 10U},
+            .mass_deficit_account = {.volume = 4.0},
+        },
+    };
+
+    EXPECT_THROW(
+        static_cast<void>(scau::coupling::core::evaluate_shared_exchange(
+            cell,
+            {{.endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::drainage, .node_id = 10U}, .q_request = 1.0, .priority_weight = 1.0}},
+            4.0)),
+        std::invalid_argument);
+    EXPECT_THROW(
+        static_cast<void>(scau::coupling::core::CouplingState{{cell}}),
         std::invalid_argument);
 }
 
