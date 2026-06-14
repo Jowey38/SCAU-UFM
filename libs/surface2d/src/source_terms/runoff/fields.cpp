@@ -7,7 +7,6 @@ namespace scau::surface2d {
 RunoffFields RunoffFields::for_mesh(const mesh::Mesh& mesh) {
     const std::size_t n = mesh.cells.size();
     RunoffFields fields;
-    fields.method = RunoffMethod::GreenAmptMeinLarson;
     fields.pervious_fraction.assign(n, 1.0);
     fields.impervious_fraction.assign(n, 0.0);
     fields.roof_fraction.assign(n, 0.0);
