@@ -276,3 +276,12 @@ target_link_libraries(test_runoff_soil_params
         GTest::gtest_main
 )
 add_test(NAME test_runoff_soil_params COMMAND test_runoff_soil_params)
+
+add_executable(test_runoff_green_ampt test_runoff_green_ampt.cpp)
+target_link_libraries(test_runoff_green_ampt
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_runoff_green_ampt COMMAND test_runoff_green_ampt)
