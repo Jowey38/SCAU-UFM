@@ -39,3 +39,37 @@
 - 涉及体积-流量换算时必须显式保留两步表达：`V_limit = 0.9 * phi_t * h * A`，`Q_limit = V_limit / dt_sub`。
 - `phi_e_n` 与 `omega_edge` 必须分字段记录：前者是边法向有效导流标量，后者是边连通性/开闭权重；日志、schema 与审计字段不得二者混名。
 - `max_cell_cfl` 是 raw 物理 CFL 诊断量，不得乘 `CFL_safety`；`C_rollback` 与 `CFL_safety` 是独立参数。
+
+## 城市产流符号（M247）
+
+下表登记 M247 城市产流模块的 machine-facing 名称、单位与代码拼写（代码拼写与 canonical name 不同处在括号注明）。Green-Ampt 参数沿用主 Spec §4.2/§4.3 既有命名，不得另造别名。权威设计入口：`superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md`。
+
+| Term | Canonical Name | Meaning | Unit/Dimension | Governing Doc |
+|---|---|---|---|---|
+| `F_inf` | `F_inf` (`cumulative_infiltration`) | Green-Ampt 累计下渗量；驱动下渗能力随累计量衰减。 | `m` | `superpowers/specs/2026-04-11-scau-ufm-global-architecture-design.md` |
+| `t_ponding` | `t_ponding` (`ponding_time`) | 积水开始时刻；`-1` 表示未积水 sentinel。 | `s` | `superpowers/specs/2026-04-11-scau-ufm-global-architecture-design.md` |
+| `K_s` | `K_s` (`k_s`) | 饱和导水率。 | `m/s` | `superpowers/specs/2026-04-11-scau-ufm-global-architecture-design.md` |
+| `psi_f` | `psi_f` | 湿润锋吸力水头；必须严格为正（`psi_f = 0` 退化 Green-Ampt）。 | `m` | `superpowers/specs/2026-04-11-scau-ufm-global-architecture-design.md` |
+| `theta_s` | `theta_s` | 饱和含水量；要求 `theta_s > theta_i`、`theta_s <= 1`。 | 无量纲 | `superpowers/specs/2026-04-11-scau-ufm-global-architecture-design.md` |
+| `theta_i` | `theta_i` | 初始含水量；要求 `theta_i >= 0`。 | 无量纲 | `superpowers/specs/2026-04-11-scau-ufm-global-architecture-design.md` |
+| `pervious_fraction` | `pervious_fraction` | 单元透水地面面积分数。 | 无量纲 | `superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md` |
+| `impervious_fraction` | `impervious_fraction` | 单元不透水地面面积分数。 | 无量纲 | `superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md` |
+| `roof_fraction` | `roof_fraction` | 单元屋面面积分数；三者之和 `<= 1 + epsilon_area`。 | 无量纲 | `superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md` |
+| `initial_abstraction_capacity` | `initial_abstraction_capacity` | 初损/截留容量（深度）。 | `m` | `superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md` |
+| `depression_storage_capacity` | `depression_storage_capacity` | 地面洼蓄容量（深度）。 | `m` | `superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md` |
+| `roof_abstraction_capacity` | `roof_abstraction_capacity` | 屋面初损容量（深度）。 | `m` | `superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md` |
+| `roof_storage_capacity` | `roof_storage_capacity` | 屋面暂存容量（深度）。 | `m` | `superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md` |
+| `roof_drain_capacity` | `roof_drain_capacity` | 屋面雨水斗/立管物理排水能力；非 `Q_limit`，先于耦合门限施加。 | `m^3/s` | `superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md` |
+| `swmm_node_index` | `swmm_node_index` | 屋面直排目标 SWMM 节点的稳定整数索引；`-1` 表示无目标，热路径不得字符串查找。 | 整数索引 | `superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md` |
+| `roof_pending_volume` | `roof_pending_volume` | 屋面已生成但尚未入管网或溢流的暂存体积。 | `m^3` | `superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md` |
+| `roof_to_swmm_requested_volume` | `roof_to_swmm_requested_volume` | 本子步请求注入 SWMM 节点的屋面体积。 | `m^3` | `superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md` |
+| `roof_to_swmm_accepted_volume` | `roof_to_swmm_accepted_volume` | CouplingLib 实际接受注入 SWMM 的屋面体积。 | `m^3` | `superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md` |
+| `roof_to_swmm_rejected_volume` | `roof_to_swmm_rejected_volume` | CouplingLib 拒收的屋面体积；必须回 pending 或溢流，不得作为损失。 | `m^3` | `superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md` |
+| `roof_overflow_to_surface_volume` | `roof_overflow_to_surface_volume` | 屋面链溢流入 2D 地表体积；与 `surface_added_volume` 不相交。 | `m^3` | `superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md` |
+| `surface_added_volume` | `surface_added_volume` | 地面链（透水+不透水）净入地表体积；不含屋面溢流。 | `m^3` | `superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md` |
+| `rejected_fail_closed_volume` | `rejected_fail_closed_volume` | fail-closed 拒绝的非法输入体积；不得作为正常质量损失桶。 | `m^3` | `superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md` |
+| `epsilon_area` | `epsilon_area` | 面积分数和约束容差。 | 无量纲 | `superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md` |
+| `epsilon_mass_abs` | `epsilon_mass_abs` | 产流质量闭合绝对容差。 | `m^3` | `superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md` |
+| `epsilon_mass_rel` | `epsilon_mass_rel` | 产流质量闭合相对容差。 | 无量纲 | `superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md` |
+
+命名约束补充：`roof_drain_capacity` 是产流侧物理排水能力，**不是** `Q_limit`；`Q_limit` 仍是耦合硬门限流量上界的唯一 machine-facing 名称，产流侧不得引入 `Q_max_safe` 或其他流量门限别名。
