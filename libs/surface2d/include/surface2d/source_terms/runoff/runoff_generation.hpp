@@ -104,4 +104,28 @@ struct RoofAcceptanceResult {
     const RoofDrainageAcceptance& acceptance,
     bool overflow_target_valid);
 
+// Bundles the assembled per-substep result with the roof drainage intent to
+// hand to CouplingLib. surface_added_volume in the result is ground-only; the
+// roof intent is satisfied later via apply_roof_drainage_acceptance and the
+// result's roof_to_swmm_accepted / overflow / pending_delta fields updated by
+// the caller (M247-C/D).
+struct RunoffGenerationOutput {
+    RunoffGenerationResult result;
+    RoofDrainageIntent intent;
+};
+
+// Top-level per-cell runoff generation for one substep (pre-acceptance):
+// runs the ground chain and the roof emit chain, assembles the audited result
+// (roof abstraction folded into abstraction_volume; roof_pending_delta = roof
+// input volume since nothing is drained yet; accepted/overflow = 0), and emits
+// the roof drainage intent. cell_index/target_node populate the intent.
+[[nodiscard]] RunoffGenerationOutput evaluate_runoff_generation(
+    const RunoffCellInputs& inputs,
+    const RunoffCellParams& params,
+    RunoffCellState& state,
+    core::Real dt,
+    core::Real f_inf_floor,
+    int cell_index,
+    int target_swmm_node_index);
+
 }  // namespace scau::surface2d

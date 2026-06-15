@@ -164,4 +164,45 @@ RoofAcceptanceResult apply_roof_drainage_acceptance(
     return result;
 }
 
+RunoffGenerationOutput evaluate_runoff_generation(
+    const RunoffCellInputs& inputs,
+    const RunoffCellParams& params,
+    RunoffCellState& state,
+    core::Real dt,
+    core::Real f_inf_floor,
+    int cell_index,
+    int target_swmm_node_index) {
+    const GroundRunoffResult ground = evaluate_ground_runoff(inputs, params, state, dt, f_inf_floor);
+    const RoofEmitResult roof = evaluate_roof_emit(inputs, params, state, dt);
+
+    const core::Real area_roof = params.roof_fraction * inputs.cell_area;
+    const core::Real area_ground =
+        (params.pervious_fraction + params.impervious_fraction) * inputs.cell_area;
+    const core::Real rain_depth = inputs.rainfall_rate * dt;
+
+    RunoffGenerationOutput out;
+    out.result.rainfall_volume = rain_depth * (area_ground + area_roof);
+    out.result.surface_added_volume = ground.surface_added_volume;
+    out.result.infiltration_volume = ground.infiltration_volume;
+    out.result.abstraction_volume = ground.abstraction_volume + roof.roof_abstraction_volume;
+    out.result.depression_storage_delta_volume = ground.depression_storage_delta_volume;
+    out.result.roof_to_swmm_requested_volume = roof.requested_volume;
+    out.result.roof_to_swmm_accepted_volume = 0.0;
+    out.result.roof_to_swmm_rejected_volume = 0.0;
+    out.result.roof_pending_delta_volume = roof.roof_input_volume;  // nothing drained yet
+    out.result.roof_overflow_to_surface_volume = 0.0;
+    out.result.rejected_fail_closed_volume = 0.0;
+    out.result.flags.green_ampt_ponding_started = ground.ponding_started;
+    out.result.flags.roof_drain_capacity_limited = roof.drain_capacity_limited;
+    if (inputs.phi_t < 0.2 && out.result.surface_added_volume > 0.0) {
+        out.result.flags.surface_storage_amplified_by_low_phi_t = true;
+    }
+
+    out.intent.source_cell_index = cell_index;
+    out.intent.target_swmm_node_index = target_swmm_node_index;
+    out.intent.requested_volume = roof.requested_volume;
+    out.intent.source_roof_area = area_roof;
+    return out;
+}
+
 }  // namespace scau::surface2d

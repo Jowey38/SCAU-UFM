@@ -213,3 +213,12 @@ target_link_libraries(test_runoff_roof
         GTest::gtest_main
 )
 add_test(NAME test_runoff_roof COMMAND test_runoff_roof)
+
+add_executable(test_runoff_generation test_runoff_generation.cpp)
+target_link_libraries(test_runoff_generation
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_runoff_generation COMMAND test_runoff_generation)
