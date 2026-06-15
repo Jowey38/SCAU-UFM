@@ -118,7 +118,38 @@ TEST(RoofAcceptance, MissingOverflowTargetFailsClosedRetainsWater) {
     RoofDrainageAcceptance acc{.requested_volume = 0.0, .accepted_volume = 0.0, .rejected_volume = 0.0};
     const auto r = apply_roof_drainage_acceptance(in, p, s, acc, false);
     EXPECT_TRUE(r.missing_overflow_target);
+    EXPECT_TRUE(r.pending_saturated);
     EXPECT_FALSE(r.overflowed);
     EXPECT_NEAR(r.overflow_to_surface_volume, 0.0, 1.0e-12);
     EXPECT_NEAR(s.roof_pending_volume, 0.8, 1.0e-12);
+}
+
+TEST(RoofEmit, InvalidRoofAbstractionCapacityFailsClosed) {
+    scau::surface2d::RunoffCellInputs in{.rainfall_rate = 1.0e-3, .phi_t = 1.0, .cell_area = 100.0};
+    scau::surface2d::RunoffCellParams p{.pervious_fraction = 0.0, .roof_fraction = 1.0,
+                                        .roof_abstraction_capacity = -1.0, .roof_drain_capacity = 1.0};
+    scau::surface2d::RunoffCellState s{};
+    EXPECT_THROW(static_cast<void>(scau::surface2d::evaluate_roof_emit(in, p, s, 10.0)), std::invalid_argument);
+}
+
+TEST(RoofAcceptance, InvalidStorageCapacityFailsClosed) {
+    using scau::surface2d::apply_roof_drainage_acceptance;
+    using scau::surface2d::RoofDrainageAcceptance;
+    scau::surface2d::RunoffCellInputs in{.rainfall_rate = 0.0, .phi_t = 1.0, .cell_area = 100.0};
+    scau::surface2d::RunoffCellParams p{.pervious_fraction = 0.0, .roof_fraction = 1.0,
+                                        .roof_storage_capacity = -1.0};
+    scau::surface2d::RunoffCellState s{};
+    RoofDrainageAcceptance acc{.requested_volume = 0.0, .accepted_volume = 0.0, .rejected_volume = 0.0};
+    EXPECT_THROW(static_cast<void>(apply_roof_drainage_acceptance(in, p, s, acc, true)), std::invalid_argument);
+}
+
+TEST(RoofAcceptance, NegativeAcceptanceVolumeFailsClosed) {
+    using scau::surface2d::apply_roof_drainage_acceptance;
+    using scau::surface2d::RoofDrainageAcceptance;
+    scau::surface2d::RunoffCellInputs in{.rainfall_rate = 0.0, .phi_t = 1.0, .cell_area = 100.0};
+    scau::surface2d::RunoffCellParams p{.pervious_fraction = 0.0, .roof_fraction = 1.0,
+                                        .roof_storage_capacity = 1.0e-2};
+    scau::surface2d::RunoffCellState s{};
+    RoofDrainageAcceptance acc{.requested_volume = 0.5, .accepted_volume = -0.1, .rejected_volume = 0.0};
+    EXPECT_THROW(static_cast<void>(apply_roof_drainage_acceptance(in, p, s, acc, true)), std::invalid_argument);
 }

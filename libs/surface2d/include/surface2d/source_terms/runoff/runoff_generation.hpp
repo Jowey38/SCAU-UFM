@@ -95,7 +95,7 @@ struct RoofAcceptanceResult {
 // Roof chain part B: subtract accepted volume from pending; the rejected portion
 // stays in pending; if pending then exceeds roof_storage_capacity * roof_area the
 // excess overflows to the mapped surface cell (when overflow_target_valid) or
-// flags missing_roof_overflow_target and is retained (never silently dropped).
+// flags missing_overflow_target and is retained (never silently dropped).
 // Mutates roof_pending_volume.
 [[nodiscard]] RoofAcceptanceResult apply_roof_drainage_acceptance(
     const RunoffCellInputs& inputs,

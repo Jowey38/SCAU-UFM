@@ -141,7 +141,7 @@ RoofAcceptanceResult apply_roof_drainage_acceptance(
     RoofAcceptanceResult result;
     result.accepted_volume = std::min(acceptance.accepted_volume, state.roof_pending_volume);
     state.roof_pending_volume -= result.accepted_volume;
-    result.rejected_volume = std::max(core::Real(0.0), acceptance.requested_volume - acceptance.accepted_volume);
+    result.rejected_volume = std::max(core::Real(0.0), acceptance.requested_volume - result.accepted_volume);
     result.node_rejected =
         acceptance.rejection_reason != RoofDrainageRejectionReason::None &&
         acceptance.accepted_volume < acceptance.requested_volume;
