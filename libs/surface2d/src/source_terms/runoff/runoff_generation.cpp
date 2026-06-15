@@ -121,4 +121,47 @@ RoofEmitResult evaluate_roof_emit(
     return result;
 }
 
+RoofAcceptanceResult apply_roof_drainage_acceptance(
+    const RunoffCellInputs& inputs,
+    const RunoffCellParams& params,
+    RunoffCellState& state,
+    const RoofDrainageAcceptance& acceptance,
+    bool overflow_target_valid) {
+    validate_common_inputs(inputs, params, 1.0);  // dt unused here; 1.0 keeps the validator happy
+    if (!std::isfinite(params.roof_storage_capacity) || params.roof_storage_capacity < 0.0) {
+        throw std::invalid_argument("roof_storage_capacity must be finite and non-negative");
+    }
+    if (!std::isfinite(acceptance.accepted_volume) || acceptance.accepted_volume < 0.0 ||
+        !std::isfinite(acceptance.requested_volume) || acceptance.requested_volume < 0.0) {
+        throw std::invalid_argument("roof acceptance volumes must be finite and non-negative");
+    }
+
+    const core::Real pending_before = state.roof_pending_volume;
+
+    RoofAcceptanceResult result;
+    result.accepted_volume = std::min(acceptance.accepted_volume, state.roof_pending_volume);
+    state.roof_pending_volume -= result.accepted_volume;
+    result.rejected_volume = std::max(core::Real(0.0), acceptance.requested_volume - acceptance.accepted_volume);
+    result.node_rejected =
+        acceptance.rejection_reason != RoofDrainageRejectionReason::None &&
+        acceptance.accepted_volume < acceptance.requested_volume;
+
+    const core::Real area_roof = params.roof_fraction * inputs.cell_area;
+    const core::Real max_pending = params.roof_storage_capacity * area_roof;
+    if (state.roof_pending_volume > max_pending) {
+        result.pending_saturated = true;
+        const core::Real excess = state.roof_pending_volume - max_pending;
+        if (overflow_target_valid) {
+            state.roof_pending_volume = max_pending;
+            result.overflow_to_surface_volume = excess;
+            result.overflowed = true;
+        } else {
+            result.missing_overflow_target = true;  // retain water; signal config error
+        }
+    }
+
+    result.pending_delta_volume = state.roof_pending_volume - pending_before;
+    return result;
+}
+
 }  // namespace scau::surface2d

@@ -80,4 +80,28 @@ struct RoofEmitResult {
     RunoffCellState& state,
     core::Real dt);
 
+// Outcome of applying a CouplingLib acceptance to the pending buffer (m^3).
+struct RoofAcceptanceResult {
+    core::Real accepted_volume{0.0};
+    core::Real rejected_volume{0.0};
+    core::Real overflow_to_surface_volume{0.0};
+    core::Real pending_delta_volume{0.0};  // pending_after - pending_before
+    bool node_rejected{false};
+    bool pending_saturated{false};
+    bool overflowed{false};
+    bool missing_overflow_target{false};
+};
+
+// Roof chain part B: subtract accepted volume from pending; the rejected portion
+// stays in pending; if pending then exceeds roof_storage_capacity * roof_area the
+// excess overflows to the mapped surface cell (when overflow_target_valid) or
+// flags missing_roof_overflow_target and is retained (never silently dropped).
+// Mutates roof_pending_volume.
+[[nodiscard]] RoofAcceptanceResult apply_roof_drainage_acceptance(
+    const RunoffCellInputs& inputs,
+    const RunoffCellParams& params,
+    RunoffCellState& state,
+    const RoofDrainageAcceptance& acceptance,
+    bool overflow_target_valid);
+
 }  // namespace scau::surface2d
