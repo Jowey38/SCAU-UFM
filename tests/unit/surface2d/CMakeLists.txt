@@ -186,3 +186,12 @@ target_link_libraries(test_runoff_green_ampt
         GTest::gtest_main
 )
 add_test(NAME test_runoff_green_ampt COMMAND test_runoff_green_ampt)
+
+add_executable(test_runoff_result test_runoff_result.cpp)
+target_link_libraries(test_runoff_result
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_runoff_result COMMAND test_runoff_result)

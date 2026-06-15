@@ -7,6 +7,7 @@ add_library(scau_surface2d
     src/source_terms/runoff/fields.cpp
     src/source_terms/runoff/green_ampt.cpp
     src/source_terms/runoff/soil_params.cpp
+    src/source_terms/runoff/result.cpp
     src/time_integration/step.cpp
 )
 add_library(scau::surface2d ALIAS scau_surface2d)
