@@ -61,4 +61,23 @@ struct GroundRunoffResult {
     core::Real dt,
     core::Real f_inf_floor);
 
+// Roof emit outcome for one substep (m^3). roof_input_volume is the water added
+// to the pending buffer this substep; requested_volume is the drain request.
+struct RoofEmitResult {
+    core::Real roof_abstraction_volume{0.0};
+    core::Real roof_input_volume{0.0};
+    core::Real requested_volume{0.0};
+    bool drain_capacity_limited{false};
+};
+
+// Roof chain part A: initial abstraction (one-way loss) then add the remainder
+// to roof_pending_volume; compute the drain request capped by roof_drain_capacity.
+// Mutates the roof portion of state. Does NOT subtract accepted volume or compute
+// overflow -- that is apply_roof_drainage_acceptance. Fail-closed on bad inputs.
+[[nodiscard]] RoofEmitResult evaluate_roof_emit(
+    const RunoffCellInputs& inputs,
+    const RunoffCellParams& params,
+    RunoffCellState& state,
+    core::Real dt);
+
 }  // namespace scau::surface2d

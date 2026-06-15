@@ -89,4 +89,36 @@ GroundRunoffResult evaluate_ground_runoff(
     return result;
 }
 
+RoofEmitResult evaluate_roof_emit(
+    const RunoffCellInputs& inputs,
+    const RunoffCellParams& params,
+    RunoffCellState& state,
+    core::Real dt) {
+    validate_common_inputs(inputs, params, dt);
+    if (!std::isfinite(params.roof_abstraction_capacity) || params.roof_abstraction_capacity < 0.0) {
+        throw std::invalid_argument("roof_abstraction_capacity must be finite and non-negative");
+    }
+    if (!std::isfinite(params.roof_drain_capacity) || params.roof_drain_capacity < 0.0) {
+        throw std::invalid_argument("roof_drain_capacity must be finite and non-negative");
+    }
+
+    const core::Real area_roof = params.roof_fraction * inputs.cell_area;
+    const core::Real rain_depth = inputs.rainfall_rate * dt;
+
+    const core::Real abs_remaining =
+        std::max(core::Real(0.0), params.roof_abstraction_capacity - state.roof_abstraction_filled);
+    const core::Real abs_fill_depth = std::min(abs_remaining, rain_depth);
+    state.roof_abstraction_filled += abs_fill_depth;
+
+    RoofEmitResult result;
+    result.roof_abstraction_volume = abs_fill_depth * area_roof;
+    result.roof_input_volume = (rain_depth - abs_fill_depth) * area_roof;
+    state.roof_pending_volume += result.roof_input_volume;
+
+    const core::Real drain_capacity_volume = params.roof_drain_capacity * dt;
+    result.requested_volume = std::min(state.roof_pending_volume, drain_capacity_volume);
+    result.drain_capacity_limited = state.roof_pending_volume > drain_capacity_volume;
+    return result;
+}
+
 }  // namespace scau::surface2d
