@@ -49,10 +49,15 @@ struct StepDiagnostics {
     std::size_t edge_count{0U};
     core::Real max_cell_cfl{0.0};
     bool rollback_required{false};
-    // Plan volumes (phi_t * dh * area) actually applied this step, for
-    // system mass audit. All zero when the step rolls back.
-    core::Real rainfall_volume{0.0};
+    // Plan volumes (m^3) actually applied this step, for system mass audit.
+    // All zero when the step rolls back. Ground runoff closure (M247-C):
+    // rainfall_volume == surface_added_volume + infiltration_volume
+    //                    + abstraction_volume + depression_storage_delta_volume.
+    core::Real rainfall_volume{0.0};            // gross rain on ground area
+    core::Real surface_added_volume{0.0};       // net ground runoff added to h
     core::Real infiltration_volume{0.0};
+    core::Real abstraction_volume{0.0};
+    core::Real depression_storage_delta_volume{0.0};
     core::Real exchange_volume{0.0};
     std::vector<CellStepDiagnostics> cells;
     std::vector<EdgeStepDiagnostics> edges;
