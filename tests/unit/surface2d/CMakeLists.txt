@@ -159,3 +159,66 @@ target_link_libraries(test_step_rollback_rejection
         GTest::gtest_main
 )
 add_test(NAME test_step_rollback_rejection COMMAND test_step_rollback_rejection)
+
+add_executable(test_runoff_fields test_runoff_fields.cpp)
+target_link_libraries(test_runoff_fields
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_runoff_fields COMMAND test_runoff_fields)
+
+add_executable(test_runoff_soil_params test_runoff_soil_params.cpp)
+target_link_libraries(test_runoff_soil_params
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_runoff_soil_params COMMAND test_runoff_soil_params)
+
+add_executable(test_runoff_green_ampt test_runoff_green_ampt.cpp)
+target_link_libraries(test_runoff_green_ampt
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_runoff_green_ampt COMMAND test_runoff_green_ampt)
+
+add_executable(test_runoff_result test_runoff_result.cpp)
+target_link_libraries(test_runoff_result
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_runoff_result COMMAND test_runoff_result)
+
+add_executable(test_runoff_ground test_runoff_ground.cpp)
+target_link_libraries(test_runoff_ground
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_runoff_ground COMMAND test_runoff_ground)
+
+add_executable(test_runoff_roof test_runoff_roof.cpp)
+target_link_libraries(test_runoff_roof
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_runoff_roof COMMAND test_runoff_roof)
+
+add_executable(test_runoff_generation test_runoff_generation.cpp)
+target_link_libraries(test_runoff_generation
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_runoff_generation COMMAND test_runoff_generation)
