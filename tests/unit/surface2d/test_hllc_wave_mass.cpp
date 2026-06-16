@@ -118,7 +118,9 @@ TEST(SurfaceHllcWaveMass, BlockedDpmEdgeStillZerosMassFlux) {
     EXPECT_EQ(diagnostics.edges[edge_index].momentum_flux_n, 0.0);
 }
 
-TEST(SurfaceHllcWaveMass, WallBoundaryStillContributesNoMassFlux) {
+// Reflective wall carries zero mass flux (this test's focus) while applying the
+// inside cell's hydrostatic pressure as momentum flux (M249).
+TEST(SurfaceHllcWaveMass, WallBoundaryContributesNoMassFluxButReflectivePressure) {
     const auto mesh = scau::mesh::build_mixed_minimal_mesh();
     const auto edge_index = first_boundary_edge_index(mesh);
     const auto cell_index = edge_cell_index(mesh, edge_index);
@@ -134,8 +136,9 @@ TEST(SurfaceHllcWaveMass, WallBoundaryStillContributesNoMassFlux) {
     const scau::surface2d::StepConfig config{.dt = 0.1, .cfl_safety = 0.45, .c_rollback = 10.0};
     const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields, boundary);
 
+    const double h = state.cells[cell_index].conserved.h;
     EXPECT_EQ(diagnostics.edges[edge_index].mass_flux, 0.0);
-    EXPECT_EQ(diagnostics.edges[edge_index].momentum_flux_n, 0.0);
+    EXPECT_DOUBLE_EQ(diagnostics.edges[edge_index].momentum_flux_n, 0.5 * 9.81 * h * h);
 }
 
 TEST(SurfaceHllcWaveMass, OpenBoundaryUsesWaveMassFlux) {

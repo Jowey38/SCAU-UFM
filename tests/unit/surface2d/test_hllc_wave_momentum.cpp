@@ -108,13 +108,17 @@ TEST(SurfaceHllcWaveMomentum, DryInternalEdgeStillBlocksMomentumFlux) {
     const scau::surface2d::StepConfig config{.dt = 0.1, .cfl_safety = 0.45, .c_rollback = 10.0, .h_min = 1.0e-6};
     const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields);
 
+    static_cast<void>(left_index);
+    static_cast<void>(right_index);
     EXPECT_EQ(diagnostics.edges[edge_index].mass_flux, 0.0);
     EXPECT_EQ(diagnostics.edges[edge_index].momentum_flux_n, 0.0);
-    EXPECT_EQ(residual_norm_squared(diagnostics.cells[left_index].momentum_residual), 0.0);
-    EXPECT_EQ(residual_norm_squared(diagnostics.cells[right_index].momentum_residual), 0.0);
+    EXPECT_EQ(diagnostics.edges[edge_index].momentum_x, 0.0);
+    EXPECT_EQ(diagnostics.edges[edge_index].momentum_y, 0.0);
 }
 
-TEST(SurfaceHllcWaveMomentum, WallBoundaryStillContributesNoMomentumFlux) {
+// Reflective wall carries no mass-driven (advective) momentum flux but applies
+// the inside cell's hydrostatic pressure (M249), independent of the velocity.
+TEST(SurfaceHllcWaveMomentum, WallBoundaryAppliesReflectiveHydrostaticPressure) {
     const auto mesh = scau::mesh::build_mixed_minimal_mesh();
     const auto edge_index = first_boundary_edge_index(mesh);
     const auto cell_index = edge_cell_index(mesh, edge_index);
@@ -130,9 +134,10 @@ TEST(SurfaceHllcWaveMomentum, WallBoundaryStillContributesNoMomentumFlux) {
     const scau::surface2d::StepConfig config{.dt = 0.1, .cfl_safety = 0.45, .c_rollback = 10.0};
     const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields, boundary);
 
+    const double h = state.cells[cell_index].conserved.h;
     EXPECT_EQ(diagnostics.edges[edge_index].mass_flux, 0.0);
-    EXPECT_EQ(diagnostics.edges[edge_index].momentum_flux_n, 0.0);
-    EXPECT_EQ(residual_norm_squared(diagnostics.cells[cell_index].momentum_residual), 0.0);
+    EXPECT_DOUBLE_EQ(diagnostics.edges[edge_index].momentum_flux_n, 0.5 * 9.81 * h * h);
+    EXPECT_GT(residual_norm_squared(diagnostics.cells[cell_index].momentum_residual), 0.0);
 }
 
 TEST(SurfaceHllcWaveMomentum, OpenBoundaryUsesWaveMomentumFlux) {

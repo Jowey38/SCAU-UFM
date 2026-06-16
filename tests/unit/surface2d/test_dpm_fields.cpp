@@ -13,7 +13,9 @@ TEST(DpmFields, CreatesMeshAlignedDefaults) {
     ASSERT_EQ(fields.edges.size(), mesh.edges.size());
     for (const auto& cell : fields.cells) {
         EXPECT_EQ(cell.phi_t, 1.0);
-        EXPECT_EQ(cell.Phi_c, 1.0);
+        EXPECT_EQ(cell.Phi_c.xx, 1.0);
+        EXPECT_EQ(cell.Phi_c.xy, 0.0);
+        EXPECT_EQ(cell.Phi_c.yy, 1.0);
     }
     for (const auto& edge : fields.edges) {
         EXPECT_EQ(edge.phi_e_n, 1.0);
