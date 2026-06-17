@@ -59,6 +59,12 @@ struct StepDiagnostics {
     core::Real infiltration_volume{0.0};
     core::Real abstraction_volume{0.0};
     core::Real depression_storage_delta_volume{0.0};
+    core::Real roof_to_swmm_requested_volume{0.0};
+    core::Real roof_to_swmm_accepted_volume{0.0};
+    core::Real roof_to_swmm_rejected_volume{0.0};
+    core::Real roof_pending_delta_volume{0.0};
+    core::Real roof_overflow_to_surface_volume{0.0};
+    bool missing_roof_overflow_target{false};
     core::Real exchange_volume{0.0};
     std::vector<CellStepDiagnostics> cells;
     std::vector<EdgeStepDiagnostics> edges;
