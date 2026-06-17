@@ -9,6 +9,7 @@
 #include "surface2d/dpm/fields.hpp"
 #include "surface2d/geometry/cache.hpp"
 #include "surface2d/source_terms/fields.hpp"
+#include "surface2d/source_terms/runoff/step_inputs.hpp"
 #include "surface2d/state/state.hpp"
 
 namespace scau::surface2d {
@@ -62,6 +63,20 @@ struct StepDiagnostics {
     std::vector<CellStepDiagnostics> cells;
     std::vector<EdgeStepDiagnostics> edges;
 };
+
+// Ground runoff source stage (M247-C): per cell, gather the ground portion of
+// runoff_state, run evaluate_ground_runoff using inputs.rainfall_rate and the
+// per-cell fields/soil, add the net ground runoff depth to h (zero momentum),
+// scatter state back, and accumulate the ground volume audit into diagnostics.
+// Roof fields of runoff_state are not touched (M247-D owns the roof chain).
+void apply_ground_runoff_stage(
+    SurfaceState& state,
+    const StepConfig& config,
+    const DpmFields& dpm_fields,
+    const RunoffStepInputs& inputs,
+    RunoffState& runoff_state,
+    const GeometryCache& geometry,
+    StepDiagnostics& diagnostics);
 
 [[nodiscard]] StepDiagnostics advance_one_step_cpu(
     const mesh::Mesh& mesh,

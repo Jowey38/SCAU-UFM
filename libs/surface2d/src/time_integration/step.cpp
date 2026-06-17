@@ -12,6 +12,8 @@
 #include "surface2d/source_terms/infiltration.hpp"
 #include "surface2d/source_terms/phi_t.hpp"
 #include "surface2d/source_terms/rainfall.hpp"
+#include "surface2d/source_terms/runoff/runoff_generation.hpp"
+#include "surface2d/source_terms/runoff/step_inputs.hpp"
 #include "surface2d/wetting_drying/limits.hpp"
 
 namespace scau::surface2d {
@@ -188,6 +190,65 @@ void apply_source_terms(
 }
 
 }  // namespace
+
+void apply_ground_runoff_stage(
+    SurfaceState& state,
+    const StepConfig& config,
+    const DpmFields& dpm_fields,
+    const RunoffStepInputs& inputs,
+    RunoffState& runoff_state,
+    const GeometryCache& geometry,
+    StepDiagnostics& diagnostics) {
+    for (std::size_t i = 0; i < state.cells.size(); ++i) {
+        const core::Real area = geometry.cell_areas[i];
+        if (area <= 0.0) {
+            continue;
+        }
+        const core::Real phi_t = dpm_fields.cells[i].phi_t;
+
+        RunoffCellInputs cell_inputs;
+        cell_inputs.rainfall_rate = inputs.rainfall_rate[i];
+        cell_inputs.phi_t = phi_t;
+        cell_inputs.cell_area = area;
+
+        RunoffCellParams params;
+        params.pervious_fraction = inputs.fields.pervious_fraction[i];
+        params.impervious_fraction = inputs.fields.impervious_fraction[i];
+        params.roof_fraction = inputs.fields.roof_fraction[i];
+        params.initial_abstraction_capacity = inputs.fields.initial_abstraction_capacity[i];
+        params.depression_storage_capacity = inputs.fields.depression_storage_capacity[i];
+        params.roof_abstraction_capacity = inputs.fields.roof_abstraction_capacity[i];
+        params.roof_storage_capacity = inputs.fields.roof_storage_capacity[i];
+        params.roof_drain_capacity = 0.0;
+        params.soil = inputs.lut.at(inputs.fields.soil_type[i]);
+
+        RunoffCellState cell_state;
+        cell_state.cumulative_infiltration = runoff_state.cumulative_infiltration[i];
+        cell_state.ponding_time = runoff_state.ponding_time[i];
+        cell_state.abstraction_filled = runoff_state.abstraction_filled[i];
+        cell_state.depression_storage_filled = runoff_state.depression_storage_filled[i];
+        cell_state.roof_abstraction_filled = runoff_state.roof_abstraction_filled[i];
+        cell_state.roof_pending_volume = runoff_state.roof_pending_volume[i];
+
+        const GroundRunoffResult g = evaluate_ground_runoff(
+            cell_inputs, params, cell_state, config.dt, inputs.f_inf_floor);
+
+        state.cells[i].conserved.h += g.surface_added_volume / (phi_t * area);
+
+        runoff_state.cumulative_infiltration[i] = cell_state.cumulative_infiltration;
+        runoff_state.ponding_time[i] = cell_state.ponding_time;
+        runoff_state.abstraction_filled[i] = cell_state.abstraction_filled;
+        runoff_state.depression_storage_filled[i] = cell_state.depression_storage_filled;
+
+        const core::Real area_ground =
+            (params.pervious_fraction + params.impervious_fraction) * area;
+        diagnostics.rainfall_volume += cell_inputs.rainfall_rate * config.dt * area_ground;
+        diagnostics.surface_added_volume += g.surface_added_volume;
+        diagnostics.infiltration_volume += g.infiltration_volume;
+        diagnostics.abstraction_volume += g.abstraction_volume;
+        diagnostics.depression_storage_delta_volume += g.depression_storage_delta_volume;
+    }
+}
 
 StepDiagnostics advance_one_step_cpu(const mesh::Mesh& mesh, SurfaceState& state, const StepConfig& config) {
     validate_step_inputs(mesh, state, config);
