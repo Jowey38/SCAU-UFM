@@ -96,7 +96,7 @@ TEST(SourceTermFields, MismatchedSizesFailClosed) {
     auto state = scau::surface2d::SurfaceState::hydrostatic_for_mesh(mesh, 1.0, 1.0);
     const auto dpm_fields = scau::surface2d::DpmFields::for_mesh(mesh);
     auto sources = scau::surface2d::SourceTermFields::for_mesh(mesh);
-    sources.rainfall_rate.pop_back();
+    sources.manning_n.pop_back();
 
     const scau::surface2d::StepConfig config{.dt = 0.1, .cfl_safety = 0.45, .c_rollback = 100.0, .h_min = 1.0e-8};
     const auto boundary = scau::surface2d::BoundaryConditions::for_mesh(mesh);

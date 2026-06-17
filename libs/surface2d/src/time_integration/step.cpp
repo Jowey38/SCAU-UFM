@@ -9,9 +9,7 @@
 #include "surface2d/riemann/hllc.hpp"
 #include "surface2d/source_terms/coupling_exchange.hpp"
 #include "surface2d/source_terms/friction.hpp"
-#include "surface2d/source_terms/infiltration.hpp"
 #include "surface2d/source_terms/phi_t.hpp"
-#include "surface2d/source_terms/rainfall.hpp"
 #include "surface2d/source_terms/runoff/runoff_generation.hpp"
 #include "surface2d/source_terms/runoff/step_inputs.hpp"
 #include "surface2d/wetting_drying/limits.hpp"
@@ -177,42 +175,7 @@ void apply_source_terms(
     const SourceTermFields& sources,
     const GeometryCache& geometry,
     StepDiagnostics& diagnostics) {
-    for (std::size_t cell_index = 0; cell_index < state.cells.size(); ++cell_index) {
-        const core::Real area = geometry.cell_areas[cell_index];
-        if (area <= 0.0) {
-            continue;
-        }
-        auto& cell = state.cells[cell_index];
-        const core::Real phi_t = dpm_fields.cells[cell_index].phi_t;
-
-        if (sources.rainfall_rate[cell_index] > 0.0) {
-            const core::Real dh = rainfall_depth_increment(
-                sources.rainfall_rate[cell_index], phi_t, config.dt);
-            cell.conserved.h += dh;
-            diagnostics.rainfall_volume += dh * phi_t * area;
-        }
-
-        if (sources.exchange_volume[cell_index] != 0.0) {
-            const auto exchange = exchange_depth_increment(
-                sources.exchange_volume[cell_index], cell.conserved.h, phi_t, area);
-            cell.conserved.h += exchange.depth_increment;
-            diagnostics.exchange_volume += exchange.applied_volume;
-        }
-
-        if (sources.infiltration_rate[cell_index] > 0.0) {
-            const core::Real dh = infiltration_depth_decrement(
-                sources.infiltration_rate[cell_index], cell.conserved.h, phi_t, config.dt);
-            cell.conserved.h -= dh;
-            diagnostics.infiltration_volume += dh * phi_t * area;
-        }
-
-        cell.conserved = apply_manning_friction(
-            apply_dry_cell_momentum_limit(cell.conserved, config.h_min),
-            sources.manning_n[cell_index],
-            config.dt,
-            config.h_min,
-            config.gravity);
-    }
+    apply_coupling_and_friction(state, config, dpm_fields, sources, geometry, diagnostics);
 }
 
 StepDiagnostics run_flux_core(
