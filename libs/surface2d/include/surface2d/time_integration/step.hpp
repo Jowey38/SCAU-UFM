@@ -115,4 +115,21 @@ void apply_ground_runoff_stage(
     const SourceTermFields& sources,
     const GeometryCache& geometry);
 
+// Runoff-aware hot-path overload (M247-C). Same flux/CFL/rollback path as the
+// SourceTermFields overload, but the source order is
+//   flux -> ground runoff -> coupling exchange -> friction
+// (supersedes M241's rainfall/infiltration). runoff_state is mutated only on an
+// accepted step (untouched on rollback). sources supplies manning_n and
+// exchange_volume; its rainfall/infiltration are NOT read on this path.
+[[nodiscard]] StepDiagnostics advance_one_step_cpu(
+    const mesh::Mesh& mesh,
+    SurfaceState& state,
+    const StepConfig& config,
+    const DpmFields& dpm_fields,
+    const BoundaryConditions& boundary,
+    const SourceTermFields& sources,
+    const GeometryCache& geometry,
+    const RunoffStepInputs& runoff_inputs,
+    RunoffState& runoff_state);
+
 }  // namespace scau::surface2d
