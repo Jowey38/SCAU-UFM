@@ -3,8 +3,10 @@
 #include <gtest/gtest.h>
 
 #include "mesh/mesh.hpp"
+#include "surface2d/boundary/conditions.hpp"
 #include "surface2d/dpm/fields.hpp"
 #include "surface2d/geometry/cache.hpp"
+#include "surface2d/source_terms/fields.hpp"
 #include "surface2d/source_terms/runoff/fields.hpp"
 #include "surface2d/source_terms/runoff/roof_step.hpp"
 #include "surface2d/source_terms/runoff/step_inputs.hpp"
@@ -100,4 +102,60 @@ TEST(RoofRunoffStage, RejectZeroStorageOverflowsToSurface) {
     EXPECT_NEAR(diag.roof_to_swmm_accepted_volume, 0.0, 1.0e-12);
     EXPECT_NEAR(diag.roof_overflow_to_surface_volume, roof_rain, 1.0e-9);
     for (const auto v : rs.roof_pending_volume) EXPECT_NEAR(v, 0.0, 1.0e-9);
+}
+
+TEST(RoofStep, FullStepRoofAcceptedConservesViaAccepted) {
+    const auto mesh = scau::mesh::build_mixed_minimal_mesh();
+    auto state = scau::surface2d::SurfaceState::hydrostatic_for_mesh(mesh, 1.0, 1.0);
+    const auto dpm = scau::surface2d::DpmFields::for_mesh(mesh);
+    const auto geom = scau::surface2d::GeometryCache::for_mesh(mesh);
+    const auto boundary = scau::surface2d::BoundaryConditions::for_mesh(mesh);
+    const auto sources = scau::surface2d::SourceTermFields::for_mesh(mesh);
+    auto rs = scau::surface2d::RunoffState::for_mesh(mesh);
+    auto runoff = scau::surface2d::RunoffStepInputs::for_mesh(mesh);
+    auto roof = scau::surface2d::RoofStepInputs::for_mesh(mesh);
+    for (std::size_t i = 0; i < mesh.cells.size(); ++i) {
+        runoff.fields.pervious_fraction[i] = 0.0;
+        runoff.fields.roof_fraction[i] = 1.0;
+        runoff.fields.roof_storage_capacity[i] = 1.0e-2;
+        runoff.rainfall_rate[i] = 2.0e-3;
+        roof.map.roof_drain_capacity[i] = 1.0e6;
+        roof.map.swmm_node_index[i] = 0;
+    }
+    roof.accept = [](const scau::surface2d::RoofDrainageIntent& in) {
+        return scau::surface2d::RoofDrainageAcceptance{
+            .requested_volume = in.requested_volume, .accepted_volume = in.requested_volume,
+            .rejected_volume = 0.0, .rejection_reason = scau::surface2d::RoofDrainageRejectionReason::None};
+    };
+    const scau::surface2d::StepConfig config{.dt = 0.5, .cfl_safety = 0.45, .c_rollback = 100.0, .h_min = 1.0e-8};
+    const auto diag = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm, boundary, sources, geom, runoff, roof, rs);
+    ASSERT_FALSE(diag.rollback_required);
+    double roof_rain = 0.0;
+    for (const double a : geom.cell_areas) roof_rain += 2.0e-3 * 0.5 * a;
+    EXPECT_NEAR(diag.roof_to_swmm_accepted_volume, roof_rain, 1.0e-9);
+    EXPECT_NEAR(diag.roof_overflow_to_surface_volume, 0.0, 1.0e-12);
+}
+
+TEST(RoofStep, RollbackLeavesRoofStateUntouched) {
+    const auto mesh = scau::mesh::build_mixed_minimal_mesh();
+    auto state = scau::surface2d::SurfaceState::hydrostatic_for_mesh(mesh, 10.0, 10.0);
+    const auto dpm = scau::surface2d::DpmFields::for_mesh(mesh);
+    const auto geom = scau::surface2d::GeometryCache::for_mesh(mesh);
+    const auto boundary = scau::surface2d::BoundaryConditions::for_mesh(mesh);
+    const auto sources = scau::surface2d::SourceTermFields::for_mesh(mesh);
+    auto rs = scau::surface2d::RunoffState::for_mesh(mesh);
+    for (auto& v : rs.roof_pending_volume) v = 0.07;
+    auto runoff = scau::surface2d::RunoffStepInputs::for_mesh(mesh);
+    auto roof = scau::surface2d::RoofStepInputs::for_mesh(mesh);
+    for (std::size_t i = 0; i < mesh.cells.size(); ++i) {
+        runoff.fields.roof_fraction[i] = 1.0;
+        runoff.fields.pervious_fraction[i] = 0.0;
+        runoff.rainfall_rate[i] = 5.0e-3;
+        roof.map.swmm_node_index[i] = 0;
+    }
+    const scau::surface2d::StepConfig config{.dt = 100.0, .cfl_safety = 0.45, .c_rollback = 1.0e-6, .h_min = 1.0e-8};
+    const auto diag = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm, boundary, sources, geom, runoff, roof, rs);
+    ASSERT_TRUE(diag.rollback_required);
+    EXPECT_EQ(diag.roof_to_swmm_accepted_volume, 0.0);
+    for (const auto v : rs.roof_pending_volume) EXPECT_EQ(v, 0.07);  // untouched on rollback
 }

@@ -9,6 +9,7 @@
 #include "surface2d/dpm/fields.hpp"
 #include "surface2d/geometry/cache.hpp"
 #include "surface2d/source_terms/fields.hpp"
+#include "surface2d/source_terms/runoff/roof_step.hpp"
 #include "surface2d/source_terms/runoff/step_inputs.hpp"
 #include "surface2d/state/state.hpp"
 
@@ -136,6 +137,22 @@ void apply_ground_runoff_stage(
     const SourceTermFields& sources,
     const GeometryCache& geometry,
     const RunoffStepInputs& runoff_inputs,
+    RunoffState& runoff_state);
+
+// Roof-aware hot-path overload (M247-D). Order:
+//   flux -> ground runoff -> roof runoff -> coupling exchange -> friction.
+// runoff_state (ground + roof) mutated only on an accepted step. roof.accept is
+// the CouplingLib acceptance port (mock in tests; real SWMM adapter later).
+[[nodiscard]] StepDiagnostics advance_one_step_cpu(
+    const mesh::Mesh& mesh,
+    SurfaceState& state,
+    const StepConfig& config,
+    const DpmFields& dpm_fields,
+    const BoundaryConditions& boundary,
+    const SourceTermFields& sources,
+    const GeometryCache& geometry,
+    const RunoffStepInputs& runoff_inputs,
+    const RoofStepInputs& roof_inputs,
     RunoffState& runoff_state);
 
 }  // namespace scau::surface2d
