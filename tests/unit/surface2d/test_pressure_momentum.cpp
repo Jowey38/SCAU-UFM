@@ -7,6 +7,7 @@
 #include "mesh/mesh.hpp"
 #include "surface2d/boundary/conditions.hpp"
 #include "surface2d/dpm/fields.hpp"
+#include "surface2d/riemann/hllc.hpp"
 #include "surface2d/state/state.hpp"
 #include "surface2d/time_integration/step.hpp"
 
@@ -63,7 +64,11 @@ void isolate_edge(scau::surface2d::DpmFields& dpm_fields, std::size_t edge_index
 
 }  // namespace
 
-TEST(SurfacePressureMomentum, InternalEdgePressureResidualIsAntisymmetric) {
+// The internal edge carries the HLLC hydrostatic pressure momentum flux. We
+// assert the per-edge vector flux (wall-independent); the equal-and-opposite
+// application to the two cells is structural (accumulate left -= flux, right
+// += flux) and the whole-cell balance is covered by the lake-at-rest test.
+TEST(SurfacePressureMomentum, InternalEdgeCarriesHllcPressureMomentumFlux) {
     const auto mesh = scau::mesh::build_mixed_minimal_mesh();
     const auto edge_index = first_internal_edge_index(mesh);
     const auto left_index = cell_index_by_id(mesh, *mesh.edges[edge_index].left_cell);
@@ -74,19 +79,18 @@ TEST(SurfacePressureMomentum, InternalEdgePressureResidualIsAntisymmetric) {
     isolate_edge(dpm_fields, edge_index);
 
     const scau::surface2d::StepConfig config{.dt = 0.1, .cfl_safety = 0.45, .c_rollback = 10.0};
+    const auto normal = scau::surface2d::Normal2{
+        .x = mesh.edges[edge_index].normal.x,
+        .y = mesh.edges[edge_index].normal.y,
+    };
+    const auto expected = scau::surface2d::hllc_normal_flux(
+        state.cells[left_index], state.cells[right_index], dpm_fields.edges[edge_index], normal, config.h_min);
+
     const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields);
 
     EXPECT_NE(diagnostics.edges[edge_index].momentum_flux_n, 0.0);
-    EXPECT_NE(
-        diagnostics.cells[left_index].momentum_residual.x * diagnostics.cells[left_index].momentum_residual.x +
-            diagnostics.cells[left_index].momentum_residual.y * diagnostics.cells[left_index].momentum_residual.y,
-        0.0);
-    EXPECT_DOUBLE_EQ(
-        diagnostics.cells[left_index].momentum_residual.x,
-        -diagnostics.cells[right_index].momentum_residual.x);
-    EXPECT_DOUBLE_EQ(
-        diagnostics.cells[left_index].momentum_residual.y,
-        -diagnostics.cells[right_index].momentum_residual.y);
+    EXPECT_DOUBLE_EQ(diagnostics.edges[edge_index].momentum_x, expected.momentum_x);
+    EXPECT_DOUBLE_EQ(diagnostics.edges[edge_index].momentum_y, expected.momentum_y);
 }
 
 TEST(SurfacePressureMomentum, DrySideEdgeContributesNoPressureResidual) {
@@ -103,13 +107,19 @@ TEST(SurfacePressureMomentum, DrySideEdgeContributesNoPressureResidual) {
     const scau::surface2d::StepConfig config{.dt = 0.1, .cfl_safety = 0.45, .c_rollback = 10.0, .h_min = 1.0e-6};
     const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields);
 
-    EXPECT_EQ(diagnostics.cells[left_index].momentum_residual.x, 0.0);
-    EXPECT_EQ(diagnostics.cells[left_index].momentum_residual.y, 0.0);
-    EXPECT_EQ(diagnostics.cells[right_index].momentum_residual.x, 0.0);
-    EXPECT_EQ(diagnostics.cells[right_index].momentum_residual.y, 0.0);
+    // The dry-side internal edge carries no flux (asserted on the per-edge
+    // diagnostic, which is independent of reflective wall pressure on the cells).
+    static_cast<void>(left_index);
+    static_cast<void>(right_index);
+    EXPECT_EQ(diagnostics.edges[edge_index].mass_flux, 0.0);
+    EXPECT_EQ(diagnostics.edges[edge_index].momentum_flux_n, 0.0);
+    EXPECT_EQ(diagnostics.edges[edge_index].momentum_x, 0.0);
+    EXPECT_EQ(diagnostics.edges[edge_index].momentum_y, 0.0);
 }
 
-TEST(SurfacePressureMomentum, WallBoundaryContributesNoPressureResidual) {
+// Reflective wall applies the inside cell's hydrostatic pressure (M249): zero
+// mass flux, but a non-zero pressure momentum flux so a lake at rest balances.
+TEST(SurfacePressureMomentum, WallBoundaryAppliesReflectiveHydrostaticPressure) {
     const auto mesh = scau::mesh::build_mixed_minimal_mesh();
     const auto edge_index = first_boundary_edge_index(mesh);
     const auto cell_index = edge_cell_index(mesh, edge_index);
@@ -123,8 +133,15 @@ TEST(SurfacePressureMomentum, WallBoundaryContributesNoPressureResidual) {
     const scau::surface2d::StepConfig config{.dt = 0.1, .cfl_safety = 0.45, .c_rollback = 10.0};
     const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields, boundary);
 
-    EXPECT_EQ(diagnostics.cells[cell_index].momentum_residual.x, 0.0);
-    EXPECT_EQ(diagnostics.cells[cell_index].momentum_residual.y, 0.0);
+    const double h = state.cells[cell_index].conserved.h;
+    const double wall_pressure = 0.5 * 9.81 * h * h;
+    EXPECT_EQ(diagnostics.edges[edge_index].mass_flux, 0.0);
+    EXPECT_DOUBLE_EQ(diagnostics.edges[edge_index].momentum_flux_n, wall_pressure);
+    // The wall pressure is delivered to the inside cell (non-zero momentum residual).
+    const double residual_norm_squared =
+        diagnostics.cells[cell_index].momentum_residual.x * diagnostics.cells[cell_index].momentum_residual.x +
+        diagnostics.cells[cell_index].momentum_residual.y * diagnostics.cells[cell_index].momentum_residual.y;
+    EXPECT_GT(residual_norm_squared, 0.0);
 }
 
 TEST(SurfacePressureMomentum, OpenBoundaryContributesPressureResidual) {

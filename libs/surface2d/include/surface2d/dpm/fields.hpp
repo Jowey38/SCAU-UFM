@@ -4,12 +4,15 @@
 
 #include "core/types.hpp"
 #include "mesh/mesh.hpp"
+#include "surface2d/dpm/tensor_projection.hpp"
 
 namespace scau::surface2d {
 
 struct CellDpmFields {
     core::Real phi_t{1.0};
-    core::Real Phi_c{1.0};
+    // Directional conveyance tensor (transport sovereignty). Default identity
+    // keeps edge phi_e_n derivation at 1.0, matching the pre-tensor baseline.
+    Tensor2Symmetric Phi_c{};
 };
 
 struct EdgeDpmFields {

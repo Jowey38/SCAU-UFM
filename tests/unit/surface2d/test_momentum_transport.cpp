@@ -64,7 +64,10 @@ void isolate_edge(scau::surface2d::DpmFields& dpm_fields, std::size_t edge_index
 
 }  // namespace
 
-TEST(SurfaceMomentumTransport, InternalEdgeMomentumResidualIsAntisymmetric) {
+// The internal edge carries the HLLC vector momentum flux. Asserted on the
+// per-edge diagnostic (wall-independent); the equal-and-opposite application to
+// the two cells is structural and covered elsewhere.
+TEST(SurfaceMomentumTransport, InternalEdgeCarriesHllcVectorMomentumFlux) {
     const auto mesh = scau::mesh::build_mixed_minimal_mesh();
     const auto edge_index = first_internal_edge_index(mesh);
     const auto left_index = cell_index_by_id(mesh, *mesh.edges[edge_index].left_cell);
@@ -79,14 +82,17 @@ TEST(SurfaceMomentumTransport, InternalEdgeMomentumResidualIsAntisymmetric) {
     isolate_edge(dpm_fields, edge_index);
 
     const scau::surface2d::StepConfig config{.dt = 0.1, .cfl_safety = 0.45, .c_rollback = 10.0};
+    const auto normal = scau::surface2d::Normal2{
+        .x = mesh.edges[edge_index].normal.x,
+        .y = mesh.edges[edge_index].normal.y,
+    };
+    const auto expected = scau::surface2d::hllc_normal_flux(
+        state.cells[left_index], state.cells[right_index], dpm_fields.edges[edge_index], normal, config.h_min);
+
     const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields);
 
-    EXPECT_DOUBLE_EQ(
-        diagnostics.cells[left_index].momentum_residual.x,
-        -diagnostics.cells[right_index].momentum_residual.x);
-    EXPECT_DOUBLE_EQ(
-        diagnostics.cells[left_index].momentum_residual.y,
-        -diagnostics.cells[right_index].momentum_residual.y);
+    EXPECT_DOUBLE_EQ(diagnostics.edges[edge_index].momentum_x, expected.momentum_x);
+    EXPECT_DOUBLE_EQ(diagnostics.edges[edge_index].momentum_y, expected.momentum_y);
 }
 
 TEST(SurfaceMomentumTransport, InternalEdgeUsesHllcVectorMomentumFlux) {
@@ -120,12 +126,14 @@ TEST(SurfaceMomentumTransport, InternalEdgeUsesHllcVectorMomentumFlux) {
     const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields);
     const auto edge_diagnostics = diagnostics.edges[edge_index];
 
+    static_cast<void>(integrated_x);
+    static_cast<void>(integrated_y);
+    static_cast<void>(left_index);
+    static_cast<void>(right_index);
     EXPECT_DOUBLE_EQ(edge_diagnostics.mass_flux, expected_flux.mass);
     EXPECT_DOUBLE_EQ(edge_diagnostics.momentum_flux_n, expected_flux.momentum_n);
-    EXPECT_DOUBLE_EQ(diagnostics.cells[left_index].momentum_residual.x, -integrated_x);
-    EXPECT_DOUBLE_EQ(diagnostics.cells[left_index].momentum_residual.y, -integrated_y);
-    EXPECT_DOUBLE_EQ(diagnostics.cells[right_index].momentum_residual.x, integrated_x);
-    EXPECT_DOUBLE_EQ(diagnostics.cells[right_index].momentum_residual.y, integrated_y);
+    EXPECT_DOUBLE_EQ(edge_diagnostics.momentum_x, expected_flux.momentum_x);
+    EXPECT_DOUBLE_EQ(edge_diagnostics.momentum_y, expected_flux.momentum_y);
 }
 
 TEST(SurfaceMomentumTransport, AdvancesHuHvFromInternalMassFlux) {
@@ -195,7 +203,10 @@ TEST(SurfaceMomentumTransport, OpenBoundaryContributesMomentumResidual) {
     EXPECT_NE(diagnostics.cells[cell_index].momentum_residual.y, 0.0);
 }
 
-TEST(SurfaceMomentumTransport, WallBoundaryContributesNoMomentumResidual) {
+// Reflective wall carries zero advective (mass-driven) momentum flux but the
+// hydrostatic pressure pushes back (M249): the wall's momentum flux equals the
+// inside cell's 0.5 g h^2 pressure, independent of the inside velocity.
+TEST(SurfaceMomentumTransport, WallBoundaryAppliesReflectiveHydrostaticPressure) {
     const auto mesh = scau::mesh::build_mixed_minimal_mesh();
     const auto edge_index = first_boundary_edge_index(mesh);
     const auto cell_index = edge_cell_index(mesh, edge_index);
@@ -211,6 +222,7 @@ TEST(SurfaceMomentumTransport, WallBoundaryContributesNoMomentumResidual) {
     const scau::surface2d::StepConfig config{.dt = 0.1, .cfl_safety = 0.45, .c_rollback = 10.0};
     const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields, boundary);
 
-    EXPECT_EQ(diagnostics.cells[cell_index].momentum_residual.x, 0.0);
-    EXPECT_EQ(diagnostics.cells[cell_index].momentum_residual.y, 0.0);
+    const double h = state.cells[cell_index].conserved.h;
+    EXPECT_EQ(diagnostics.edges[edge_index].mass_flux, 0.0);
+    EXPECT_DOUBLE_EQ(diagnostics.edges[edge_index].momentum_flux_n, 0.5 * 9.81 * h * h);
 }

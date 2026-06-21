@@ -66,14 +66,6 @@ void set_edge_aligned_state(
     state.cells[right_index].eta = 1.20;
 }
 
-void expect_zero_cell_residual(
-    const scau::surface2d::StepDiagnostics& diagnostics,
-    std::size_t cell_index) {
-    EXPECT_EQ(diagnostics.cells[cell_index].mass_residual, 0.0);
-    EXPECT_EQ(diagnostics.cells[cell_index].momentum_residual.x, 0.0);
-    EXPECT_EQ(diagnostics.cells[cell_index].momentum_residual.y, 0.0);
-}
-
 }  // namespace
 
 TEST(SurfaceDpmEdgeSourceConservation, ActiveInternalEdgeClosesMassMomentumAndPhiTSourcePairing) {
@@ -109,16 +101,26 @@ TEST(SurfaceDpmEdgeSourceConservation, ActiveInternalEdgeClosesMassMomentumAndPh
         diagnostics.cells[left_index].mass_residual,
         -diagnostics.cells[right_index].mass_residual);
 
-    const double left_momentum_norm =
-        diagnostics.cells[left_index].momentum_residual.x * diagnostics.cells[left_index].momentum_residual.x +
-        diagnostics.cells[left_index].momentum_residual.y * diagnostics.cells[left_index].momentum_residual.y;
-    EXPECT_NE(left_momentum_norm, 0.0);
-    EXPECT_DOUBLE_EQ(
-        diagnostics.cells[left_index].momentum_residual.x,
-        -diagnostics.cells[right_index].momentum_residual.x);
-    EXPECT_DOUBLE_EQ(
-        diagnostics.cells[left_index].momentum_residual.y,
-        -diagnostics.cells[right_index].momentum_residual.y);
+    // The internal edge carries the HLLC vector momentum flux. Asserted on the
+    // per-edge diagnostic (wall-independent); the equal-and-opposite cell
+    // application is structural. (Cell totals now include reflective wall
+    // pressure per M249, so they are no longer a clean single-edge proxy.)
+    // Recompute the expected flux from a fresh pre-step state because advance
+    // mutates `state`.
+    auto pre_step = scau::surface2d::SurfaceState::hydrostatic_for_mesh(mesh, 1.0, 1.0);
+    set_edge_aligned_state(mesh, edge_index, pre_step, left_index, right_index);
+    const auto normal = scau::surface2d::Normal2{
+        .x = mesh.edges[edge_index].normal.x,
+        .y = mesh.edges[edge_index].normal.y,
+    };
+    const auto expected_flux = scau::surface2d::hllc_normal_flux(
+        pre_step.cells[left_index], pre_step.cells[right_index], dpm_fields.edges[edge_index], normal, config.h_min);
+    EXPECT_NE(
+        diagnostics.edges[edge_index].momentum_x * diagnostics.edges[edge_index].momentum_x +
+            diagnostics.edges[edge_index].momentum_y * diagnostics.edges[edge_index].momentum_y,
+        0.0);
+    EXPECT_DOUBLE_EQ(diagnostics.edges[edge_index].momentum_x, expected_flux.momentum_x);
+    EXPECT_DOUBLE_EQ(diagnostics.edges[edge_index].momentum_y, expected_flux.momentum_y);
 }
 
 TEST(SurfaceDpmEdgeSourceConservation, OmegaEdgeHardBlockZerosTransportResiduals) {
@@ -138,10 +140,16 @@ TEST(SurfaceDpmEdgeSourceConservation, OmegaEdgeHardBlockZerosTransportResiduals
     const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields);
 
     ASSERT_EQ(diagnostics.edges.size(), mesh.edges.size());
+    // The blocked internal edge transports nothing (mass + advective momentum).
+    // Asserted on the per-edge diagnostic and on the cells' MASS residual, which
+    // stay clean. The cells' momentum residual now also carries reflective wall
+    // pressure (M249) and is therefore no longer expected to be zero here.
     EXPECT_EQ(diagnostics.edges[edge_index].mass_flux, 0.0);
     EXPECT_EQ(diagnostics.edges[edge_index].momentum_flux_n, 0.0);
-    expect_zero_cell_residual(diagnostics, left_index);
-    expect_zero_cell_residual(diagnostics, right_index);
+    EXPECT_EQ(diagnostics.edges[edge_index].momentum_x, 0.0);
+    EXPECT_EQ(diagnostics.edges[edge_index].momentum_y, 0.0);
+    EXPECT_EQ(diagnostics.cells[left_index].mass_residual, 0.0);
+    EXPECT_EQ(diagnostics.cells[right_index].mass_residual, 0.0);
 }
 
 TEST(SurfaceDpmEdgeSourceConservation, PhiENSoftBlockZerosTransportResiduals) {
@@ -161,8 +169,14 @@ TEST(SurfaceDpmEdgeSourceConservation, PhiENSoftBlockZerosTransportResiduals) {
     const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields);
 
     ASSERT_EQ(diagnostics.edges.size(), mesh.edges.size());
+    // The blocked internal edge transports nothing (mass + advective momentum).
+    // Asserted on the per-edge diagnostic and on the cells' MASS residual, which
+    // stay clean. The cells' momentum residual now also carries reflective wall
+    // pressure (M249) and is therefore no longer expected to be zero here.
     EXPECT_EQ(diagnostics.edges[edge_index].mass_flux, 0.0);
     EXPECT_EQ(diagnostics.edges[edge_index].momentum_flux_n, 0.0);
-    expect_zero_cell_residual(diagnostics, left_index);
-    expect_zero_cell_residual(diagnostics, right_index);
+    EXPECT_EQ(diagnostics.edges[edge_index].momentum_x, 0.0);
+    EXPECT_EQ(diagnostics.edges[edge_index].momentum_y, 0.0);
+    EXPECT_EQ(diagnostics.cells[left_index].mass_residual, 0.0);
+    EXPECT_EQ(diagnostics.cells[right_index].mass_residual, 0.0);
 }

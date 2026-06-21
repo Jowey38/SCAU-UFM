@@ -1,136 +1,86 @@
 #include "surface2d/time_integration/step.hpp"
 
-#include <algorithm>
 #include <cmath>
-#include <optional>
 #include <stdexcept>
-#include <string>
-#include <unordered_map>
 #include <vector>
 
+#include "surface2d/cfl/diagnostics.hpp"
+#include "surface2d/dpm/edge_classification.hpp"
 #include "surface2d/riemann/hllc.hpp"
+#include "surface2d/source_terms/coupling_exchange.hpp"
+#include "surface2d/source_terms/friction.hpp"
+#include "surface2d/source_terms/infiltration.hpp"
 #include "surface2d/source_terms/phi_t.hpp"
+#include "surface2d/source_terms/rainfall.hpp"
+#include "surface2d/wetting_drying/limits.hpp"
 
 namespace scau::surface2d {
 namespace {
 
 void validate_step_inputs(const mesh::Mesh& mesh, const SurfaceState& state, const StepConfig& config) {
-    if (config.dt <= 0.0) {
+    if (!std::isfinite(config.dt) || config.dt <= 0.0) {
         throw std::invalid_argument("step dt must be positive");
     }
-    if (config.cfl_safety <= 0.0) {
+    if (!std::isfinite(config.cfl_safety) || config.cfl_safety <= 0.0) {
         throw std::invalid_argument("CFL_safety must be positive");
     }
-    if (config.c_rollback <= 0.0) {
+    if (!std::isfinite(config.c_rollback) || config.c_rollback <= 0.0) {
         throw std::invalid_argument("C_rollback must be positive");
     }
-    if (config.h_min < 0.0) {
+    if (!std::isfinite(config.h_min) || config.h_min < 0.0) {
         throw std::invalid_argument("h_min must be non-negative");
+    }
+    if (!std::isfinite(config.gravity) || config.gravity <= 0.0) {
+        throw std::invalid_argument("gravity must be positive");
+    }
+    if (mesh.cells.empty()) {
+        throw std::invalid_argument("step mesh must contain at least one cell");
     }
     validate_state_matches_mesh(state, mesh);
 }
 
-std::unordered_map<std::string, std::size_t> cell_indices_by_id(const mesh::Mesh& mesh) {
-    std::unordered_map<std::string, std::size_t> indices;
-    for (std::size_t index = 0; index < mesh.cells.size(); ++index) {
-        indices.emplace(mesh.cells[index].id, index);
-    }
-    return indices;
-}
-
-std::size_t edge_cell_index(
-    const std::unordered_map<std::string, std::size_t>& cell_indices,
-    const std::optional<std::string>& primary_cell,
-    const std::optional<std::string>& fallback_cell) {
-    const auto& cell_id = primary_cell.has_value() ? *primary_cell : *fallback_cell;
-    return cell_indices.at(cell_id);
-}
-
-std::vector<core::Real> cell_areas(const mesh::Mesh& mesh) {
-    const auto nodes = mesh::node_lookup(mesh.nodes);
-    std::vector<core::Real> areas(mesh.cells.size(), 0.0);
-    for (std::size_t cell_index = 0; cell_index < mesh.cells.size(); ++cell_index) {
-        areas[cell_index] = mesh::cell_area(mesh.cells[cell_index], nodes);
-    }
-    return areas;
-}
-
-core::Real raw_cell_cfl(
-    const mesh::Mesh& mesh,
-    const SurfaceState& state,
-    const StepConfig& config,
-    const BoundaryConditions& boundary) {
-    const auto cell_indices = cell_indices_by_id(mesh);
-    const auto areas = cell_areas(mesh);
-    std::vector<core::Real> cell_cfl(mesh.cells.size(), 0.0);
-
-    for (std::size_t edge_index = 0; edge_index < mesh.edges.size(); ++edge_index) {
-        const auto& edge = mesh.edges[edge_index];
-        const bool is_internal = edge.left_cell.has_value() && edge.right_cell.has_value();
-        if (!is_internal && boundary.edges[edge_index] == BoundaryKind::Wall) {
-            continue;
-        }
-
-        const std::size_t left_index = edge_cell_index(cell_indices, edge.left_cell, edge.right_cell);
-        const std::size_t right_index = edge_cell_index(cell_indices, edge.right_cell, edge.left_cell);
-        const auto speeds = estimate_hllc_wave_speeds(
-            state.cells[left_index],
-            state.cells[right_index],
-            Normal2{.x = edge.normal.x, .y = edge.normal.y});
-        const core::Real spectral_radius = std::max(std::abs(speeds.s_l), std::abs(speeds.s_r));
-
-        if (edge.left_cell.has_value() && areas[left_index] > 0.0) {
-            cell_cfl[left_index] += config.dt * edge.length * spectral_radius / areas[left_index];
-        }
-        if (edge.right_cell.has_value() && areas[right_index] > 0.0) {
-            cell_cfl[right_index] += config.dt * edge.length * spectral_radius / areas[right_index];
-        }
-    }
-
-    return *std::max_element(cell_cfl.begin(), cell_cfl.end());
-}
-
 void apply_depth_update(
-    const mesh::Mesh& mesh,
     SurfaceState& state,
     const StepConfig& config,
-    const std::vector<CellStepDiagnostics>& cells) {
-    const auto nodes = mesh::node_lookup(mesh.nodes);
-    for (std::size_t cell_index = 0; cell_index < mesh.cells.size(); ++cell_index) {
-        const core::Real area = mesh::cell_area(mesh.cells[cell_index], nodes);
+    const std::vector<CellStepDiagnostics>& cells,
+    const GeometryCache& geometry) {
+    for (std::size_t cell_index = 0; cell_index < state.cells.size(); ++cell_index) {
+        const core::Real area = geometry.cell_areas[cell_index];
         if (area > 0.0) {
-            state.cells[cell_index].conserved.h = std::max(
-                0.0,
-                state.cells[cell_index].conserved.h + config.dt * cells[cell_index].mass_residual / area);
+            const core::Real dh = config.dt * cells[cell_index].mass_residual / area;
+            state.cells[cell_index].conserved.h = nonnegative_depth_after_increment(
+                state.cells[cell_index].conserved.h,
+                dh);
         }
     }
 }
 
 EdgeStepDiagnostics edge_step_diagnostics(
-    const mesh::Edge& edge,
+    const EdgeAdjacency& adjacency,
     const SurfaceState& state,
     const DpmFields& dpm_fields,
-    const std::unordered_map<std::string, std::size_t>& cell_indices,
-    const EdgeFlux& flux) {
-    const std::size_t left_index = edge_cell_index(cell_indices, edge.left_cell, edge.right_cell);
-    const std::size_t right_index = edge_cell_index(cell_indices, edge.right_cell, edge.left_cell);
-    const auto& left = state.cells[left_index];
-    const auto& right = state.cells[right_index];
-
+    const EdgeFlux& flux,
+    bool assemble_wb_pairing) {
     EdgeStepDiagnostics diagnostics{
         .mass_flux = flux.mass,
         .momentum_flux_n = flux.momentum_n,
+        .momentum_x = flux.momentum_x,
+        .momentum_y = flux.momentum_y,
     };
 
-    if (edge.left_cell.has_value() && edge.right_cell.has_value()) {
+    // Main-spec 5.6: hard-block edges (omega_edge = 0) assemble no WB
+    // pressure/source pairing; soft-block and regular edges do.
+    if (adjacency.is_internal() && assemble_wb_pairing) {
+        const auto& left = state.cells[*adjacency.left];
+        const auto& right = state.cells[*adjacency.right];
         const core::Real h = 0.5 * (left.conserved.h + right.conserved.h);
         diagnostics.pressure_pairing = pressure_pairing_phi_t(
-            dpm_fields.cells[left_index].phi_t,
-            dpm_fields.cells[right_index].phi_t,
+            dpm_fields.cells[*adjacency.left].phi_t,
+            dpm_fields.cells[*adjacency.right].phi_t,
             h);
         diagnostics.s_phi_t = s_phi_t_centered(
-            dpm_fields.cells[left_index].phi_t,
-            dpm_fields.cells[right_index].phi_t,
+            dpm_fields.cells[*adjacency.left].phi_t,
+            dpm_fields.cells[*adjacency.right].phi_t,
             h);
         diagnostics.residual = diagnostics.pressure_pairing + diagnostics.s_phi_t;
     }
@@ -142,13 +92,14 @@ StepDiagnostics base_diagnostics(
     const mesh::Mesh& mesh,
     const SurfaceState& state,
     const StepConfig& config,
-    const BoundaryConditions& boundary) {
-    const core::Real max_cell_cfl = raw_cell_cfl(mesh, state, config, boundary);
+    const BoundaryConditions& boundary,
+    const GeometryCache& geometry) {
+    const auto cfl = evaluate_cfl_diagnostics(mesh, state, boundary, geometry, config.dt, config.c_rollback);
     return StepDiagnostics{
         .cell_count = mesh.cells.size(),
         .edge_count = mesh.edges.size(),
-        .max_cell_cfl = max_cell_cfl,
-        .rollback_required = max_cell_cfl > config.c_rollback,
+        .max_cell_cfl = cfl.max_cell_cfl,
+        .rollback_required = cfl.rollback_required,
         .cells = std::vector<CellStepDiagnostics>(mesh.cells.size()),
         .edges = {},
     };
@@ -169,21 +120,21 @@ void accumulate_momentum_flux_residual(
     sink.momentum_residual.y += signed_integrated_flux_y;
 }
 
-
 void apply_momentum_update(
-    const mesh::Mesh& mesh,
     SurfaceState& state,
     const StepConfig& config,
-    const std::vector<CellStepDiagnostics>& cells) {
-    const auto nodes = mesh::node_lookup(mesh.nodes);
-    for (std::size_t cell_index = 0; cell_index < mesh.cells.size(); ++cell_index) {
-        const core::Real area = mesh::cell_area(mesh.cells[cell_index], nodes);
+    const std::vector<CellStepDiagnostics>& cells,
+    const GeometryCache& geometry) {
+    for (std::size_t cell_index = 0; cell_index < state.cells.size(); ++cell_index) {
+        const core::Real area = geometry.cell_areas[cell_index];
         if (area <= 0.0) {
             continue;
         }
+
+        state.cells[cell_index].conserved = apply_dry_cell_momentum_limit(
+            state.cells[cell_index].conserved,
+            config.h_min);
         if (state.cells[cell_index].conserved.h <= config.h_min) {
-            state.cells[cell_index].conserved.hu = 0.0;
-            state.cells[cell_index].conserved.hv = 0.0;
             continue;
         }
         state.cells[cell_index].conserved.hu += config.dt * cells[cell_index].momentum_residual.x / area;
@@ -191,11 +142,57 @@ void apply_momentum_update(
     }
 }
 
+void apply_source_terms(
+    SurfaceState& state,
+    const StepConfig& config,
+    const DpmFields& dpm_fields,
+    const SourceTermFields& sources,
+    const GeometryCache& geometry,
+    StepDiagnostics& diagnostics) {
+    for (std::size_t cell_index = 0; cell_index < state.cells.size(); ++cell_index) {
+        const core::Real area = geometry.cell_areas[cell_index];
+        if (area <= 0.0) {
+            continue;
+        }
+        auto& cell = state.cells[cell_index];
+        const core::Real phi_t = dpm_fields.cells[cell_index].phi_t;
+
+        if (sources.rainfall_rate[cell_index] > 0.0) {
+            const core::Real dh = rainfall_depth_increment(
+                sources.rainfall_rate[cell_index], phi_t, config.dt);
+            cell.conserved.h += dh;
+            diagnostics.rainfall_volume += dh * phi_t * area;
+        }
+
+        if (sources.exchange_volume[cell_index] != 0.0) {
+            const auto exchange = exchange_depth_increment(
+                sources.exchange_volume[cell_index], cell.conserved.h, phi_t, area);
+            cell.conserved.h += exchange.depth_increment;
+            diagnostics.exchange_volume += exchange.applied_volume;
+        }
+
+        if (sources.infiltration_rate[cell_index] > 0.0) {
+            const core::Real dh = infiltration_depth_decrement(
+                sources.infiltration_rate[cell_index], cell.conserved.h, phi_t, config.dt);
+            cell.conserved.h -= dh;
+            diagnostics.infiltration_volume += dh * phi_t * area;
+        }
+
+        cell.conserved = apply_manning_friction(
+            apply_dry_cell_momentum_limit(cell.conserved, config.h_min),
+            sources.manning_n[cell_index],
+            config.dt,
+            config.h_min,
+            config.gravity);
+    }
+}
+
 }  // namespace
 
 StepDiagnostics advance_one_step_cpu(const mesh::Mesh& mesh, SurfaceState& state, const StepConfig& config) {
     validate_step_inputs(mesh, state, config);
-    return base_diagnostics(mesh, state, config, BoundaryConditions::for_mesh(mesh));
+    const auto geometry = GeometryCache::for_mesh(mesh);
+    return base_diagnostics(mesh, state, config, BoundaryConditions::for_mesh(mesh), geometry);
 }
 
 StepDiagnostics advance_one_step_cpu(
@@ -212,28 +209,54 @@ StepDiagnostics advance_one_step_cpu(
     const StepConfig& config,
     const DpmFields& dpm_fields,
     const BoundaryConditions& boundary) {
+    return advance_one_step_cpu(mesh, state, config, dpm_fields, boundary, SourceTermFields::for_mesh(mesh));
+}
+
+StepDiagnostics advance_one_step_cpu(
+    const mesh::Mesh& mesh,
+    SurfaceState& state,
+    const StepConfig& config,
+    const DpmFields& dpm_fields,
+    const BoundaryConditions& boundary,
+    const SourceTermFields& sources) {
+    const auto geometry = GeometryCache::for_mesh(mesh);
+    return advance_one_step_cpu(mesh, state, config, dpm_fields, boundary, sources, geometry);
+}
+
+StepDiagnostics advance_one_step_cpu(
+    const mesh::Mesh& mesh,
+    SurfaceState& state,
+    const StepConfig& config,
+    const DpmFields& dpm_fields,
+    const BoundaryConditions& boundary,
+    const SourceTermFields& sources,
+    const GeometryCache& geometry) {
     validate_step_inputs(mesh, state, config);
     validate_dpm_fields_match_mesh(dpm_fields, mesh);
     validate_boundary_conditions_match_mesh(boundary, mesh);
+    validate_source_term_fields_match_mesh(sources, mesh);
+    validate_geometry_cache_matches_mesh(geometry, mesh);
 
-    auto diagnostics = base_diagnostics(mesh, state, config, boundary);
+    auto diagnostics = base_diagnostics(mesh, state, config, boundary, geometry);
     diagnostics.edges.reserve(mesh.edges.size());
-    const auto cell_indices = cell_indices_by_id(mesh);
     for (std::size_t edge_index = 0; edge_index < mesh.edges.size(); ++edge_index) {
         const auto& edge = mesh.edges[edge_index];
-        const bool is_internal = edge.left_cell.has_value() && edge.right_cell.has_value();
+        const auto& adjacency = geometry.edge_cells[edge_index];
 
-        if (is_internal) {
+        if (adjacency.is_internal()) {
+            const std::size_t left_index = *adjacency.left;
+            const std::size_t right_index = *adjacency.right;
             const auto flux = hllc_normal_flux(
-                state.cells[cell_indices.at(*edge.left_cell)],
-                state.cells[cell_indices.at(*edge.right_cell)],
+                state.cells[left_index],
+                state.cells[right_index],
                 dpm_fields.edges[edge_index],
                 Normal2{.x = edge.normal.x, .y = edge.normal.y},
                 config.h_min);
-            const auto edge_diagnostics = edge_step_diagnostics(edge, state, dpm_fields, cell_indices, flux);
+            const bool assemble_wb_pairing = classify_edge(
+                dpm_fields.edges[edge_index].omega_edge,
+                dpm_fields.edges[edge_index].phi_e_n).wb_pairing_assembled;
+            const auto edge_diagnostics = edge_step_diagnostics(adjacency, state, dpm_fields, flux, assemble_wb_pairing);
             diagnostics.edges.push_back(edge_diagnostics);
-            const std::size_t left_index = cell_indices.at(*edge.left_cell);
-            const std::size_t right_index = cell_indices.at(*edge.right_cell);
             const core::Real integrated_flux = edge_diagnostics.mass_flux * edge.length;
             diagnostics.cells[left_index].mass_residual -= integrated_flux;
             diagnostics.cells[right_index].mass_residual += integrated_flux;
@@ -245,11 +268,30 @@ StepDiagnostics advance_one_step_cpu(
         }
 
         if (boundary.edges[edge_index] == BoundaryKind::Wall) {
-            diagnostics.edges.push_back(EdgeStepDiagnostics{});
+            // Reflective wall (main-spec hard-block / wall boundary): zero mass
+            // flux, but the inside cell's hydrostatic pressure pushes back so
+            // the closed-polygon pressure sum of a boundary cell balances and a
+            // lake at rest stays at rest. Uses the same gravity (9.81) and
+            // unscaled 0.5 g h^2 form as the interior HLLC pressure so the
+            // balance is exact for uniform fields.
+            const std::size_t inside_index = adjacency.inside();
+            const core::Real h_inside = state.cells[inside_index].conserved.h;
+            const core::Real wall_pressure = 0.5 * 9.81 * h_inside * h_inside;
+            diagnostics.edges.push_back(EdgeStepDiagnostics{
+                .momentum_flux_n = wall_pressure,
+                .momentum_x = wall_pressure * edge.normal.x,
+                .momentum_y = wall_pressure * edge.normal.y,
+            });
+
+            const core::Real momentum_x = wall_pressure * edge.normal.x * edge.length;
+            const core::Real momentum_y = wall_pressure * edge.normal.y * edge.length;
+            const core::Real signed_momentum_x = adjacency.left.has_value() ? -momentum_x : momentum_x;
+            const core::Real signed_momentum_y = adjacency.left.has_value() ? -momentum_y : momentum_y;
+            accumulate_momentum_flux_residual(diagnostics.cells[inside_index], signed_momentum_x, signed_momentum_y);
             continue;
         }
 
-        const std::size_t inside_index = edge_cell_index(cell_indices, edge.left_cell, edge.right_cell);
+        const std::size_t inside_index = adjacency.inside();
         const auto& inside = state.cells[inside_index];
         const auto outside = open_boundary_outside_state(inside);
         const auto flux = hllc_normal_flux(
@@ -262,22 +304,25 @@ StepDiagnostics advance_one_step_cpu(
         EdgeStepDiagnostics edge_diagnostics{
             .mass_flux = flux.mass,
             .momentum_flux_n = flux.momentum_n,
+            .momentum_x = flux.momentum_x,
+            .momentum_y = flux.momentum_y,
         };
         diagnostics.edges.push_back(edge_diagnostics);
 
         const core::Real integrated_flux = edge_diagnostics.mass_flux * edge.length;
-        const core::Real signed_integrated_flux = edge.left_cell.has_value() ? -integrated_flux : integrated_flux;
+        const core::Real signed_integrated_flux = adjacency.left.has_value() ? -integrated_flux : integrated_flux;
         diagnostics.cells[inside_index].mass_residual += signed_integrated_flux;
 
-        const core::Real signed_momentum_x = edge.left_cell.has_value() ? -flux.momentum_x * edge.length : flux.momentum_x * edge.length;
-        const core::Real signed_momentum_y = edge.left_cell.has_value() ? -flux.momentum_y * edge.length : flux.momentum_y * edge.length;
+        const core::Real signed_momentum_x = adjacency.left.has_value() ? -flux.momentum_x * edge.length : flux.momentum_x * edge.length;
+        const core::Real signed_momentum_y = adjacency.left.has_value() ? -flux.momentum_y * edge.length : flux.momentum_y * edge.length;
         accumulate_momentum_flux_residual(diagnostics.cells[inside_index], signed_momentum_x, signed_momentum_y);
     }
     if (diagnostics.rollback_required) {
         return diagnostics;
     }
-    apply_depth_update(mesh, state, config, diagnostics.cells);
-    apply_momentum_update(mesh, state, config, diagnostics.cells);
+    apply_depth_update(state, config, diagnostics.cells, geometry);
+    apply_momentum_update(state, config, diagnostics.cells, geometry);
+    apply_source_terms(state, config, dpm_fields, sources, geometry, diagnostics);
     return diagnostics;
 }
 
