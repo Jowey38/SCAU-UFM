@@ -416,4 +416,34 @@ StepDiagnostics advance_one_step_cpu(
     return diagnostics;
 }
 
+StepDiagnostics advance_one_step_cpu(
+    const mesh::Mesh& mesh,
+    SurfaceState& state,
+    const StepConfig& config,
+    const DpmFields& dpm_fields,
+    const BoundaryConditions& boundary,
+    const SourceTermFields& sources,
+    const GeometryCache& geometry,
+    const RunoffStepInputs& runoff_inputs,
+    const RoofStepInputs& roof_inputs,
+    RunoffState& runoff_state) {
+    validate_step_inputs(mesh, state, config);
+    validate_dpm_fields_match_mesh(dpm_fields, mesh);
+    validate_boundary_conditions_match_mesh(boundary, mesh);
+    validate_source_term_fields_match_mesh(sources, mesh);
+    validate_geometry_cache_matches_mesh(geometry, mesh);
+    validate_runoff_step_inputs_match_mesh(runoff_inputs, mesh);
+    validate_roof_step_inputs_match_mesh(roof_inputs, mesh);
+    validate_runoff_state_match_mesh(runoff_state, mesh);
+
+    auto diagnostics = run_flux_core(mesh, state, config, dpm_fields, boundary, geometry);
+    if (diagnostics.rollback_required) {
+        return diagnostics;  // runoff_state + h untouched
+    }
+    apply_ground_runoff_stage(state, config, dpm_fields, runoff_inputs, runoff_state, geometry, diagnostics);
+    apply_roof_runoff_stage(state, config, dpm_fields, runoff_inputs, roof_inputs, runoff_state, geometry, diagnostics);
+    apply_coupling_and_friction(state, config, dpm_fields, sources, geometry, diagnostics);
+    return diagnostics;
+}
+
 }  // namespace scau::surface2d
