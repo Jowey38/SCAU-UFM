@@ -339,3 +339,12 @@ target_link_libraries(test_runoff_roof_step
         GTest::gtest_main
 )
 add_test(NAME test_runoff_roof_step COMMAND test_runoff_roof_step)
+
+add_executable(test_runoff_golden_urban_block test_runoff_golden_urban_block.cpp)
+target_link_libraries(test_runoff_golden_urban_block
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_runoff_golden_urban_block COMMAND test_runoff_golden_urban_block)
