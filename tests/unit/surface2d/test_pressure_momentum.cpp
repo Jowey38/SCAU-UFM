@@ -64,10 +64,13 @@ void isolate_edge(scau::surface2d::DpmFields& dpm_fields, std::size_t edge_index
 
 }  // namespace
 
-// The internal edge carries the HLLC hydrostatic pressure momentum flux. We
-// assert the per-edge vector flux (wall-independent); the equal-and-opposite
-// application to the two cells is structural (accumulate left -= flux, right
-// += flux) and the whole-cell balance is covered by the lake-at-rest test.
+// The internal edge carries the hydrostatic pressure as the phi_t-scaled
+// well-balanced pairing (wb_pressure), separate from the now advective-only
+// HLLC normal momentum flux (h*un^2, which is zero for a lake at rest). We
+// assert the per-edge advective vector flux (wall-independent) follows the
+// HLLC reference, and that the WB pressure pairing carries the non-zero
+// hydrostatic pressure. The equal-and-opposite application to the two cells is
+// structural and the whole-cell balance is covered by the lake-at-rest test.
 TEST(SurfacePressureMomentum, InternalEdgeCarriesHllcPressureMomentumFlux) {
     const auto mesh = scau::mesh::build_mixed_minimal_mesh();
     const auto edge_index = first_internal_edge_index(mesh);
@@ -88,9 +91,13 @@ TEST(SurfacePressureMomentum, InternalEdgeCarriesHllcPressureMomentumFlux) {
 
     const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields);
 
-    EXPECT_NE(diagnostics.edges[edge_index].momentum_flux_n, 0.0);
+    // HLLC normal momentum is advective-only (h*un^2) and matches the
+    // reference; it is zero for a lake at rest. The hydrostatic pressure the
+    // edge carries is now the phi_t-scaled WB pressure pairing.
+    EXPECT_DOUBLE_EQ(diagnostics.edges[edge_index].momentum_flux_n, expected.momentum_n);
     EXPECT_DOUBLE_EQ(diagnostics.edges[edge_index].momentum_x, expected.momentum_x);
     EXPECT_DOUBLE_EQ(diagnostics.edges[edge_index].momentum_y, expected.momentum_y);
+    EXPECT_NE(diagnostics.edges[edge_index].wb_pressure, 0.0);
 }
 
 TEST(SurfacePressureMomentum, DrySideEdgeContributesNoPressureResidual) {

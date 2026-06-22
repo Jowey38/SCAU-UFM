@@ -6,12 +6,14 @@
 
 #include "surface2d/cfl/diagnostics.hpp"
 #include "surface2d/dpm/edge_classification.hpp"
+#include "surface2d/reconstruction/hydrostatic.hpp"
 #include "surface2d/riemann/hllc.hpp"
 #include "surface2d/source_terms/coupling_exchange.hpp"
 #include "surface2d/source_terms/friction.hpp"
 #include "surface2d/source_terms/infiltration.hpp"
 #include "surface2d/source_terms/phi_t.hpp"
 #include "surface2d/source_terms/rainfall.hpp"
+#include "surface2d/source_terms/well_balanced.hpp"
 #include "surface2d/wetting_drying/limits.hpp"
 
 namespace scau::surface2d {
@@ -264,6 +266,27 @@ StepDiagnostics advance_one_step_cpu(
             const core::Real integrated_momentum_y = flux.momentum_y * edge.length;
             accumulate_momentum_flux_residual(diagnostics.cells[left_index], -integrated_momentum_x, -integrated_momentum_y);
             accumulate_momentum_flux_residual(diagnostics.cells[right_index], integrated_momentum_x, integrated_momentum_y);
+            if (assemble_wb_pairing) {
+                const auto pair = reconstruct_hydrostatic_pair(state.cells[left_index], state.cells[right_index]);
+                const auto wb = well_balanced_edge_pairing(
+                    dpm_fields.cells[left_index].phi_t,
+                    dpm_fields.cells[right_index].phi_t,
+                    state.cells[left_index].conserved.h,
+                    state.cells[right_index].conserved.h,
+                    pair.left.conserved.h,
+                    pair.right.conserved.h,
+                    config.gravity);
+                diagnostics.edges.back().wb_pressure = wb.pressure_flux;
+                diagnostics.edges.back().s_topo = wb.s_topo_left;
+                accumulate_momentum_flux_residual(
+                    diagnostics.cells[left_index],
+                    wb.left_normal * edge.normal.x * edge.length,
+                    wb.left_normal * edge.normal.y * edge.length);
+                accumulate_momentum_flux_residual(
+                    diagnostics.cells[right_index],
+                    -wb.right_normal * edge.normal.x * edge.length,
+                    -wb.right_normal * edge.normal.y * edge.length);
+            }
             continue;
         }
 
@@ -276,7 +299,8 @@ StepDiagnostics advance_one_step_cpu(
             // balance is exact for uniform fields.
             const std::size_t inside_index = adjacency.inside();
             const core::Real h_inside = state.cells[inside_index].conserved.h;
-            const core::Real wall_pressure = 0.5 * 9.81 * h_inside * h_inside;
+            const core::Real wall_pressure = well_balanced_boundary_pressure(
+                dpm_fields.cells[inside_index].phi_t, h_inside, config.gravity);
             diagnostics.edges.push_back(EdgeStepDiagnostics{
                 .momentum_flux_n = wall_pressure,
                 .momentum_x = wall_pressure * edge.normal.x,
