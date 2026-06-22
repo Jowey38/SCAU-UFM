@@ -285,3 +285,12 @@ target_link_libraries(test_runoff_green_ampt
         GTest::gtest_main
 )
 add_test(NAME test_runoff_green_ampt COMMAND test_runoff_green_ampt)
+
+add_executable(test_well_balanced_pairing test_well_balanced_pairing.cpp)
+target_link_libraries(test_well_balanced_pairing
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_well_balanced_pairing COMMAND test_well_balanced_pairing)
