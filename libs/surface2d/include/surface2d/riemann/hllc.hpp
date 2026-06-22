@@ -1,12 +1,11 @@
 #pragma once
 
 #include "core/types.hpp"
+#include "surface2d/dpm/edge_classification.hpp"
 #include "surface2d/dpm/fields.hpp"
 #include "surface2d/state/state.hpp"
 
 namespace scau::surface2d {
-
-inline constexpr core::Real PhiEdgeMin = 1.0e-12;
 
 struct Normal2 {
     core::Real x{0.0};

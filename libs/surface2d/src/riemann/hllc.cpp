@@ -94,7 +94,7 @@ EdgeFlux hllc_normal_flux(
     const EdgeDpmFields& edge_fields,
     Normal2 normal,
     core::Real h_min) {
-    if (edge_fields.omega_edge == 0.0 || edge_fields.phi_e_n < PhiEdgeMin) {
+    if (classify_edge(edge_fields.omega_edge, edge_fields.phi_e_n).advective_flux_zeroed) {
         return EdgeFlux{};
     }
 
