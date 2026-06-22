@@ -1,6 +1,6 @@
 # S_phi_t 接入动量：Well-Balanced 压力-源项配对设计
 
-> **状态：** 设计（brainstorming 产出，待 writing-plans 转实施）。已并入数值评审 `离散格式与 well-balancing 相消证明.md`：采纳 Path B（Audusse 单侧分裂）、修正 WB 边源系数约定（见 §2.2/§2.4b）。
+> **状态：** 设计（brainstorming 产出，待 writing-plans 转实施）。已并入两轮数值评审：① `离散格式与 well-balancing 相消证明.md` → Path B（Audusse 单侧分裂）+ WB 边源系数约定（§2.2/§2.4b）；② `审核附件设计方案.md` → 地形源改 Audusse 平方差形式 `½g·phi_t,i·(h̄²−h_i²)`，G5 升至与网格无关的逐位机器零（§2.2/§2.3）。
 > **范围决策：** A（well-balancing 收口，Phase-1 spec 边界内）。
 > **权威依据：** 主 Spec `2026-04-11-scau-ufm-global-architecture-design.md` §5.2（控制方程）、§5.5（DPM-HLLC 调用顺序与主权分离）、§5.5.1（波速锁定）、§5.5.2（DPM 一致性引理、边平均算子、验证空白区）、§5.6（S_phi_t/S_topo 界面中心差分）；符号表 `2026-04-22-symbols-and-terms-reference.md`。
 
@@ -24,10 +24,15 @@
 
 - phi_t-缩放压力界面通量（守恒，左右反号）：`F_p,e = 0.5·g·phi_t,e·h̄_e²`，沿 `n`
 - 孔隙率单侧局部源（对单元 `i`）：`S_phi_t,e^(i) = 0.5·g·h̄_e²·(phi_t,e − phi_t,i)`，沿 `n_{ie}`
-- 地形单侧局部源（对单元 `i`）：`S_topo,e^(i) = −g·phi_t,e·h̄_e·(z_{b,e} − z_{b,i})`，沿 `n_{ie}`
+- 地形单侧局部源（对单元 `i`，**Audusse 平方差形式**，乘单元自身 `phi_t,i`）：`S_topo,e^(i) = 0.5·g·phi_t,i·(h̄_e² − h_i²)`，沿 `n_{ie}`
+  - 此式由 Audusse 标准两项合并而来：界面平方差源 `0.5·g·phi_t,i·(h̄_e² − h_i*²)` + 单元中心配套源 `0.5·g·phi_t,i·(h_i*² − h_i²)`，逐边代数相加 `h_i*²` 消去 → 单一 per-edge 项 `0.5·g·phi_t,i·(h̄_e² − h_i²)`（见 §2.3 证明）。
 - 边分类门控（复用 M248 `classify_edge`，§5.6）：hard-block 不装配任何 WB 配对项；soft-block 与 regular 装配。
 
-`h̄_e` 使用 hydrostatic reconstruction 后的 `h_L*`、`h_R*` 之均值（与压力通量同模板，§5.6）。`phi_t,e − phi_t,i = ½(phi_t,j − phi_t,i)`，故单侧孔隙率源等效于全跳变系数 **¼**（见 §2.2 系数校正）。`n_{ie}` 为单元 `i` 在边 `e` 的外法向。
+`h̄_e` 使用 hydrostatic reconstruction 后的 `h_L*`、`h_R*` 之均值；`h_i` 为单元中心水深，`h_i*` 为单元 `i` 在边 `e` 的重构水深（与压力通量同模板，§5.6）。`phi_t,e − phi_t,i = ½(phi_t,j − phi_t,i)`，故单侧孔隙率源等效于全跳变系数 **¼**（见 §2.2 系数校正）。`n_{ie}` 为单元 `i` 在边 `e` 的外法向。
+
+**地形源主权**：地形源乘**单元自身 `phi_t,i`**（非边平均 `phi_t,e`），这是逐位对消的关键（§2.3）。
+
+**装配归属决策**：Audusse 单元中心配套源因与界面平方差源逐边合并，**完整单侧贡献（含地形项）由 `well_balanced` 纯函数按边输出**，step.cpp 仅按 `n_{ie}` 累加——无需单独的单元内源 pass（评审实施问题取此选项）。
 
 ### 1.3 `libs/surface2d/time_integration/step`（接线）
 
@@ -59,10 +64,10 @@ S_phi_t = ½g·h²·∇φt        S_topo = −g·φt·h·∇z_b
 内部边 `e_ij`，单元 `i` 在边的外法向 `n_{ie}`，`h̄_e = ½(h_i*+h_j*)`，`phi_t,e = ½(phi_t,i+phi_t,j)`，Audusse 重构底高 `z_{b,e} = max(z_{b,i}, z_{b,j})`：
 
 ```
-F_adv,e     = phi_e_n · (h·u·u_n)_HLLC                          [仅平流，无压力；界面通量]
-F_p,e       = ½·g·phi_t,e·h̄_e²                                 [界面通量，左右反号]
-S_phi_t,e^(i) = ½·g·h̄_e² · (phi_t,e − phi_t,i)                  [单元 i 侧局部源]
-S_topo,e^(i)  = −g·phi_t,e·h̄_e · (z_{b,e} − z_{b,i})            [单元 i 侧局部源]
+F_adv,e       = phi_e_n · (h·u·u_n)_HLLC                        [仅平流，无压力；界面通量]
+F_p,e         = ½·g·phi_t,e·h̄_e²                               [界面通量，左右反号]
+S_phi_t,e^(i) = ½·g·h̄_e² · (phi_t,e − phi_t,i)                 [单元 i 侧局部源]
+S_topo,e^(i)  = ½·g·phi_t,i · (h̄_e² − h_i²)                    [单元 i 侧局部源，Audusse 平方差]
 ```
 
 单元 `i` 的边 `e` 贡献（所有项乘 `n_{ie}·len_e`）：
@@ -71,9 +76,11 @@ S_topo,e^(i)  = −g·phi_t,e·h̄_e · (z_{b,e} − z_{b,i})            [单元
 dM_i += ( −F_adv,e − F_p,e + S_phi_t,e^(i) + S_topo,e^(i) ) · n_{ie} · len_e
 ```
 
-单元 `j` 用其自身 `n_{je} = −n_{ie}`、`phi_t,j`、`z_b,j` 对称装配（`F_adv,e`、`F_p,e` 因 `n_{je}=−n_{ie}` 自动反号守恒）。三处必须共用同一 `h̄_e`、`phi_t,e`、`z_{b,e}` 模板（§5.6 强制；禁止任一处单独换平均或限幅器）。
+单元 `j` 用其自身 `n_{je} = −n_{ie}`、`phi_t,j`、`h_j` 对称装配（`F_adv,e`、`F_p,e` 因 `n_{je}=−n_{ie}` 自动反号守恒）。压力/孔隙率项共用同一 `h̄_e`、`phi_t,e` 模板（§5.6 强制；禁止任一处单独换平均或限幅器）。
 
-**系数校正（评审拦截）**：`phi_t,e − phi_t,i = ½(phi_t,j − phi_t,i)`，即单侧源等效于"全跳变" `(phi_t,j − phi_t,i)` 的系数 **¼**。若误用全跳变系数 ½（在两侧同步累加约定下），等同重复计双倍孔隙率跳变、G4 立即 O(1) 报红。
+**系数校正（第一轮评审拦截）**：`phi_t,e − phi_t,i = ½(phi_t,j − phi_t,i)`，即孔隙率单侧源等效于"全跳变" `(phi_t,j − phi_t,i)` 的系数 **¼**。若误用全跳变系数 ½（两侧同步累加约定），重复计双倍孔隙率跳变、G4 立即 O(1) 报红。
+
+**地形源平方差修正（第二轮评审拦截）**：地形源不可用线性化中点差分 `−g·phi_t,e·h̄_e·(z_{b,e}−z_{b,i})`——其在非均匀/任意多边形网格上因逐边变化的 `h̄_e` 无法提出单元中心常量，G5 残差在 `O(Δz_b)` 报红。必须用 **Audusse 平方差形式** `½·g·phi_t,i·(h̄_e² − h_i²)`（乘单元自身 `phi_t,i`），使闭合多边形求和后退化为单元中心常量 → 逐位归零（§2.3）。
 
 ### 2.3 Well-Balancing 单侧逐位相消证明（静水 u=0，η=h+z_b 均匀）
 
@@ -85,31 +92,39 @@ dM_i += ( −F_adv,e − F_p,e + S_phi_t,e^(i) + S_topo,e^(i) ) · n_{ie} · len
 
 静水 `∇η=0` ⟹ 压力散度被 `S_phi_t + S_topo` 精确抵消。
 
-**离散单侧对消（单元 i 侧）**：
+**离散单侧逐位对消（单元 i 侧，三步）**：
 
-孔隙率项：
+1. 压力 + 孔隙率源 → 退化为以**本单元 phi_t,i** 计的局部压力：
 ```
 −F_p,e + S_phi_t,e^(i) = −½g·phi_t,e·h̄² + ½g·h̄²·(phi_t,e − phi_t,i) = −½g·phi_t,i·h̄²
 ```
-即单元 i 侧的"压力通量 − 孔隙率源"精确退化为以**本单元 phi_t,i** 计的局部静水压力 `−½g·phi_t,i·h̄²`。
 
-地形项：静水时 `η_i = h_i* + z_{b,e} = h_i + z_{b,i}`（重构与单元中心同 η），故 `z_{b,e} − z_{b,i} = h_i − h̄_e`（因 η 均匀，`h_i* = η − z_{b,e} = h̄_e`）。代入 `S_topo,e^(i) = −g·phi_t,e·h̄_e·(h_i − h̄_e)`。
+2. 加 Audusse 平方差地形源（合并形式 `½g·phi_t,i·(h̄² − h_i²)`）→ 就地消去逐边变化的 `h̄²`，退化为单元中心常量 `h_i²`：
+```
+−½g·phi_t,i·h̄² + ½g·phi_t,i·(h̄² − h_i²) = −½g·phi_t,i·h_i²
+```
+（等价于 Audusse 两项链：界面 `½g·phi_t,i·(h̄²−h_i*²)` 先消 `h̄²` 得 `−½g·phi_t,i·h_i*²`，单元中心配套 `½g·phi_t,i·(h_i*²−h_i²)` 再把 `h_i*²` 转为 `h_i²`；`h_i*²` 逐边代数抵消。）
 
-将单侧总和沿单元 i 的闭合多边形求和：`Σ_e (−½g·phi_t,i·h̄_e²) n_{ie} len_e`。当 η 均匀、各边 `h̄_e = η − z_{b,e}` 由共享 `z_{b,e}` 决定时，配合 `S_topo` 项使各边贡献与单元内部静水压梯度逐位相消 ⟹ `dM_i = 0` ⟹ 速度保持零。平流项 `F_adv,e` 在 `u=0` 时为 0，不破坏平衡。
+3. 沿单元 i 闭合多边形求和：`phi_t,i`、`h_i²` 均为**单元中心常量**，提出求和号：
+```
+Σ_e (−½g·phi_t,i·h_i²) n_{ie} len_e = −½g·phi_t,i·h_i² · Σ_e n_{ie} len_e ≡ 0
+```
+任意闭合多边形的几何外法向积分 `Σ_e n_{ie} len_e ≡ 0` ⟹ `dM_i = 0` ⟹ 速度保持零。
 
-> **实施期锁定项（G5 验证目标）**：地形项的**逐位**对消依赖重构 `h_i*` 与 `S_topo` 源严格同模板。Audusse 标准在 `h_i ≠ h̄_e`（低床单元）时需配套的 centered 地形源分量；本设计采用单侧 `z_{b,e}=max` 重构形式，其在变床下的精确逐位对消由实施计划锁定 `h_i*` 使用细节，并以 G5（`EXPECT_NEAR`，tol 1e-10）为验收。平床 G4 为精确逐位（tol 1e-12）。
+**这是与网格无关的 bit-wise 绝对静水对消**：逐边变化的 `h̄_e`、各边不同的 `z_{b,e}` 全部被平方差结构吸收，最终只剩单元中心常量的几何恒等式。孔隙率大范围跳变（G4）与高陡斜坡（G5）同时发生时残差亦锁死在机器零。平流项 `F_adv,e` 在 `u=0` 时为 0，不破坏平衡。
+
+> **G4/G5 验收**：平床 phi_t 跳变（G4）与变床 phi_t 均匀（G5）均为逐位机器零，`EXPECT_NEAR` tol `1e-12`（残差仅受 `Σ n·L` 的几何浮点舍入 ~1e-15 影响）。
 
 ### 2.4 关键场景预期
 
 - **G2/G4（phi_t 跳变，平床 z_b=0，u=0）**：`∇η=0`，压力跳变力被单侧 `S_phi_t,e^(i)` 逐位抵消 → 零速度；`S_topo=0`（tol 1e-12）。
-- **G5（z_b 斜坡，phi_t 均匀，u=0）**：`∇η=0`，压力随 h 的力被单侧 `S_topo,e^(i)` 抵消 → 零速度；`S_phi_t=0`（tol 1e-10，Audusse 重构）。
+- **G5（z_b 斜坡，phi_t 均匀，u=0）**：`∇η=0`，压力随 h 的力被 Audusse 平方差地形源 `S_topo,e^(i)=½g·phi_t,i·(h̄²−h_i²)` 逐位抵消 → 零速度；`S_phi_t=0`（tol 1e-12，与网格无关）。
 
-### 2.4b 装配约定决策（Path B over Path A）
+### 2.4b 装配约定与离散决策（两轮评审）
 
-经数值评审（`离散格式与 well-balancing 相消证明.md`）核验，采纳 **Path B（Audusse 单侧分裂）**，否决 Path A（中心差分对 + 硬系数 ¼）：
-
-- **Path A**（全边共享中心源、两侧同步累加）：须把 `S_phi_t` 全跳变系数硬改为 ¼；平床精确，但变床/陡坡/干湿下因 Audusse 非线性截断 `h*=max(0,η−z_{b,e})` 难以逐位对消。
-- **Path B**（单侧局部对消，采纳）：用单元自身 `phi_t,i`/`z_b,i` 与重构 `z_{b,e}=max` 构造单侧源，逐位对消天然兼容变床与未来干湿，扩展性强；CUDA 线程内按 Left/Right 单侧装配，无需跨线程共享系数约定。
+- **第一轮**（`离散格式与 well-balancing 相消证明.md`）：采纳 **Path B（Audusse 单侧分裂）**，否决 Path A（全边共享中心源 + 硬系数 ¼）。Path B 用单元自身 `phi_t,i` 构造单侧源、逐位对消、CUDA 线程内按 Left/Right 单侧装配，无需跨线程共享系数约定；天然兼容变床与未来干湿。孔隙率单侧源等效全跳变系数 ¼。
+- **第二轮**（`审核附件设计方案.md`）：地形源由**线性化中点差分** `−g·phi_t,e·h̄·(z_{b,e}−z_{b,i})` 改为 **Audusse 平方差形式** `½g·phi_t,i·(h̄²−h_i²)`。前者在非均匀/任意多边形网格上因逐边变化的 `h̄_e` 无法提出单元中心常量、G5 在 `O(Δz_b)` 报红；后者使闭合多边形求和退化为单元中心常量的几何恒等式 `Σ n·L ≡ 0`，与网格无关地逐位归零。地形源乘单元自身 `phi_t,i`（非边平均）是该对消的关键。
+- **装配归属**：Audusse 单元中心配套源与界面平方差源逐边代数合并为单一 per-edge 项，故完整单侧贡献（含地形）由 `well_balanced` 纯函数按边输出，step.cpp 仅按 `n_{ie}` 累加——无需单独单元内 pass。
 
 **教训（记入 cerebrum）**：WB 边源的系数依赖装配约定；"全跳变"与"单侧半跳变"差 2 倍，约定与系数必须配套，否则 G4 在 O(1) 级报红。
 
@@ -126,7 +141,7 @@ dM_i += ( −F_adv,e − F_p,e + S_phi_t,e^(i) + S_topo,e^(i) ) · n_{ie} · len
 | ID | 名称 | 场景 | 断言 |
 |---|---|---|---|
 | G4 | phi_t-jump lake at rest | 混合网格，u=0，η 均匀，phi_t 跳变（如 1.0→1.5），墙边界 | 一步后 `max(|hu|,|hv|) < 1e-12`；WB 压力与 `S_phi_t` 装配非零但相消 |
-| G5 | sloping-bed lake at rest | u=0，η 均匀（z_b 斜坡 ⟹ h 随之），phi_t 均匀，墙边界 | 一步后 `max(|hu|,|hv|) < 1e-10`（`EXPECT_NEAR`）；WB 压力与 `S_topo` 装配非零但相消 |
+| G5 | sloping-bed lake at rest | u=0，η 均匀（z_b 斜坡 ⟹ h 随之），phi_t 均匀，非均匀/混合网格，墙边界 | 一步后 `max(|hu|,|hv|) < 1e-12`（`EXPECT_NEAR`，Audusse 平方差，与网格无关）；WB 压力与 `S_topo` 装配非零但逐位相消 |
 
 落位：先作为 `tests/unit/surface2d/` 单测（与 `test_well_balanced_lake_at_rest` 同形）；GoldenSuite manifest 化属独立任务，G4/G5 设计为其候选 `G_n`。
 
@@ -160,7 +175,7 @@ dM_i += ( −F_adv,e − F_p,e + S_phi_t,e^(i) + S_topo,e^(i) ) · n_{ie} · len
 
 ### 3.5 命名（符号表对齐）
 
-新机器可读名：`wb_pressure_flux`、`s_phi_t`、`s_topo`、`phi_t_edge`、`h_bar_edge`、`z_b_edge`（= `max(z_b_i, z_b_j)`，Audusse 重构底高）。单侧源记为 `s_phi_t_side`、`s_topo_side`（per-cell-side）。保留 `phi_e_n`/`omega_edge`/`phi_t` 既有语义；不引入 `Q_max_safe` 类退役别名；`max_cell_cfl` 不乘 `CFL_safety`（不变）。
+新机器可读名：`wb_pressure_flux`、`s_phi_t`、`s_topo`、`phi_t_edge`、`h_bar_edge`、`h_reconstructed`（`h_i*`）、`z_b_edge`（= `max(z_b_i, z_b_j)`，Audusse 重构底高）。单侧源记为 `s_phi_t_side`、`s_topo_side`（per-cell-side；地形为 Audusse 平方差 `½ g phi_t_i (h_bar² − h_cell²)`）。保留 `phi_e_n`/`omega_edge`/`phi_t` 既有语义；不引入 `Q_max_safe` 类退役别名；`max_cell_cfl` 不乘 `CFL_safety`（不变）。
 
 ## 4. 边界声明
 
