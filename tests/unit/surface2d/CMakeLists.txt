@@ -294,3 +294,21 @@ target_link_libraries(test_well_balanced_pairing
         GTest::gtest_main
 )
 add_test(NAME test_well_balanced_pairing COMMAND test_well_balanced_pairing)
+
+add_executable(test_well_balanced_phi_t_jump_at_rest test_well_balanced_phi_t_jump_at_rest.cpp)
+target_link_libraries(test_well_balanced_phi_t_jump_at_rest
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_well_balanced_phi_t_jump_at_rest COMMAND test_well_balanced_phi_t_jump_at_rest)
+
+add_executable(test_well_balanced_sloping_bed_at_rest test_well_balanced_sloping_bed_at_rest.cpp)
+target_link_libraries(test_well_balanced_sloping_bed_at_rest
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_well_balanced_sloping_bed_at_rest COMMAND test_well_balanced_sloping_bed_at_rest)
