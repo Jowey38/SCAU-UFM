@@ -23,7 +23,11 @@
 - 全量测试 **142/142 passed**（含 1 个 DISABLED G5），约 38 s。
 - 安检：S_phi_t 改动面均为纯算术；单元/边索引经 `GeometryCache` 邻接 + `validate_*_match_mesh` 边界保护；`reconstruct_hydrostatic_pair` 纯函数、`diagnostics.edges.back()` 安全；无原始内存/字符串/路径/第三方面。无 finding。
 
-## 3. 未交付：G5 变床静水 well-balancing（已定位、已 DISABLED、待专项）
+## 3. G5 变床静水 well-balancing（已解决 2026-06-24）
+
+> **更新：** 已通过专项 `docs/superpowers/plans/2026-06-23-audusse-hydrostatic-reconstruction.md` 解决。`reconstruct_hydrostatic_pair` 已修复为主 Spec §5.4 Audusse（commit `3167da5`），bed-step 夹具迁移（`70b73d8`），G5 启用并**逐位通过 1e-12、与网格无关**（`806fe75`）。Task 1 经 subagent 两阶段评审；Task 2 迁移经 subagent 评审确认正当；Task 3/4 因积分耗尽 inline。全量 142/142。下文为原始缺口记录（保留备查）。
+
+### 原始缺口记录
 
 G5 失败，残差 `O(Δz_b)≈0.13`。根因是**预存的主 Spec §5.4 偏差**：共享的 `reconstruct_hydrostatic_pair` 用 `h_i*=max(0, eta_min − z_b_i)`，而 §5.4 要求 Audusse `z_b*=max(z_b_L,z_b_R)`、`h_i*=max(0, eta_i − z_b*)`。变床上当前式使 `h_L*≠h_R*`，标准 HLLC 因此在静水态产生伪平流通量。WB 配对本身正确（`left_normal=−½g·phi_t_i·h_i²` 与 h̄ 无关，已由 G4 与模块单测证明）。
 

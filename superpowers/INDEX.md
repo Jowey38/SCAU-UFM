@@ -9,7 +9,7 @@
 | `superpowers/specs/2026-04-11-scau-ufm-global-architecture-design.md` | 主 Spec；定义物理语义、接口契约、系统不变式、耦合核心语义与默认参数。 |
 | `superpowers/specs/2026-04-14-scau-ufm-stability-reliability-protocol.md` | 稳定性协议；定义 gate、触发阈值、执行后果、证据要求与 operator 责任。 |
 | `superpowers/specs/2026-04-22-symbols-and-terms-reference.md` | 符号与术语表；定义 machine-facing 名称、单位、退役别名与命名约束。 |
-| `superpowers/specs/project-layout-design.md` | 目标目录结构设计；定义二维地表内核、CouplingLib、SWMM/D-Flow FM 适配、第三方治理、验证体系与 Phase 演进的目标工程落位。 |
+| `superpowers/specs/project-layout-design.md` | 目标目录结构设计；定义二维地表内核、CouplingLib（含 1D-1D 交换原语 `core/engine_interface/` 与三方步进驱动 `coupling/driver/`）、SWMM/D-Flow FM 适配、第三方治理（区分源码静态嵌入与 BMI 接口快照 + 运行时 DLL 两种嵌入模式）、validation 层、验证体系与 Phase 演进的目标工程落位；集成验证按三对两两双向 + 全耦合组织。 |
 
 ## 执行类规范（条件性权威）
 
@@ -113,6 +113,18 @@
 | `superpowers/specs/2026-06-09-m235-controlled-non-production-real-publisher-readiness-gap-analysis.md` | M235 controlled non-production real publisher readiness gap analysis；列出真实 publisher 前置审批、credential、sink policy、idempotency、audit 与 failure-handling 缺口，确认 real publisher 仍 blocked。 |
 | `superpowers/specs/2026-06-09-m236-controlled-non-production-real-publisher-sandbox-contract-design.md` | M236 controlled non-production real publisher sandbox contract design；定义非生产 sandbox sink request/response、credential reference、operator approval、idempotency、audit 与 fail-closed 语义，仍不实现真实发布。 |
 | `superpowers/specs/2026-06-09-m237-controlled-non-production-publisher-sandbox-contract-mock-implementation-evidence.md` | M237 controlled non-production publisher sandbox contract mock implementation evidence；记录 deterministic validation-layer contract mapper 与 fail-closed 覆盖，仍无真实 sink 提交或外部发布。 |
+| `superpowers/specs/2026-06-09-m238-controlled-non-production-publisher-sandbox-contract-stage-rollup.md` | M238 controlled non-production publisher sandbox contract stage rollup；汇总 M235-M237 contract gap/design/mock evidence，关闭 validation-only contract stage，仍不构成真实发布或 production readiness 证据。 |
+| `superpowers/specs/2026-06-12-m239-controlled-non-production-publisher-sandbox-contract-dependency-guard-design.md` | M239 controlled non-production publisher sandbox contract dependency guard design；定义 source/build/evidence 负向 guard，防止 mock contract 引入真实 network/filesystem/credential resolver/CI-release/engine 依赖。 |
+| `superpowers/specs/2026-06-13-m241-surface2d-source-terms-and-geometry-cache-evidence.md` | M241 Surface2D 源项补全与几何缓存优化证据；记录 Manning 摩阻/降雨/入渗/耦合交换源项、GeometryCache 热路径优化、fail-closed 加固与 127/127 全量测试证据；不构成 GoldenSuite 门禁证据。 |
+| `superpowers/specs/2026-06-13-m242-surface2d-cfl-wetting-structure-evidence.md` | M242 Surface2D CFL 与 Wetting/Drying 结构对齐证据；记录 `cfl/diagnostics`、`wetting_drying/limits` 模块抽取、step.cpp 边界收敛与 130/130 全量测试证据。 |
+| `superpowers/specs/2026-06-13-m244-anisotropic-dpm-tensor-projection-evidence.md` | M244 Anisotropic DPM 张量投影模块证据；记录 `dpm/tensor_projection` 边张量算术平均、法向/切向投影、退化保守规则、各向异性度量与弱保证标记（主 Spec §5.3/§5.5.2），纯函数 fail-closed、零回归、132/132 全量测试；尚未接入 HLLC 热路径，不构成 GoldenSuite 门禁证据。 |
+| `superpowers/specs/2026-06-13-m245-phi-c-tensor-migration-and-edge-conveyance-assembly-evidence.md` | M245 Phi_c 张量化与边导流装配证据；`CellDpmFields.Phi_c` 标量迁移为 `Tensor2Symmetric`，新增 `dpm/edge_conveyance` 从张量派生边 `phi_e_n`（算术平均投影 + omega 缩放 + 弱保证计数）；默认单位张量保持 `phi_e_n=1.0` 不漂移 golden，HLLC 仍消费边 `phi_e_n`，133/133 全量测试；记录 bug-014 phi_t 越界校验回归。不构成 GoldenSuite 门禁证据。 |
+| `superpowers/specs/2026-06-13-m246-dpm-closure-laws-evidence.md` | M246 DPM closure_laws 参数一致性证据；新增 `dpm/closure_laws` 严格落地主 Spec `validate_dpm_consistency`（phi_t>=max 对角、phi_t<=1、正定、λ 下限/上限、条件数）；PreProc 期约束不接入热路径；记录放弃 `storage_exchange`（本 Spec 物理无此项）的范围决策，134/134 全量测试。不构成 GoldenSuite 门禁证据。 |
+| `superpowers/specs/2026-06-13-m248-edge-classification-and-wb-pairing-gating-evidence.md` | M248 边界面分类与 WB 配对装配证据（原拟 M247，因并行会话占用改标）；新增 `dpm/edge_classification`（spec epsilon_omega=1e-4、phi_edge_min=0.01），统一 hard/soft/regular 判据，校正 hllc 临时阈值 1e-12→spec 值，并按 §5.6 在 hard-block 边门控 WB 配对；默认场零回归、135/135 全量测试。S_phi_t 接入动量留作后续任务。不构成 GoldenSuite 门禁证据。 |
+| `superpowers/specs/2026-06-13-m249-well-balanced-wall-pressure-gap-evidence.md` | M249 静水 well-balancing 墙边界压力修复证据（已落地）；记录 lake-at-rest 伪加速 bug、根因（反射墙未施加 0.5gh² 压力）、落地修复、边诊断层测试迁移、启用 lake-at-rest 回归与 139/139 全量测试证据。bug-026 resolved。 |
+| `superpowers/specs/2026-06-23-s-phi-t-momentum-coupling-evidence.md` | S_phi_t 接入动量（scope A）实施证据；HLLC 平流-only + `well_balanced` Audusse 单侧分裂配对（F_p/S_phi_t/平方差 S_topo）+ step 接线 + phi_t-缩放墙压；G4 平床 phi_t 跳变与 G5 变床静水均逐位 1e-12 well-balanced；含主 Spec §5.4 Audusse `reconstruct_hydrostatic_pair` 修复与 bed-step 夹具迁移。142/142 全量测试；动态 phi_t 跳变仍属 §5.5.2 验证空白区，不构成 GoldenSuite 门禁证据。 |
+| `superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md` | M247 城市产流模块设计；规划 Surface2D 独占地表产流、Green-Ampt 首实现、CUDA-ready enum/SoA 分发、透水/不透水/屋面直排分链、roof direct-drain intent 经 CouplingLib 注入 SWMM lateral inflow、roof pending/overflow 守恒、fail-closed 与 Golden runoff urban block 候选。不构成实现或 GoldenSuite 门禁证据。 |
+| `superpowers/specs/2026-06-12-m240-embedded-engine-extraction-and-tri-coupling-evidence.md` | M240 嵌入式引擎提取与三方两两双向耦合实施证据；记录 SWMM 5.2.4 solver 提取到 `extern/swmm5/`、BMI 契约快照、third_party 治理、真实 `SwmmEngine` 静态嵌入证据（真实算例 5/5）、`DFlowFMEngine` BMI 运行时加载 fail-closed 边界、core 1D-1D 接口交换原语、1D→2D 返流路径与 `libs/coupling/driver/` 三方耦合步进驱动；D-Flow FM 真实 kernel 步进证据仍 blocked（待外部构建 DLL）。 |
 
 ## 历史记录规则
 
