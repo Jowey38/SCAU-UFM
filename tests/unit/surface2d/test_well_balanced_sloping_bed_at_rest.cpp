@@ -23,19 +23,8 @@ double max_abs_momentum(const scau::surface2d::SurfaceState& state) {
 // (1.5 everywhere); each cell's depth h = eta - z_b differs (z_b = cell-index
 // fraction). Zero velocity, walled domain, uniform phi_t. The Audusse
 // square-difference S_topo pairing keeps the lake at rest, mesh-independent.
-//
-// DISABLED: this currently FAILS (residual ~ O(dz_b), 0.13) because the shared
-// `reconstruct_hydrostatic_pair` deviates from main-spec 5.4 Audusse: it uses
-// h_i* = max(0, eta_min - z_b_i) instead of the spec's h_i* = max(0, eta_i -
-// max(z_b_i, z_b_j)). Over a variable bed this makes h_L* != h_R* at rest, so
-// the standard HLLC produces a spurious advective flux (the WB pairing itself
-// is correct: left_normal reduces to -0.5 g phi_t_i h_i^2 regardless of h_bar).
-// Achieving sloping-bed well-balancing requires fixing the reconstruction to
-// spec 5.4 Audusse, which is a foundational kernel change that also changes the
-// expectations of test_hydrostatic_reconstruction (PreservesVelocityWhenDepth-
-// IsClipped) and the bed-step fixtures (set_edge_aligned_state). Deferred to a
-// dedicated, reviewed task. Re-enable (remove DISABLED_) together with that fix.
-TEST(WellBalancedSlopingBedAtRest, DISABLED_SlopingBedKeepsMomentumZero) {
+// Enabled after the main-spec 5.4 Audusse reconstruction fix.
+TEST(WellBalancedSlopingBedAtRest, SlopingBedKeepsMomentumZero) {
     const auto mesh = scau::mesh::build_mixed_minimal_mesh();
     const double eta = 1.5;
     auto state = scau::surface2d::SurfaceState::for_mesh(mesh);
