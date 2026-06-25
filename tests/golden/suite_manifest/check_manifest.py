@@ -72,14 +72,21 @@ def main() -> None:
     if unknown:
         fail(f"unknown manifest test_id(s): {', '.join(unknown)}")
 
-    # For every active implemented entry, golden CMakeLists must mention the target name.
-    cmake_text = TESTS_CMAKELISTS.read_text(encoding="utf-8") if TESTS_CMAKELISTS.exists() else ""
+        # For every active implemented entry, some tests/golden/**/CMakeLists.txt
+    # must register the add_test token, and at least one golden CMakeLists must
+    # set the LABELS golden property.
+    cmake_texts = []
+    if TESTS_CMAKELISTS.exists():
+        cmake_texts.append(TESTS_CMAKELISTS.read_text(encoding="utf-8"))
+    for path in sorted((ROOT / "tests" / "golden").glob("*/CMakeLists.txt")):
+        cmake_texts.append(path.read_text(encoding="utf-8"))
+    combined_cmake = "\n".join(cmake_texts)
     for test_id, (name, status, ci_gate) in REQUIRED.items():
         if status == "implemented" and ci_gate:
             token = f"add_test(NAME test_{name}"
-            if token not in cmake_text:
+            if token not in combined_cmake:
                 fail(f"{test_id}: active gate test missing add_test token {token}")
-            if "LABELS golden" not in cmake_text:
+            if "LABELS golden" not in combined_cmake:
                 fail("golden CMakeLists must label tests with LABELS golden")
 
     print("OK goldensuite manifest completeness passes")
