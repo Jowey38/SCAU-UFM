@@ -1,3 +1,5 @@
+include_directories(${CMAKE_SOURCE_DIR})
+
 add_subdirectory(hydrostatic_step)
 add_subdirectory(phi_t_jump_hydrostatic)
 add_subdirectory(phi_c_edge_zero_velocity)
