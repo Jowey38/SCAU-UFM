@@ -12,6 +12,7 @@ struct RunoffCellInputs {
     core::Real rainfall_rate{0.0};  // m/s
     core::Real phi_t{1.0};
     core::Real cell_area{0.0};      // m^2 (plan area)
+    core::Real surface_depth{0.0};  // m (existing ponded surface water depth h)
 };
 
 // Per-cell static parameters. Area fractions are dimensionless; abstraction and
@@ -45,7 +46,8 @@ struct RunoffCellState {
 // Ground (pervious + impervious) outcome for one substep, in m^3.
 struct GroundRunoffResult {
     core::Real surface_added_volume{0.0};
-    core::Real infiltration_volume{0.0};
+    core::Real infiltration_volume{0.0};          // pure-liquid, rain-derived
+    core::Real ponded_infiltration_volume{0.0};   // pure-liquid, ponded-h-derived
     core::Real abstraction_volume{0.0};
     core::Real depression_storage_delta_volume{0.0};
     bool ponding_started{false};

@@ -21,6 +21,9 @@ void validate_common_inputs(
     if (!std::isfinite(inputs.cell_area) || inputs.cell_area <= 0.0) {
         throw std::invalid_argument("runoff cell_area must be finite and positive");
     }
+    if (!std::isfinite(inputs.surface_depth) || inputs.surface_depth < 0.0) {
+        throw std::invalid_argument("runoff surface_depth must be finite and non-negative");
+    }
     if (!std::isfinite(dt) || dt <= 0.0) {
         throw std::invalid_argument("runoff dt must be finite and positive");
     }
@@ -67,25 +70,36 @@ GroundRunoffResult evaluate_ground_runoff(
         std::max(core::Real(0.0), params.depression_storage_capacity - state.depression_storage_filled);
     const core::Real dep_fill_depth = std::min(dep_remaining, after_abstraction);
     state.depression_storage_filled += dep_fill_depth;
-    const core::Real available_depth = after_abstraction - dep_fill_depth;
+    const core::Real rain_excess = after_abstraction - dep_fill_depth;
+
+    // Couple the cell's existing ponded surface water into the SAME Green-Ampt
+    // call. Surface storage is phi_t * h * A, so pre-scale the ponded depth by
+    // phi_t when forming the capacity offered to the soil. The resulting
+    // infiltrated_depth is PURE LIQUID (no phi_t factor on the recomposed volume).
+    const core::Real surface_depth_equivalent = inputs.surface_depth * inputs.phi_t;
+    const core::Real available_depth = rain_excess + surface_depth_equivalent;
 
     GroundRunoffResult result;
     result.abstraction_volume = abs_fill_depth * area_ground;
     result.depression_storage_delta_volume = dep_fill_depth * area_ground;
 
-    core::Real infiltrated_depth = 0.0;
+    core::Real inf_from_rain_depth = 0.0;
+    core::Real inf_from_ponded_depth = 0.0;
     if (area_pervious > 0.0) {
         const auto ga = green_ampt_infiltration_step(
             params.soil, state.cumulative_infiltration, available_depth, dt, f_inf_floor);
-        infiltrated_depth = ga.infiltrated_depth;
         state.cumulative_infiltration = ga.cumulative_infiltration;
         result.ponding_started = ga.ponding_started;
+        // Post-call attribution: rain is consumed first, ponded h covers the rest.
+        inf_from_rain_depth = std::min(ga.infiltrated_depth, rain_excess);
+        inf_from_ponded_depth = ga.infiltrated_depth - inf_from_rain_depth;
     }
 
-    const core::Real runoff_pervious_depth = available_depth - infiltrated_depth;
-    result.infiltration_volume = infiltrated_depth * area_pervious;
+    const core::Real runoff_pervious_depth = rain_excess - inf_from_rain_depth;
+    result.infiltration_volume = inf_from_rain_depth * area_pervious;
+    result.ponded_infiltration_volume = inf_from_ponded_depth * area_pervious;
     result.surface_added_volume =
-        runoff_pervious_depth * area_pervious + available_depth * area_impervious;
+        runoff_pervious_depth * area_pervious + rain_excess * area_impervious;
     return result;
 }
 
@@ -183,6 +197,12 @@ RunoffGenerationOutput evaluate_runoff_generation(
     RunoffGenerationOutput out;
     out.result.rainfall_volume = rain_depth * (area_ground + area_roof);
     out.result.surface_added_volume = ground.surface_added_volume;
+    // This assembler deliberately assumes surface_depth == 0 and therefore does
+    // not audit ground.ponded_infiltration_volume. The M247-F hot path that may
+    // thread a nonzero surface_depth is evaluate_ground_runoff +
+    // apply_ground_runoff_stage; any future caller routing ponded h through this
+    // entry point must audit ponded_infiltration_volume here to avoid a silent
+    // conservation hole.
     out.result.infiltration_volume = ground.infiltration_volume;
     out.result.abstraction_volume = ground.abstraction_volume + roof.roof_abstraction_volume;
     out.result.depression_storage_delta_volume = ground.depression_storage_delta_volume;
