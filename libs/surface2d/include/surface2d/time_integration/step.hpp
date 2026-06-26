@@ -57,6 +57,10 @@ struct StepDiagnostics {
     //                    + abstraction_volume + depression_storage_delta_volume.
     core::Real rainfall_volume{0.0};            // gross rain on ground area
     core::Real surface_added_volume{0.0};       // net ground runoff added to h
+    // Pure-liquid volume of ponded surface water removed from h this step by
+    // Green-Ampt infiltration (M247-F). Maps to a depth drop via the phi_t-
+    // scaled storage mapping dh = ponded_infiltration_volume / (phi_t * A).
+    core::Real ponded_infiltration_volume{0.0};
     core::Real infiltration_volume{0.0};
     core::Real abstraction_volume{0.0};
     core::Real depression_storage_delta_volume{0.0};
