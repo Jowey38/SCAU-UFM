@@ -105,6 +105,7 @@ TEST(GoldenUrbanBlock, ConservesAcrossRainPeakAndPostRainPhases) {
     double total_rain = 0.0;
     double total_surface_added = 0.0;
     double total_overflow = 0.0;
+    double total_ponded_infiltration = 0.0;
     double total_accepted = 0.0;
     double last_f_inf = rs.cumulative_infiltration[0];
     const double v0 = system_volume(state, dpm, geom);
@@ -131,15 +132,21 @@ TEST(GoldenUrbanBlock, ConservesAcrossRainPeakAndPostRainPhases) {
             total_rain += diag.rainfall_volume;
             total_surface_added += diag.surface_added_volume;
             total_overflow += diag.roof_overflow_to_surface_volume;
+            total_ponded_infiltration += diag.ponded_infiltration_volume;
             total_accepted += diag.roof_to_swmm_accepted_volume;
         }
     }
 
     // (2) Cumulative closure across the whole run.
     const double v1 = system_volume(state, dpm, geom);
-    // In a closed box the only sources that change surface storage h are ground
-    // surface runoff and roof overflow; everything else is loss / leaves to pipe / held.
-    EXPECT_NEAR(v1 - v0, total_surface_added + total_overflow, 1.0e-8);
+    // In a closed box the surface storage h is fed by ground surface runoff and
+    // roof overflow, and drained by ponded-h Green-Ampt infiltration (M247-F);
+    // everything else is loss / leaves to pipe / held. With phi_t == 1 on every
+    // cell here, total_ponded_infiltration is ~0, but the term is wired exactly so
+    // the invariant holds once phi_t < 1 or ponded h is consumed.
+    EXPECT_NEAR(v1 - v0,
+                total_surface_added + total_overflow - total_ponded_infiltration,
+                1.0e-8);
 
     // (3) Behavioral coverage: roof both drained to SWMM and overflowed to surface.
     EXPECT_GT(total_accepted, 0.0);
@@ -148,4 +155,84 @@ TEST(GoldenUrbanBlock, ConservesAcrossRainPeakAndPostRainPhases) {
     // Post-rain phase (rate 0) contributed no gross rain: total equals the first two phases only.
     const double rained = (1.0e-4 * 5 + 5.0e-4 * 3) * config.dt * total_area;
     EXPECT_NEAR(total_rain, rained, 1.0e-9);
+}
+
+// M247-F mini-golden: phi_t < 1 on C0 with ZERO rain but nonzero ponded h. The
+// ponded-h Green-Ampt path must drain h by exactly the pervious fraction of the
+// ponded depth, and the phi_t-scaled surface storage that leaves equals the
+// reported ponded_infiltration_volume diagnostic (the new conservation term).
+TEST(GoldenUrbanBlock, LowPorosityInterfaceConservation) {
+    const auto mesh = scau::mesh::build_mixed_minimal_mesh();
+    auto state = scau::surface2d::SurfaceState::hydrostatic_for_mesh(mesh, 1.0, 0.1);
+    auto dpm = scau::surface2d::DpmFields::for_mesh(mesh);
+    dpm.cells[0].phi_t = 0.4;
+    const auto geom = scau::surface2d::GeometryCache::for_mesh(mesh);
+    const auto boundary = scau::surface2d::BoundaryConditions::for_mesh(mesh);
+    const auto sources = scau::surface2d::SourceTermFields::for_mesh(mesh);
+    auto rs = scau::surface2d::RunoffState::for_mesh(mesh);
+    auto runoff = scau::surface2d::RunoffStepInputs::for_mesh(mesh);
+    auto roof = scau::surface2d::RoofStepInputs::for_mesh(mesh);
+
+    for (std::size_t i = 0; i < mesh.cells.size(); ++i) {
+        runoff.fields.pervious_fraction[i] = 0.0;
+        runoff.fields.impervious_fraction[i] = 0.0;
+        runoff.fields.roof_fraction[i] = 0.0;
+        runoff.rainfall_rate[i] = 0.0;
+    }
+    runoff.fields.pervious_fraction[0] = 0.1;
+    runoff.lut.entries[0] = scau::surface2d::SoilParams{.k_s = 1.0, .psi_f = 0.1, .theta_s = 0.4, .theta_i = 0.1};
+
+    const scau::surface2d::StepConfig config{.dt = 1.0, .cfl_safety = 0.45, .c_rollback = 100.0, .h_min = 1.0e-8};
+    const double before = dpm.cells[0].phi_t * 0.1 * geom.cell_areas[0];
+    const auto diag = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm, boundary, sources, geom, runoff, roof, rs);
+    ASSERT_FALSE(diag.rollback_required);
+    const double after = dpm.cells[0].phi_t * state.cells[0].conserved.h * geom.cell_areas[0];
+
+    EXPECT_NEAR(before - after, diag.ponded_infiltration_volume, 1.0e-9);
+    // fully-infiltrated case: drained depth = h*pervious_fraction => h_after = h*(1 - pervious_fraction)
+    EXPECT_NEAR(state.cells[0].conserved.h, 0.09, 1.0e-9);
+    EXPECT_GE(state.cells[0].conserved.h, 0.0);
+}
+
+// M247-F stage-level coupling check: BOTH nonzero rain AND nonzero ponded h on
+// the same pervious C0 cell with phi_t < 1. Asserts the per-cell surface-storage
+// invariant phi_t*A*(h_after - h_before) == surface_added - ponded_infiltration,
+// reading the totals from the returned diagnostics (only C0 generates runoff, so
+// the cell-level and step-level totals coincide here). Rain is kept tiny and
+// c_rollback lenient so the closed lake-at-rest step never rolls back.
+TEST(GoldenUrbanBlock, MixedRainAndPondedConservation) {
+    const auto mesh = scau::mesh::build_mixed_minimal_mesh();
+    auto state = scau::surface2d::SurfaceState::hydrostatic_for_mesh(mesh, 1.0, 0.1);
+    auto dpm = scau::surface2d::DpmFields::for_mesh(mesh);
+    dpm.cells[0].phi_t = 0.4;
+    const auto geom = scau::surface2d::GeometryCache::for_mesh(mesh);
+    const auto boundary = scau::surface2d::BoundaryConditions::for_mesh(mesh);
+    const auto sources = scau::surface2d::SourceTermFields::for_mesh(mesh);
+    auto rs = scau::surface2d::RunoffState::for_mesh(mesh);
+    auto runoff = scau::surface2d::RunoffStepInputs::for_mesh(mesh);
+    auto roof = scau::surface2d::RoofStepInputs::for_mesh(mesh);
+
+    for (std::size_t i = 0; i < mesh.cells.size(); ++i) {
+        runoff.fields.pervious_fraction[i] = 0.0;
+        runoff.fields.impervious_fraction[i] = 0.0;
+        runoff.fields.roof_fraction[i] = 0.0;
+        runoff.rainfall_rate[i] = 0.0;
+    }
+    runoff.fields.pervious_fraction[0] = 0.1;
+    runoff.rainfall_rate[0] = 1.0e-4;  // tiny rain so the closed box does not roll back
+    runoff.lut.entries[0] = scau::surface2d::SoilParams{.k_s = 1.0, .psi_f = 0.1, .theta_s = 0.4, .theta_i = 0.1};
+
+    const scau::surface2d::StepConfig config{.dt = 1.0, .cfl_safety = 0.45, .c_rollback = 100.0, .h_min = 1.0e-8};
+    const double h_before = state.cells[0].conserved.h;
+    const auto diag = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm, boundary, sources, geom, runoff, roof, rs);
+    ASSERT_FALSE(diag.rollback_required);
+    const double h_after = state.cells[0].conserved.h;
+
+    // Only C0 is a runoff cell, so the step-level surface_added / ponded
+    // infiltration diagnostics equal C0's contribution.
+    const double storage_delta = dpm.cells[0].phi_t * geom.cell_areas[0] * (h_after - h_before);
+    EXPECT_NEAR(storage_delta,
+                diag.surface_added_volume - diag.ponded_infiltration_volume,
+                1.0e-9);
+    EXPECT_GE(h_after, 0.0);
 }
