@@ -44,10 +44,20 @@ infiltration volume is removed from a phi_t-weighted storage column via
 (`LowPorosityInterfaceConservation`, `MixedRainAndPondedConservation`) specifically guard the
 `O(1-phi_t)` liquid-volume leak across the surface-soil interface.
 
+As a consequence of M247-F, the reused M247-E golden `ConservesAcrossRainPeakAndPostRainPhases`
+is no longer a pure rain-only scenario: its initially-ponded pervious C0 cell now slowly drains
+via Green-Ampt infiltration across the run. This is the intended M247-F semantic and conservation
+is preserved (the surface-storage invariant accounts for it via the ponded_infiltration term); it
+is not a regression.
+
 ## 3. 自检证据
 
 - 构建：`cmake --build --preset windows-msvc` 0 编译/链接错误，0 LNK1168。
-- 测试：`ctest --preset windows-msvc` → **53/53 通过**（含本 golden；Total ≈ 10.6 s）。
+- 测试：`ctest --preset windows-msvc` → **53/53 通过**（含本 golden；Total ≈ 11.3 s）。
+  - Note: this 53 counts ctest entries (one per test executable / gtest suite binary), not
+    individual gtest TEST() cases. M247-F added 6 new gtest cases inside existing executables
+    (2 mini-goldens in test_runoff_golden_urban_block + 2 in test_runoff_ground + 2 in
+    test_runoff_step), so the ctest entry count is unchanged at 53/53 post-M247-F.
 - 单算例：`test_runoff_golden_urban_block` 1/1 通过。
 
 ## 4. 边界声明

@@ -141,9 +141,12 @@ TEST(GoldenUrbanBlock, ConservesAcrossRainPeakAndPostRainPhases) {
     const double v1 = system_volume(state, dpm, geom);
     // In a closed box the surface storage h is fed by ground surface runoff and
     // roof overflow, and drained by ponded-h Green-Ampt infiltration (M247-F);
-    // everything else is loss / leaves to pipe / held. With phi_t == 1 on every
-    // cell here, total_ponded_infiltration is ~0, but the term is wired exactly so
-    // the invariant holds once phi_t < 1 or ponded h is consumed.
+    // everything else is loss / leaves to pipe / held. This golden starts from
+    // ponded water (lake-at-rest) on the pervious C0 cell, so ponded infiltration
+    // is materially nonzero even at phi_t == 1: the subtracted
+    // total_ponded_infiltration term is actively exercised, not near-zero.
+    // (Ponded infiltration is zero only when surface_depth or pervious area is
+    // zero, which is not the case here.)
     EXPECT_NEAR(v1 - v0,
                 total_surface_added + total_overflow - total_ponded_infiltration,
                 1.0e-8);
