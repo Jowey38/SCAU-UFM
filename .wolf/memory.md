@@ -601,3 +601,6 @@
 | 10:41 | Edited superpowers/specs/2026-06-23-s-phi-t-momentum-coupling-evidence.md | 1→5 lines | ~104 |
 | 10:42 | Edited superpowers/INDEX.md | 1→2 lines | ~162 |
 | 2026-06-24 | Audusse reconstruction专项 (Task 1-4): fixed reconstruct_hydrostatic_pair to spec 5.4 Audusse; migrated 1 stale fixture; enabled G5 (bit-wise 1e-12) | hydrostatic.cpp, test_hydrostatic_reconstruction, test_dpm_edge_conveyance_assembly, test_well_balanced_sloping_bed_at_rest | full suite 142/142, build 0 errors | ~30k |
+| 11:05 | Created GoldenSuite manifest skeleton, tolerance source, placeholders, and RED checker result | tests/golden/*, tests/CMakeLists.txt | checker failed as intended on missing implemented directories | ~6k |
+
+| 2026-06-25 | GoldenSuite manifest (Task 1-5) landed in worktree feat/goldensuite-manifest: full G1-G12 JSON registry, G1-G6 active golden tests, manifest checker, CI jobs, and evidence/records | tests/golden, .github/workflows/ci.yml, superpowers/specs/2026-06-25-goldensuite-manifest-evidence.md | 6/6 golden tests pass, manifest check passes | ~20k |
