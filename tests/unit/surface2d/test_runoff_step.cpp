@@ -125,3 +125,63 @@ TEST(RunoffStep, RollbackLeavesRunoffStateUntouched) {
     EXPECT_EQ(diag.surface_added_volume, 0.0);
     for (const auto v : rs.cumulative_infiltration) EXPECT_EQ(v, 0.05);
 }
+
+TEST(GroundRunoffStage, PondedRemovalUsesPhiTScaledDepthDrop) {
+    const auto mesh = scau::mesh::build_mixed_minimal_mesh();
+    auto state = scau::surface2d::SurfaceState::hydrostatic_for_mesh(mesh, 1.0, 0.1);
+    auto dpm = scau::surface2d::DpmFields::for_mesh(mesh);
+    dpm.cells[0].phi_t = 0.4;
+    const auto geom = scau::surface2d::GeometryCache::for_mesh(mesh);
+    auto rs = scau::surface2d::RunoffState::for_mesh(mesh);
+    auto in = scau::surface2d::RunoffStepInputs::for_mesh(mesh);
+
+    // only C0 active; 10% pervious, no rain, very high capacity soil
+    for (std::size_t i = 0; i < mesh.cells.size(); ++i) {
+        in.fields.pervious_fraction[i] = 0.0;
+        in.fields.impervious_fraction[i] = 0.0;
+        in.rainfall_rate[i] = 0.0;
+    }
+    in.fields.pervious_fraction[0] = 0.1;
+    in.lut.entries[0] = scau::surface2d::SoilParams{.k_s = 1.0, .psi_f = 0.1, .theta_s = 0.4, .theta_i = 0.1};
+
+    const scau::surface2d::StepConfig config{.dt = 1.0, .h_min = 1.0e-8};
+    scau::surface2d::StepDiagnostics diag;
+    diag.cell_count = mesh.cells.size();
+
+    scau::surface2d::apply_ground_runoff_stage(state, config, dpm, in, rs, geom, diag);
+
+    // For h=0.1, phi_t=0.4, perv=0.1: all ponded supply on the pervious footprint infiltrates.
+    // ponded_infiltration_volume = (0.1*0.4) * (0.1*A) = 0.004*A
+    const double area0 = geom.cell_areas[0];
+    EXPECT_NEAR(diag.ponded_infiltration_volume, 0.004 * area0, 1.0e-9);
+    EXPECT_NEAR(state.cells[0].conserved.h, 0.09, 1.0e-9);   // h drops by h*pervious_fraction = 0.01
+    EXPECT_GE(state.cells[0].conserved.h, 0.0);
+}
+
+TEST(GroundRunoffStage, SurfaceStorageInvariantIncludesPondedInfiltration) {
+    const auto mesh = scau::mesh::build_mixed_minimal_mesh();
+    auto state = scau::surface2d::SurfaceState::hydrostatic_for_mesh(mesh, 1.0, 0.02);
+    auto dpm = scau::surface2d::DpmFields::for_mesh(mesh);
+    dpm.cells[0].phi_t = 0.5;
+    const auto geom = scau::surface2d::GeometryCache::for_mesh(mesh);
+    auto rs = scau::surface2d::RunoffState::for_mesh(mesh);
+    auto in = scau::surface2d::RunoffStepInputs::for_mesh(mesh);
+    for (std::size_t i = 0; i < mesh.cells.size(); ++i) {
+        in.fields.pervious_fraction[i] = 0.0;
+        in.fields.impervious_fraction[i] = 0.0;
+        in.rainfall_rate[i] = 0.0;
+    }
+    in.fields.pervious_fraction[0] = 1.0;
+    in.lut.entries[0] = scau::surface2d::SoilParams{.k_s = 1.0, .psi_f = 0.1, .theta_s = 0.4, .theta_i = 0.1};
+
+    const double before = 0.5 * 0.02 * geom.cell_areas[0];
+    const scau::surface2d::StepConfig config{.dt = 1.0, .h_min = 1.0e-8};
+    scau::surface2d::StepDiagnostics diag;
+    diag.cell_count = mesh.cells.size();
+    scau::surface2d::apply_ground_runoff_stage(state, config, dpm, in, rs, geom, diag);
+    const double after = 0.5 * state.cells[0].conserved.h * geom.cell_areas[0];
+
+    EXPECT_NEAR(after - before,
+                diag.surface_added_volume - diag.ponded_infiltration_volume,
+                1.0e-9);
+}

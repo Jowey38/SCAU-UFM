@@ -294,6 +294,9 @@ void apply_ground_runoff_stage(
         cell_inputs.rainfall_rate = inputs.rainfall_rate[i];
         cell_inputs.phi_t = phi_t;
         cell_inputs.cell_area = area;
+        // Current post-flux, pre-runoff surface depth; the ground chain may
+        // infiltrate this ponded water (M247-F). Read before the writeback.
+        cell_inputs.surface_depth = state.cells[i].conserved.h;
 
         RunoffCellParams params;
         params.pervious_fraction = inputs.fields.pervious_fraction[i];
@@ -317,7 +320,8 @@ void apply_ground_runoff_stage(
         const GroundRunoffResult g = evaluate_ground_runoff(
             cell_inputs, params, cell_state, config.dt, inputs.f_inf_floor);
 
-        state.cells[i].conserved.h += g.surface_added_volume / (phi_t * area);
+        state.cells[i].conserved.h +=
+            (g.surface_added_volume - g.ponded_infiltration_volume) / (phi_t * area);
 
         runoff_state.cumulative_infiltration[i] = cell_state.cumulative_infiltration;
         runoff_state.ponding_time[i] = cell_state.ponding_time;
@@ -328,6 +332,7 @@ void apply_ground_runoff_stage(
             (params.pervious_fraction + params.impervious_fraction) * area;
         diagnostics.rainfall_volume += cell_inputs.rainfall_rate * config.dt * area_ground;
         diagnostics.surface_added_volume += g.surface_added_volume;
+        diagnostics.ponded_infiltration_volume += g.ponded_infiltration_volume;
         diagnostics.infiltration_volume += g.infiltration_volume;
         diagnostics.abstraction_volume += g.abstraction_volume;
         diagnostics.depression_storage_delta_volume += g.depression_storage_delta_volume;
