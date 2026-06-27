@@ -5,6 +5,7 @@ add_library(scau_surface2d
     src/dpm/edge_classification.cpp
     src/dpm/edge_conveyance.cpp
     src/dpm/fields.cpp
+    src/dpm/phi_t_remap.cpp
     src/dpm/tensor_projection.cpp
     src/geometry/cache.cpp
     src/reconstruction/hydrostatic.cpp
