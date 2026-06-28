@@ -93,7 +93,7 @@ Contents:
 - `CMakeLists.txt`
 - `test_snapshot_replay_mass_deficit.cpp`
 
-This test should be labeled `golden` and wired into the GoldenSuite tree like G1-G6.
+This test should be wired into the GoldenSuite tree like G1-G6, but for the first landing it must use a non-gating label such as `candidate_non_gating` rather than `golden`, so the existing CI job `ctest -L golden` does not pick it up before explicit gate promotion.
 
 ## Scenario Matrix
 

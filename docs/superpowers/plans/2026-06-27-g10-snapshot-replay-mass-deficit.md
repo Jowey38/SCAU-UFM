@@ -4,7 +4,7 @@
 
 **Goal:** Promote GoldenSuite entry `G10 snapshot_replay_mass_deficit` from `pending` to an implemented Phase-1 pure in-memory CouplingLib core Golden.
 
-**Architecture:** Reuse the already-proven CouplingLib core snapshot/rollback/replay and mass-audit semantics from `tests/unit/coupling/test_coupling_core_state.cpp` and `test_coupling_mass_deficit_account.cpp`, then consolidate them into a dedicated Golden under `tests/golden/snapshot_replay_mass_deficit/`. The first landing keeps `ci_gate: false` and proves deterministic replayable-core behavior without introducing real 1D solver transient replay or any file-backed snapshot path.
+**Architecture:** Reuse the already-proven CouplingLib core snapshot/rollback/replay and mass-audit semantics from `tests/unit/coupling/test_coupling_core_state.cpp` and `test_coupling_mass_deficit_account.cpp`, then consolidate them into a dedicated Golden under `tests/golden/snapshot_replay_mass_deficit/`. The first landing keeps `ci_gate: false`, labels the target `candidate_non_gating` so the existing CI selector `ctest -L golden` does not pick it up yet, and proves deterministic replayable-core behavior without introducing real 1D solver transient replay or any file-backed snapshot path.
 
 **Tech Stack:** C++20, CMake/CTest, GoogleTest, Python 3 manifest checker, Windows MSVC preset with vcpkg.
 
@@ -59,7 +59,7 @@ target_link_libraries(test_snapshot_replay_mass_deficit
         GTest::gtest_main
 )
 add_test(NAME test_snapshot_replay_mass_deficit COMMAND test_snapshot_replay_mass_deficit)
-set_tests_properties(test_snapshot_replay_mass_deficit PROPERTIES LABELS golden)
+set_tests_properties(test_snapshot_replay_mass_deficit PROPERTIES LABELS "candidate_non_gating")
 ```
 
 - [ ] **Step 3: Create a compile-only Golden test skeleton**
@@ -485,7 +485,7 @@ Expected: `OK goldensuite manifest completeness passes`
 Run:
 
 ```bash
-ctest --preset windows-msvc -C Debug -L golden --output-on-failure
+ctest --preset windows-msvc -C Debug -L candidate_non_gating --output-on-failure
 ```
 
 Expected: PASS, now including `test_snapshot_replay_mass_deficit`.
@@ -579,7 +579,7 @@ Run:
 ```bash
 python tests/golden/suite_manifest/check_manifest.py
 ctest --preset windows-msvc -C Debug -R "^test_snapshot_replay_mass_deficit$" -V
-ctest --preset windows-msvc -C Debug -L golden --output-on-failure
+ctest --preset windows-msvc -C Debug -L candidate_non_gating --output-on-failure
 ```
 
 Expected: all PASS.

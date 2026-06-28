@@ -82,12 +82,13 @@ def main() -> None:
         cmake_texts.append(path.read_text(encoding="utf-8"))
     combined_cmake = "\n".join(cmake_texts)
     for test_id, (name, status, ci_gate) in REQUIRED.items():
-        if status == "implemented" and ci_gate:
+        if status == "implemented":
             token = f"add_test(NAME test_{name}"
             if token not in combined_cmake:
-                fail(f"{test_id}: active gate test missing add_test token {token}")
+                fail(f"{test_id}: implemented test missing add_test token {token}")
+        if status == "implemented" and ci_gate:
             if "LABELS golden" not in combined_cmake:
-                fail("golden CMakeLists must label tests with LABELS golden")
+                fail("golden CMakeLists must label active gate tests with LABELS golden")
 
     print("OK goldensuite manifest completeness passes")
 

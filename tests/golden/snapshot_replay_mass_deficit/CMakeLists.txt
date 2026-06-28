@@ -1,4 +1,4 @@
 add_executable(test_snapshot_replay_mass_deficit test_snapshot_replay_mass_deficit.cpp)
 target_link_libraries(test_snapshot_replay_mass_deficit PRIVATE scau::coupling_core scau::warnings GTest::gtest_main)
 add_test(NAME test_snapshot_replay_mass_deficit COMMAND test_snapshot_replay_mass_deficit)
-set_tests_properties(test_snapshot_replay_mass_deficit PROPERTIES LABELS golden)
+set_tests_properties(test_snapshot_replay_mass_deficit PROPERTIES LABELS "candidate_non_gating")

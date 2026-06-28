@@ -24,4 +24,4 @@ This implementation does not claim real 1D solver transient replay correctness. 
 
 ## Gate recommendation
 
-G10 is promoted to `status: implemented` while keeping `ci_gate: false` for the first landing. Promote to `ci_gate: true` only after one stable CI cycle on the merged branch.
+G10 is promoted to `status: implemented` while keeping `ci_gate: false` for the first landing. The test is intentionally labeled `candidate_non_gating` rather than `golden` so the current CI job `ctest -L golden` does not pick it up before explicit gate promotion. Promote to `ci_gate: true` only after one stable CI cycle on the merged branch.
