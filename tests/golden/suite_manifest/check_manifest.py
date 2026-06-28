@@ -17,7 +17,7 @@ REQUIRED = {
     "G7": ("stcf_v4_to_v5_migration", "pending", False),
     "G8": ("swmm_single_pipe_surcharge", "pending", False),
     "G9": ("cpu_gpu_deterministic_match", "pending", False),
-    "G10": ("snapshot_replay_mass_deficit", "pending", False),
+    "G10": ("snapshot_replay_mass_deficit", "implemented", False),
     "G11": ("dflowfm_river_steady", "pending", False),
     "G12": ("dual_engine_shared_cell", "pending", False),
 }
@@ -78,16 +78,20 @@ def main() -> None:
     cmake_texts = []
     if TESTS_CMAKELISTS.exists():
         cmake_texts.append(TESTS_CMAKELISTS.read_text(encoding="utf-8"))
+    golden_cmake_by_name = {}
     for path in sorted((ROOT / "tests" / "golden").glob("*/CMakeLists.txt")):
-        cmake_texts.append(path.read_text(encoding="utf-8"))
+        golden_cmake_by_name[path.parent.name] = path.read_text(encoding="utf-8")
+        cmake_texts.append(golden_cmake_by_name[path.parent.name])
     combined_cmake = "\n".join(cmake_texts)
     for test_id, (name, status, ci_gate) in REQUIRED.items():
-        if status == "implemented" and ci_gate:
+        if status == "implemented":
             token = f"add_test(NAME test_{name}"
             if token not in combined_cmake:
-                fail(f"{test_id}: active gate test missing add_test token {token}")
-            if "LABELS golden" not in combined_cmake:
-                fail("golden CMakeLists must label tests with LABELS golden")
+                fail(f"{test_id}: implemented test missing add_test token {token}")
+        if status == "implemented" and ci_gate:
+            per_test_cmake = golden_cmake_by_name.get(name, "")
+            if "LABELS golden" not in per_test_cmake:
+                fail(f"{test_id}: active gate test CMakeLists must set LABELS golden")
 
     print("OK goldensuite manifest completeness passes")
 
