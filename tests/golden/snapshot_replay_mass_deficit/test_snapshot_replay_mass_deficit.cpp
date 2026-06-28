@@ -130,12 +130,12 @@ TEST(SnapshotReplayMassDeficitGolden, SharedEndpointDeficitReplayConsistency) {
     auto fresh = make_shared_state();
     auto replayed = make_shared_state();
 
-    const auto baseline = fresh.compute_system_mass(kHWet);
-    const auto replay_snapshot = replayed.snapshot();
-
     enqueue_shared_sequence(fresh);
+    const auto baseline = fresh.compute_system_mass(kHWet);
     fresh.replay_pending();
 
+    enqueue_shared_sequence(replayed);
+    const auto replay_snapshot = replayed.snapshot();
     replayed.enqueue_event({
         .exchange_cell_index = 0U,
         .direction = scau::coupling::core::ExchangeDirection::engine_to_surface,
@@ -150,7 +150,20 @@ TEST(SnapshotReplayMassDeficitGolden, SharedEndpointDeficitReplayConsistency) {
     });
     replayed.replay_pending();
     replayed.rollback(replay_snapshot);
-    enqueue_shared_sequence(replayed);
+    const auto restored_snapshot = replayed.snapshot();
+    ASSERT_EQ(restored_snapshot.pending_events().size(), 1U);
+    EXPECT_DOUBLE_EQ(restored_snapshot.pending_events()[0].volume_delta, 2.0);
+    EXPECT_DOUBLE_EQ(restored_snapshot.pending_events()[0].unmet_volume, 2.0);
+    EXPECT_DOUBLE_EQ(restored_snapshot.pending_events()[0].repayment_volume, 1.0);
+    ASSERT_EQ(restored_snapshot.pending_events()[0].shared_endpoint_events.size(), 2U);
+    EXPECT_EQ(restored_snapshot.pending_events()[0].shared_endpoint_events[0].endpoint.engine, scau::coupling::core::SharedExchangeEngine::drainage);
+    EXPECT_EQ(restored_snapshot.pending_events()[0].shared_endpoint_events[0].endpoint.node_id, 10U);
+    EXPECT_DOUBLE_EQ(restored_snapshot.pending_events()[0].shared_endpoint_events[0].unmet_volume, 1.5);
+    EXPECT_DOUBLE_EQ(restored_snapshot.pending_events()[0].shared_endpoint_events[0].repayment_volume, 0.0);
+    EXPECT_EQ(restored_snapshot.pending_events()[0].shared_endpoint_events[1].endpoint.engine, scau::coupling::core::SharedExchangeEngine::river);
+    EXPECT_EQ(restored_snapshot.pending_events()[0].shared_endpoint_events[1].endpoint.node_id, 20U);
+    EXPECT_DOUBLE_EQ(restored_snapshot.pending_events()[0].shared_endpoint_events[1].unmet_volume, 0.5);
+    EXPECT_DOUBLE_EQ(restored_snapshot.pending_events()[0].shared_endpoint_events[1].repayment_volume, 1.0);
     replayed.replay_pending();
 
     ASSERT_EQ(fresh.cells().size(), replayed.cells().size());
