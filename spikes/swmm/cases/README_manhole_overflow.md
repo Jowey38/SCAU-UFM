@@ -1,14 +1,23 @@
 # manhole_overflow.inp specification
 
-Required content (per third-party-spike-design §5.1):
+`manhole_overflow.inp` is authored in this repository for the G8 real-SWMM
+evidence path. It is not copied from EPA or third-party example sets.
 
-- One junction "J1" with shallow rim elevation.
-- One conduit C1 carrying upstream flow into J1.
-- One free outfall downstream.
-- An inflow time series large enough to drive J1 into surcharge.
+Case shape:
 
-Required for ABI verification of `swmm_NODE_OVERFLOW > 0` behaviour and
-`swmm_NODE_HEAD` evolution across surcharge transitions.
+- `J0`: upstream inflow junction receiving constant `TS_SURCHARGE` flow.
+- `J1`: shallow manhole (`MaxDepth = 0.35 m`) intended to expose head rise and
+  overflow/surcharge behaviour.
+- `C0`: upstream conduit from `J0` to `J1`.
+- `C1`: restricted downstream conduit from `J1` to free outfall `OUT1`.
+- `OUT1`: free outfall.
 
-Source: must be authored or sourced from an EPA-public-domain example. Do NOT
-copy from third-party copyrighted example sets. License audit pending in M30.
+Evidence target:
+
+- run through `spikes/swmm/host/swmm_spike_host.cpp`;
+- observe real SWMM `swmm_NODE_HEAD` and `swmm_NODE_OVERFLOW` at node `J1`;
+- archive the run output as G8 physical evidence before any future promotion of
+  `swmm_single_pipe_surcharge` to `ci_gate:true`.
+
+This remains standalone spike evidence until real SWMM is wired into the main
+CMake/test graph.
