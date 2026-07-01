@@ -69,7 +69,7 @@
     "applicable_phase": "Phase 1+",
     "reference_path": "tests/golden/reference/tolerances.md",
     "ci_gate": false,
-    "status": "pending"
+    "status": "implemented"
   },
   {
     "test_id": "G9",
