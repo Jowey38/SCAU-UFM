@@ -13,6 +13,12 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules")
 
 include(ScauWarnings)
 
+option(SCAU_EMBED_SWMM "Build the vendored SWMM 5.2.4 solver and the real SwmmEngine adapter" ON)
+
+if(SCAU_EMBED_SWMM)
+    include(${CMAKE_SOURCE_DIR}/cmake/third_party/swmm.cmake)
+endif()
+
 enable_testing()
 
 add_subdirectory(libs/core)

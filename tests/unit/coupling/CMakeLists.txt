@@ -325,3 +325,19 @@ target_link_libraries(test_coupling_system_mass_audit
         GTest::gtest_main
 )
 add_test(NAME test_coupling_system_mass_audit COMMAND test_coupling_system_mass_audit)
+
+if(SCAU_EMBED_SWMM)
+    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/cases DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+    add_executable(test_coupling_swmm_engine test_coupling_swmm_engine.cpp)
+    target_link_libraries(test_coupling_swmm_engine
+        PRIVATE
+            scau::coupling_drainage
+            scau::warnings
+            GTest::gtest_main
+    )
+    target_compile_definitions(test_coupling_swmm_engine
+        PRIVATE
+            SCAU_SWMM_TEST_CASE_DIR="${CMAKE_CURRENT_BINARY_DIR}/cases"
+    )
+    add_test(NAME test_coupling_swmm_engine COMMAND test_coupling_swmm_engine)
+endif()

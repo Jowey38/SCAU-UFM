@@ -1,0 +1,15 @@
+name: swmm5
+upstream: US EPA Stormwater Management Model (SWMM)
+upstream-repo: https://github.com/USEPA/Stormwater-Management-Model
+branch: develop
+version: 5.2.4 (VERSION 52004, src/solver/consts.h)
+extracted-from: Stormwater-Management-Model-develop/ (local checkout at repo root)
+extracted-on: 2026-06-12
+extracted-scope: src/solver/ (complete solver library incl. include/swmm5.h public API)
+vendored-to: extern/swmm5/src/solver/
+license: Public Domain (US EPA work; see third_party/licenses/swmm5-LICENSE-NOTE.md)
+patches: none (see third_party/patches/)
+build: cmake/third_party/swmm.cmake builds static lib target scau_extern_swmm5;
+       upstream src/solver/CMakeLists.txt is retained for reference only and is NOT used.
+abi-boundary: only libs/coupling/drainage/src/*.cpp may include swmm5.h; no public
+              header or DTO may expose SWMM types (project-layout-design.md §4 firewall).
