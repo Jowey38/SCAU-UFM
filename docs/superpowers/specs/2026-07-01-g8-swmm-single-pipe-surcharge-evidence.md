@@ -8,19 +8,21 @@ Implemented as a non-gating Golden candidate (`ci_gate:false`).
 
 G8 currently validates the executable Phase-1 boundary available in this repository:
 
-- SWMM-side deterministic surcharge state through `MockSwmmEngine`;
+- real SWMM surcharge/overflow generation through `SwmmEngine` and the authored `swmm_manhole_overflow.inp` case;
 - CouplingLib hard gate semantics using `V_limit = 0.9 * phi_t * h * A` and `Q_limit = V_limit / dt_sub`;
-- surface-to-SWMM drain requests clamped at `Q_limit`;
+- a real SWMM `NODE_OVERFLOW` request from `J1` that exceeds the cell `Q_limit` and is clamped;
 - unmet volume recorded in `mass_deficit_account` after replay;
 - follow-up zero-request step repays outstanding deficit without exceeding the recomputed `Q_limit`;
-- SWMM adapter acceptance writes `q_granted + q_repay` into node lateral inflow.
+- SWMM adapter acceptance writes `q_granted + q_repay` into node lateral inflow, verified after a follow-up routing step.
 
-The executable Golden remains mock-boundary coverage, but it now has two real-SWMM backing layers: standalone spike evidence in `spikes/swmm/evidence/g8_real_swmm_inp_evidence.md`, and main-graph runtime evidence through the real `SwmmEngine` test path. The standalone authored `manhole_overflow.inp` and the main-graph copied `swmm_manhole_overflow.inp` both produce real SWMM `NODE_OVERFLOW > 0` at `J1`. This still does not promote G8 to `ci_gate:true`; that decision remains separate from proving the runtime path exists.
+G8 now has three aligned evidence layers: the executable Golden itself runs on real `SwmmEngine`, standalone spike evidence exists in `spikes/swmm/evidence/g8_real_swmm_inp_evidence.md`, and the main-graph runtime evidence exists through `test_coupling_swmm_engine`. This still does not promote G8 to `ci_gate:true`; that decision remains separate from proving the runtime path exists.
 
 ## Validation
 
-Validated on 2026-07-01 from `H:/githubcode/SCAU-UFM/.worktrees/g10b-replay-drift-audit`:
+Validated from `H:/githubcode/SCAU-UFM/.worktrees/g10b-replay-drift-audit`:
 
+- 2026-07-01 mock-boundary candidate path — PASS
+- 2026-07-02 real-runtime candidate path with `SwmmEngine` + `swmm_manhole_overflow.inp` — PASS
 - `cmake --preset windows-msvc` — PASS
 - `cmake --build build/windows-msvc --config Debug --target test_swmm_single_pipe_surcharge` — PASS
 - `ctest --test-dir build/windows-msvc -C Debug -R "^test_swmm_single_pipe_surcharge$" --output-on-failure` — PASS
