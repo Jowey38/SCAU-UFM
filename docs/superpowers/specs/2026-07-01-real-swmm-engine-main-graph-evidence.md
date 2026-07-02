@@ -51,6 +51,7 @@ Results:
 - configure: PASS;
 - `test_coupling_swmm_engine` build: PASS;
 - `test_coupling_swmm_engine`: PASS;
+- main-graph G8 evidence path: PASS (`swmm_manhole_overflow.inp` reaches `J1` head >= `0.45`, positive `NODE_OVERFLOW`, and `is_surcharged(J1)==true` through the real adapter);
 - manifest checker: PASS;
 - `candidate_non_gating`: PASS (`test_swmm_single_pipe_surcharge`,
   `test_snapshot_replay_mass_deficit`);
