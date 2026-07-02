@@ -15,7 +15,7 @@ G8 currently validates the executable Phase-1 boundary available in this reposit
 - follow-up zero-request step repays outstanding deficit without exceeding the recomputed `Q_limit`;
 - SWMM adapter acceptance writes `q_granted + q_repay` into node lateral inflow.
 
-The executable Golden remains mock-boundary coverage, but it now has standalone real-SWMM physical backing in `spikes/swmm/evidence/g8_real_swmm_inp_evidence.md`: authored `single_pipe.inp` and `manhole_overflow.inp` run through the spike host, with `manhole_overflow.inp` producing real SWMM `NODE_OVERFLOW > 0` at `J1`. This still does not promote G8 to `ci_gate:true`; CI-gated real SWMM coverage requires a real `SwmmEngine` in the main CMake/test graph.
+The executable Golden remains mock-boundary coverage, but it now has two real-SWMM backing layers: standalone spike evidence in `spikes/swmm/evidence/g8_real_swmm_inp_evidence.md`, and main-graph runtime evidence through the real `SwmmEngine` test path. The standalone authored `manhole_overflow.inp` and the main-graph copied `swmm_manhole_overflow.inp` both produce real SWMM `NODE_OVERFLOW > 0` at `J1`. This still does not promote G8 to `ci_gate:true`; that decision remains separate from proving the runtime path exists.
 
 ## Validation
 

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <string>
 
@@ -12,6 +13,10 @@ using scau::coupling::drainage::SwmmEngineError;
 
 std::string minimal_case_path() {
     return std::string(SCAU_SWMM_TEST_CASE_DIR) + "/swmm_minimal.inp";
+}
+
+std::string manhole_overflow_case_path() {
+    return std::string(SCAU_SWMM_TEST_CASE_DIR) + "/swmm_manhole_overflow.inp";
 }
 
 }  // namespace
@@ -70,6 +75,35 @@ TEST(CouplingSwmmEngine, SetOutfallStageOnlyTargetsOutfalls) {
     EXPECT_NO_THROW(engine.set_outfall_stage(o1, 9.4));
     EXPECT_THROW(engine.set_outfall_stage(j1, 9.4), SwmmEngineError);
     EXPECT_THROW(engine.set_outfall_stage(o1, std::nan("")), SwmmEngineError);
+
+    engine.finalize();
+}
+
+TEST(CouplingSwmmEngine, MainGraphG8EvidenceSeesRealOverflowAndSurcharge) {
+    SwmmEngine engine;
+    engine.initialize(manhole_overflow_case_path());
+
+    const int j1 = engine.node_index("J1");
+    double max_head = 0.0;
+    double max_overflow = 0.0;
+    bool saw_positive_overflow = false;
+    bool saw_surcharge = false;
+
+    for (int step = 0; step < 100; ++step) {
+        engine.step(10.0);
+        max_head = std::max(max_head, engine.get_node_head(j1));
+        max_overflow = std::max(max_overflow, engine.get_node_overflow(j1));
+        saw_positive_overflow = saw_positive_overflow || engine.get_node_overflow(j1) > 0.0;
+        saw_surcharge = saw_surcharge || engine.is_surcharged(j1);
+        if (saw_positive_overflow && saw_surcharge) {
+            break;
+        }
+    }
+
+    EXPECT_TRUE(saw_positive_overflow);
+    EXPECT_TRUE(saw_surcharge);
+    EXPECT_GE(max_head, 0.45 - 1.0e-9);
+    EXPECT_GT(max_overflow, 0.30);
 
     engine.finalize();
 }
