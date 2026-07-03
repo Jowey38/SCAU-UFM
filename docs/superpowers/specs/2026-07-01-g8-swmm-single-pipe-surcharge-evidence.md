@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented as a non-gating Golden candidate (`ci_gate:false`).
+Implemented and promoted to an active Golden gate (`ci_gate:true`).
 
 ## Scope
 

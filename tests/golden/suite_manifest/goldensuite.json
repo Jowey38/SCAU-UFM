@@ -68,7 +68,7 @@
     "test_path": "tests/golden/swmm_single_pipe_surcharge/",
     "applicable_phase": "Phase 1+",
     "reference_path": "tests/golden/reference/tolerances.md",
-    "ci_gate": false,
+    "ci_gate": true,
     "status": "implemented"
   },
   {

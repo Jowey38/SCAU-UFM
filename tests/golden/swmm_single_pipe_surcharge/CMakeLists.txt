@@ -17,4 +17,4 @@ target_compile_definitions(test_swmm_single_pipe_surcharge
         SCAU_G8_SWMM_CASE_DIR="${CMAKE_CURRENT_BINARY_DIR}"
 )
 add_test(NAME test_swmm_single_pipe_surcharge COMMAND test_swmm_single_pipe_surcharge)
-set_tests_properties(test_swmm_single_pipe_surcharge PROPERTIES LABELS candidate_non_gating)
+set_tests_properties(test_swmm_single_pipe_surcharge PROPERTIES LABELS golden)
