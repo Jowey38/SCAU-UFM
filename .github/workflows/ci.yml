@@ -5,7 +5,7 @@ on:
   push:
     branches: [main, master]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, feat/m230-stage-record]
 
 env:
   VCPKG_ROOT: ${{ github.workspace }}/vcpkg
