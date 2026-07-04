@@ -14,6 +14,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules")
 include(ScauWarnings)
 
 option(SCAU_EMBED_SWMM "Build the vendored SWMM 5.2.4 solver and the real SwmmEngine adapter" ON)
+option(SCAU_ENABLE_DFLOWFM_BMI_RUNTIME "Build the runtime-loaded D-Flow FM BMI adapter" ON)
 
 if(SCAU_EMBED_SWMM)
     include(${CMAKE_SOURCE_DIR}/cmake/third_party/swmm.cmake)
