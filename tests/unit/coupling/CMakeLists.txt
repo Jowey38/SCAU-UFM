@@ -341,3 +341,22 @@ if(SCAU_EMBED_SWMM)
     )
     add_test(NAME test_coupling_swmm_engine COMMAND test_coupling_swmm_engine)
 endif()
+
+if(SCAU_ENABLE_DFLOWFM_BMI_RUNTIME)
+    add_library(fake_dflowfm_bmi SHARED fake_dflowfm_bmi.cpp)
+    target_compile_features(fake_dflowfm_bmi PRIVATE cxx_std_20)
+
+    add_executable(test_coupling_dflowfm_engine test_coupling_dflowfm_engine.cpp)
+    target_link_libraries(test_coupling_dflowfm_engine
+        PRIVATE
+            scau::coupling_river
+            scau::warnings
+            GTest::gtest_main
+    )
+    target_compile_definitions(test_coupling_dflowfm_engine
+        PRIVATE
+            SCAU_FAKE_DFLOWFM_BMI_LIBRARY="$<TARGET_FILE:fake_dflowfm_bmi>"
+    )
+    add_dependencies(test_coupling_dflowfm_engine fake_dflowfm_bmi)
+    add_test(NAME test_coupling_dflowfm_engine COMMAND test_coupling_dflowfm_engine)
+endif()

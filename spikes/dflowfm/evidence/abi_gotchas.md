@@ -40,6 +40,10 @@ Initial findings from inspection of
 
 - D-Flow FM upstream depends on netCDF, MPI (optional), PETSc (optional), MKL,
   Fortran runtime. Spike must verify which are required at link time.
+- The main-graph `DFlowFMEngine` does not link D-Flow FM at build time. It
+  runtime-loads `SCAU_DFLOWFM_LIBRARY` when set, otherwise `dflowfm.dll` on
+  Windows or `libdflowfm.so` on POSIX. Missing libraries fail closed and keep
+  G11 pending rather than producing mock runtime evidence.
 
 ## Calling convention
 

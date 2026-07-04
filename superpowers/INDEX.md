@@ -132,6 +132,7 @@
 | `docs/superpowers/specs/2026-06-26-m253-cvc-spatial-phi-t-dynamic-perturbation-evidence.md` | M253 CVC spatial `phi_t` dynamic perturbation 候选证据；新增 `test_cvc_spatial_phi_t_dynamic_perturbation`，以 `golden_candidate;cvc;surface2d` 标签量化非零速度空间 `phi_t` 阶跃的当前物理储量残差，不改变 solver 行为。 |
 | `superpowers/specs/2026-06-13-m247-urban-runoff-generation-design.md` | M247 城市产流模块设计；规划 Surface2D 独占地表产流、Green-Ampt 首实现、CUDA-ready enum/SoA 分发、透水/不透水/屋面直排分链、roof direct-drain intent 经 CouplingLib 注入 SWMM lateral inflow、roof pending/overflow 守恒、fail-closed 与 Golden runoff urban block 候选。不构成实现或 GoldenSuite 门禁证据。 |
 | `superpowers/specs/2026-06-12-m240-embedded-engine-extraction-and-tri-coupling-evidence.md` | M240 嵌入式引擎提取与三方两两双向耦合实施证据；记录 SWMM 5.2.4 solver 提取到 `extern/swmm5/`、BMI 契约快照、third_party 治理、真实 `SwmmEngine` 静态嵌入证据（真实算例 5/5）、`DFlowFMEngine` BMI 运行时加载 fail-closed 边界、core 1D-1D 接口交换原语、1D→2D 返流路径与 `libs/coupling/driver/` 三方耦合步进驱动；D-Flow FM 真实 kernel 步进证据仍 blocked（待外部构建 DLL）。 |
+| `docs/superpowers/specs/2026-07-03-g11-dflowfm-runtime-readiness-evidence.md` | G11 D-Flow FM runtime readiness 证据；新增运行时加载 BMI adapter、缺库/缺符号/非法使用 fail-closed、fake BMI 动态库正向路径与单实例 guard 覆盖；G11 `dflowfm_river_steady` 仍保持 `pending, ci_gate:false`，真实外部 D-Flow FM 100-step `.mdu` 证据仍 blocked。 |
 
 ## 历史记录规则
 

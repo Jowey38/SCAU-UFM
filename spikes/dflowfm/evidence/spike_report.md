@@ -1,30 +1,60 @@
 # D-Flow FM BMI 1.0 spike report
 
-**Status:** TBD — spike run not yet executed (M29 = host skeleton only).
+**Status:** Runtime-readiness boundary exists in the main graph, but the real
+external D-Flow FM kernel/case run is still blocked. G11
+`dflowfm_river_steady` must remain `pending` and `ci_gate:false` until a
+replayable 100-step run from `spikes/dflowfm/cases/` is recorded here.
 
 ## §3.1 Lifecycle
 
-TBD
+Main-graph readiness: `DFlowFMEngine` now runtime-loads the BMI library and
+fails closed when the library is missing, when initialization receives an empty
+`.mdu` path, or when a second initialized instance would own the process-global
+BMI state.
+
+Real-kernel evidence: TBD. The spike host has not yet been executed against a
+provided Delft3D/D-Flow FM build and model case.
 
 ## §3.2 Time advance
 
-TBD
+Main-graph readiness: `DFlowFMEngine::update(dt_dfm)` validates finite positive
+`dt_dfm`, calls BMI `update(double)`, and refreshes `get_current_time` after a
+successful step.
+
+Real-kernel evidence: TBD. A G11 spike must verify that `update(dt)` honors the
+caller-supplied step and must record `get_current_time` over 100 steps.
 
 ## §3.3 State read / write
 
-TBD
+Main-graph readiness: `DFlowFMEngine` resolves BMI `get_var`/`set_var` at
+runtime. Reads treat `get_var` as an engine-owned double buffer and index by
+`location_id`; writes currently support scalar/location-0 `set_var` only.
+
+Real-kernel evidence: TBD. Before G11 can become an executable runtime Golden,
+the spike must enumerate real variable names, shapes, units, and the correct
+lateral-discharge/stage variables. Non-scalar writes require `set_var_slice`
+evidence before use.
 
 ## §3.4 Hot-start / state save
 
-TBD
+Still blocking. BMI 1.0 does not expose save/restore state. Any G11/G12 replay
+claim needs either a documented D-Flow FM-specific hot-start path or an explicit
+Phase-2 limitation recorded in the evidence.
 
 ## §3.5 Error / exception
 
-TBD
+Main-graph readiness: loader, missing-symbol, invalid-use, initialize/update,
+and finalize failures are converted to `DFlowFMEngineError` with
+machine-readable `engine_id="DFlowFM"` and `dflowfm_*` error codes.
+
+Real-kernel evidence: TBD. The spike must record representative non-zero return
+codes and any log callback diagnostics emitted by the real kernel.
 
 ## §3.6 Version stability
 
-TBD
+TBD. The runtime adapter resolves the BMI 1.0 symbol set by name and does not
+expose third-party headers through public SCAU-UFM DTOs, but no real D-Flow FM
+version has been locked for G11 yet.
 
 ## §4 Must-document
 
