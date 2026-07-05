@@ -346,6 +346,9 @@ if(SCAU_ENABLE_DFLOWFM_BMI_RUNTIME)
     add_library(fake_dflowfm_bmi SHARED fake_dflowfm_bmi.cpp)
     target_compile_features(fake_dflowfm_bmi PRIVATE cxx_std_20)
 
+    add_library(fake_dflowfm_bmi_missing_symbol SHARED fake_dflowfm_bmi_missing_symbol.cpp)
+    target_compile_features(fake_dflowfm_bmi_missing_symbol PRIVATE cxx_std_20)
+
     add_executable(test_coupling_dflowfm_engine test_coupling_dflowfm_engine.cpp)
     target_link_libraries(test_coupling_dflowfm_engine
         PRIVATE
@@ -356,7 +359,8 @@ if(SCAU_ENABLE_DFLOWFM_BMI_RUNTIME)
     target_compile_definitions(test_coupling_dflowfm_engine
         PRIVATE
             SCAU_FAKE_DFLOWFM_BMI_LIBRARY="$<TARGET_FILE:fake_dflowfm_bmi>"
+            SCAU_FAKE_DFLOWFM_BMI_MISSING_SYMBOL_LIBRARY="$<TARGET_FILE:fake_dflowfm_bmi_missing_symbol>"
     )
-    add_dependencies(test_coupling_dflowfm_engine fake_dflowfm_bmi)
+    add_dependencies(test_coupling_dflowfm_engine fake_dflowfm_bmi fake_dflowfm_bmi_missing_symbol)
     add_test(NAME test_coupling_dflowfm_engine COMMAND test_coupling_dflowfm_engine)
 endif()

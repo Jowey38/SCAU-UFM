@@ -18,6 +18,10 @@ std::string fake_library_path() {
     return SCAU_FAKE_DFLOWFM_BMI_LIBRARY;
 }
 
+std::string fake_missing_symbol_library_path() {
+    return SCAU_FAKE_DFLOWFM_BMI_MISSING_SYMBOL_LIBRARY;
+}
+
 }  // namespace
 
 TEST(CouplingDFlowFMEngine, MissingRuntimeLibraryFailsClosed) {
@@ -58,6 +62,15 @@ TEST(CouplingDFlowFMEngine, BoundaryInterfaceStillExcludesCoreSemantics) {
     // IDFlowFMEngine; Q_limit, deficit, rollback, replay, and arbitration remain
     // CouplingLib-owned by construction and are not mirrored here.
     EXPECT_THROW(engine.initialize("case.mdu"), scau::coupling::river::DFlowFMEngineError);
+}
+
+TEST(CouplingDFlowFMEngine, MissingRequiredBmiSymbolFailsClosed) {
+    scau::coupling::river::DFlowFMEngine engine{fake_missing_symbol_library_path()};
+
+    EXPECT_FALSE(engine.initialized());
+    EXPECT_THROW(engine.initialize("fake_case.mdu"), scau::coupling::river::DFlowFMEngineError);
+    EXPECT_FALSE(engine.initialized());
+    EXPECT_DOUBLE_EQ(engine.elapsed_time(), 0.0);
 }
 
 TEST(CouplingDFlowFMEngine, FakeBmiRuntimeLoadsAndAdvancesLifecycle) {
