@@ -16,6 +16,7 @@
 #include <array>
 #include <cstdio>
 #include <cstring>
+#include <string>
 
 extern "C" {
 #include "bmi.h"
@@ -51,10 +52,39 @@ int main(int argc, char **argv) {
     int var_count = 0;
     get_var_count(&var_count);
     std::printf("[spike] get_var_count = %d\n", var_count);
-    for (int i = 0; i < var_count && i < 32; ++i) {
+    std::printf("[spike] variable inventory markdown follows\n");
+    std::printf("| index | name | type | rank | shape | units | read/write role | notes |\n");
+    std::printf("|---|---|---|---|---|---|---|---|\n");
+    for (int i = 0; i < var_count; ++i) {
         std::array<char, MAXSTRINGLEN> name{};
+        std::array<char, MAXSTRINGLEN> type{};
+        std::array<char, MAXSTRINGLEN> units{};
+        std::array<int, MAXDIMS> shape{};
+        int rank = 0;
         get_var_name(i, name.data());
-        std::printf("[spike]   var[%d] = %s\n", i, name.data());
+        get_var_type(name.data(), type.data());
+        get_var_rank(name.data(), &rank);
+        get_var_shape(name.data(), shape.data());
+        get_var_units(name.data(), units.data());
+
+        std::string shape_text;
+        for (int dim = 0; dim < rank; ++dim) {
+            if (!shape_text.empty()) {
+                shape_text += " x ";
+            }
+            shape_text += std::to_string(shape[dim]);
+        }
+        if (shape_text.empty()) {
+            shape_text = "scalar";
+        }
+
+        std::printf("| %d | %s | %s | %d | %s | %s | TBD | captured by spike host |\n",
+                    i,
+                    name.data(),
+                    type.data(),
+                    rank,
+                    shape_text.c_str(),
+                    units.data());
     }
 
     double t0 = 0.0;

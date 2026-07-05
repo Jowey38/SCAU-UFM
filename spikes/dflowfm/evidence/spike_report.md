@@ -33,8 +33,10 @@ runtime. Reads treat `get_var` as an engine-owned double buffer and index by
 Real-kernel evidence: TBD. Before G11 can become an executable runtime Golden,
 the spike must enumerate real variable names, shapes, units, and the correct
 lateral-discharge/stage variables, and record them in
-`evidence/var_inventory.md`. Non-scalar writes require `set_var_slice`
-evidence before use.
+`evidence/var_inventory.md`. The spike host now emits a markdown inventory table
+for this purpose; a future real-runtime pass should paste that output into the
+inventory file and then annotate roles/notes. Non-scalar writes require
+`set_var_slice` evidence before use.
 
 ## §3.4 Hot-start / state save
 
