@@ -29,7 +29,8 @@ Severity: `MATCH` | `MATCH_WITH_NOTE` | `GAP_MITIGABLE` | `GAP_BLOCKING` | `TBD`
 3. Verify `get_var` pointer lifetime: does `set_var` invalidate previously
    returned pointers? does `update`?
 4. Enumerate the full list of available variable names via
-   `get_var_count` + `get_var_name`; record in `evidence/var_inventory.md`.
+   `get_var_count` + `get_var_name`; record in `evidence/var_inventory.md`
+   together with type, rank, shape, units, and read/write role.
 5. Confirm whether a second D-Flow FM DLL can be loaded into the same process
    under a different name; if not, document the §6.5 snapshot scope impact.
 6. Locate RTC / weir / gate state read path; if outside BMI, document the
