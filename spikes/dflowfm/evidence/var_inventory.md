@@ -17,6 +17,11 @@ It should answer the G11 questions that fake/mock coverage cannot answer:
 
 ## Capture instructions
 
+The spike host now prints a markdown inventory table directly from
+`get_var_count` / `get_var_name` / `get_var_type` / `get_var_rank` /
+`get_var_shape` / `get_var_units`. During a real runtime pass, copy that table
+output into this file and then fill the `read/write role` and `notes` columns.
+
 For each exported variable observed during the real spike run, record:
 
 | index | name | type | rank | shape | units | read/write role | notes |
