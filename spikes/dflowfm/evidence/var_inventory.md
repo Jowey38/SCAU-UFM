@@ -19,8 +19,11 @@ It should answer the G11 questions that fake/mock coverage cannot answer:
 
 The spike host now prints a markdown inventory table directly from
 `get_var_count` / `get_var_name` / `get_var_type` / `get_var_rank` /
-`get_var_shape` / `get_var_units`. During a real runtime pass, copy that table
-output into this file and then fill the `read/write role` and `notes` columns.
+`get_var_shape` / `get_var_units`. During a real runtime pass, either copy that
+stdout table or use `--inventory-out <file>` and paste the generated file into
+this document, then fill the `read/write role` and `notes` columns. Treat a
+non-zero host exit as an incomplete inventory capture; pair the inventory with a
+trace summary from the same run when promoting G11 evidence.
 
 For each exported variable observed during the real spike run, record:
 
