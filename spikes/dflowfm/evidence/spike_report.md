@@ -22,7 +22,13 @@ Main-graph readiness: `DFlowFMEngine::update(dt_dfm)` validates finite positive
 successful step.
 
 Real-kernel evidence: TBD. A G11 spike must verify that `update(dt)` honors the
-caller-supplied step and must record `get_current_time` over 100 steps.
+caller-supplied step and must record `get_current_time` over 100 steps. The
+spike host now supports `--steps`, `--dt`, and `--trace-out <file>` so that the
+step trace can be archived directly instead of copied from terminal output. The
+trace summary records completed steps, requested steps, last time, expected last
+time, and maximum observed `dt` absolute error. A non-zero `update()` or
+`finalize()` return now makes the host exit non-zero, so a scripted spike run can
+reject partial traces.
 
 ## §3.3 State read / write
 
