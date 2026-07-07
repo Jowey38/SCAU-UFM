@@ -75,6 +75,9 @@ version has been locked for G11 yet.
 - OS resources: TBD (working directory dependence noted)
 - External deps: TBD (netCDF, MPI, PETSc, MKL likely)
 
+See also `evidence/runbook.md` for the exact capture procedure once a real
+runtime library and `.mdu` case are available.
+
 ## Exit-criteria checklist (§7)
 
 - [ ] §3 all assumptions have replayable evidence
