@@ -40,6 +40,9 @@ At minimum, identify and document the actual runtime names for:
 - lateral discharge;
 - any weir / gate / structure variables needed by the `reach_with_weir` case.
 
+See also `evidence/runbook.md` for the recommended host command line and output
+artifact set.
+
 ## Follow-on usage
 
 - `spike_report.md` should summarize the conclusions from this inventory.
