@@ -35,6 +35,8 @@ struct SpikeOptions {
     const char *config_path{nullptr};
     int steps{kStepsToRun};
     double dt_seconds{kDtSeconds};
+    const char *boundary_discharge_var{kBoundaryDischargeVar};
+    const char *stage_var{kStageVar};
     const char *inventory_out_path{nullptr};
     const char *trace_out_path{nullptr};
 };
@@ -93,6 +95,14 @@ bool parse_options(int argc, char **argv, SpikeOptions *options) {
             }
             continue;
         }
+        if (arg == "--boundary-var" && i + 1 < argc) {
+            options->boundary_discharge_var = argv[++i];
+            continue;
+        }
+        if (arg == "--stage-var" && i + 1 < argc) {
+            options->stage_var = argv[++i];
+            continue;
+        }
         if (arg == "--inventory-out" && i + 1 < argc) {
             options->inventory_out_path = argv[++i];
             continue;
@@ -113,6 +123,7 @@ int main(int argc, char **argv) {
     if (!parse_options(argc, argv, &options)) {
         std::fprintf(stderr,
                      "usage: %s <config.mdu> [--steps N] [--dt seconds] "
+                     "[--boundary-var name] [--stage-var name] "
                      "[--inventory-out file] [--trace-out file]\n",
                      argv[0]);
         return 2;
@@ -211,8 +222,15 @@ int main(int argc, char **argv) {
     std::printf("[spike] t0=%.6f t1=%.6f engine_dt=%.6f\n",
                 t0, t1, dt_internal);
     if (trace_out != nullptr) {
-        std::fprintf(trace_out, "# t0=%.6f t1=%.6f engine_dt=%.6f steps=%d dt=%.6f\n",
-                     t0, t1, dt_internal, options.steps, options.dt_seconds);
+        std::fprintf(trace_out,
+                     "# t0=%.6f t1=%.6f engine_dt=%.6f steps=%d dt=%.6f boundary_var=%s stage_var=%s\n",
+                     t0,
+                     t1,
+                     dt_internal,
+                     options.steps,
+                     options.dt_seconds,
+                     options.boundary_discharge_var,
+                     options.stage_var);
         write_line(trace_out, "# columns: step current_time stage0");
     }
 
@@ -225,7 +243,7 @@ int main(int argc, char **argv) {
     for (int step = 0; step < options.steps; ++step) {
         const double q_inject = 1.5;  // SI m^3/s
         // GAP D3: caller provides pointer to caller-owned buffer.
-        set_var(kBoundaryDischargeVar, static_cast<const void *>(&q_inject));
+        set_var(options.boundary_discharge_var, static_cast<const void *>(&q_inject));
 
         rc = update(options.dt_seconds);
         if (rc != 0) {
@@ -255,7 +273,7 @@ int main(int argc, char **argv) {
         // GAP D3: get_var fills a pointer-to-pointer into engine memory.
         // Caller does NOT free.
         void *engine_ptr = nullptr;
-        get_var(kStageVar, &engine_ptr);
+        get_var(options.stage_var, &engine_ptr);
         if (engine_ptr != nullptr) {
             const double *stage = static_cast<const double *>(engine_ptr);
             std::printf("[spike] step=%d t=%.6f stage[0]=%.6f\n",
