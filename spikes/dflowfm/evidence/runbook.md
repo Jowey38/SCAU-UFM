@@ -32,9 +32,14 @@ Run the host with explicit step count and output files:
 build/dflowfm-spike/dflowfm_spike_host spikes/dflowfm/cases/reach_with_weir.mdu \
   --steps 100 \
   --dt 60 \
+  --boundary-var boundary_discharge \
+  --stage-var stage_at_section \
   --inventory-out spikes/dflowfm/evidence/var_inventory.captured.md \
   --trace-out spikes/dflowfm/evidence/reach_with_weir.trace.txt
 ```
+
+If the real BMI variable names differ, override `--boundary-var` and
+`--stage-var` instead of recompiling the host.
 
 ## Expected outputs
 
