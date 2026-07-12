@@ -26,17 +26,23 @@ cmake --build build/dflowfm-spike
 
 ## Recommended capture command
 
-Run the host with explicit step count and output files:
+Run the host with explicit step count and output files.
+
+For the first sanity pass, prefer the repository-owned `single_reach.mdu`
+skeleton:
 
 ```bash
-build/dflowfm-spike/dflowfm_spike_host spikes/dflowfm/cases/reach_with_weir.mdu \
+build/dflowfm-spike/dflowfm_spike_host spikes/dflowfm/cases/single_reach.mdu \
   --steps 100 \
   --dt 60 \
   --boundary-var boundary_discharge \
   --stage-var stage_at_section \
   --inventory-out spikes/dflowfm/evidence/var_inventory.captured.md \
-  --trace-out spikes/dflowfm/evidence/reach_with_weir.trace.txt
+  --trace-out spikes/dflowfm/evidence/single_reach.trace.txt
 ```
+
+Once the runtime and companion files are stable, the same command shape can be
+reused for `reach_with_weir.mdu`.
 
 If the real BMI variable names differ, override `--boundary-var` and
 `--stage-var` instead of recompiling the host.
