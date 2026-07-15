@@ -20,6 +20,9 @@ void MockSwmmEngine::initialize(const std::string& inp_path) {
     elapsed_time_ = 0.0;
     node_heads_.clear();
     node_lateral_inflows_.clear();
+    node_inflows_.clear();
+    node_overflows_.clear();
+    outfall_stages_.clear();
     link_flows_.clear();
     node_surcharge_flags_.clear();
 }
@@ -38,6 +41,9 @@ void MockSwmmEngine::finalize() {
     initialized_ = false;
     node_heads_.clear();
     node_lateral_inflows_.clear();
+    node_inflows_.clear();
+    node_overflows_.clear();
+    outfall_stages_.clear();
     link_flows_.clear();
     node_surcharge_flags_.clear();
 }
@@ -94,6 +100,87 @@ void MockSwmmEngine::set_node_head_fixture(int node_id, double head) {
         throw SwmmEngineError("node head fixture must be finite");
     }
     node_heads_[node_id] = head;
+}
+
+double MockSwmmEngine::get_node_inflow(int node_id) const {
+    if (!initialized_) {
+        throw SwmmEngineError("SWMM mock engine is not initialized");
+    }
+    if (node_id < 0) {
+        throw SwmmEngineError("node_id must be non-negative");
+    }
+    const auto iter = node_inflows_.find(node_id);
+    if (iter == node_inflows_.end()) {
+        return 0.0;
+    }
+    return iter->second;
+}
+
+void MockSwmmEngine::set_node_inflow_fixture(int node_id, double q) {
+    if (!initialized_) {
+        throw SwmmEngineError("SWMM mock engine is not initialized");
+    }
+    if (node_id < 0) {
+        throw SwmmEngineError("node_id must be non-negative");
+    }
+    if (!std::isfinite(q)) {
+        throw SwmmEngineError("node inflow fixture must be finite");
+    }
+    node_inflows_[node_id] = q;
+}
+
+double MockSwmmEngine::get_node_overflow(int node_id) const {
+    if (!initialized_) {
+        throw SwmmEngineError("SWMM mock engine is not initialized");
+    }
+    if (node_id < 0) {
+        throw SwmmEngineError("node_id must be non-negative");
+    }
+    const auto iter = node_overflows_.find(node_id);
+    if (iter == node_overflows_.end()) {
+        return 0.0;
+    }
+    return iter->second;
+}
+
+void MockSwmmEngine::set_node_overflow_fixture(int node_id, double q) {
+    if (!initialized_) {
+        throw SwmmEngineError("SWMM mock engine is not initialized");
+    }
+    if (node_id < 0) {
+        throw SwmmEngineError("node_id must be non-negative");
+    }
+    if (!std::isfinite(q) || q < 0.0) {
+        throw SwmmEngineError("node overflow fixture must be finite and non-negative");
+    }
+    node_overflows_[node_id] = q;
+}
+
+void MockSwmmEngine::set_outfall_stage(int node_id, double stage) {
+    if (!initialized_) {
+        throw SwmmEngineError("SWMM mock engine is not initialized");
+    }
+    if (node_id < 0) {
+        throw SwmmEngineError("node_id must be non-negative");
+    }
+    if (!std::isfinite(stage)) {
+        throw SwmmEngineError("outfall stage must be finite");
+    }
+    outfall_stages_[node_id] = stage;
+}
+
+double MockSwmmEngine::outfall_stage(int node_id) const {
+    if (!initialized_) {
+        throw SwmmEngineError("SWMM mock engine is not initialized");
+    }
+    if (node_id < 0) {
+        throw SwmmEngineError("node_id must be non-negative");
+    }
+    const auto iter = outfall_stages_.find(node_id);
+    if (iter == outfall_stages_.end()) {
+        return 0.0;
+    }
+    return iter->second;
 }
 
 double MockSwmmEngine::get_link_flow(int link_id) const {

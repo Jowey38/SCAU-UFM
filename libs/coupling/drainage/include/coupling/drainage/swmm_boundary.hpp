@@ -42,6 +42,9 @@ public:
     [[nodiscard]] virtual double get_node_head(int node_id) const = 0;
     [[nodiscard]] virtual double get_node_lateral_inflow(int node_id) const = 0;
     virtual void set_node_lateral_inflow(int node_id, double q) = 0;
+    [[nodiscard]] virtual double get_node_inflow(int node_id) const = 0;
+    [[nodiscard]] virtual double get_node_overflow(int node_id) const = 0;
+    virtual void set_outfall_stage(int node_id, double stage) = 0;
 
     [[nodiscard]] virtual double get_link_flow(int link_id) const = 0;
     [[nodiscard]] virtual bool is_surcharged(int node_id) const = 0;
@@ -57,6 +60,12 @@ public:
     [[nodiscard]] double get_node_lateral_inflow(int node_id) const override;
     void set_node_lateral_inflow(int node_id, double q) override;
     void set_node_head_fixture(int node_id, double head);
+    [[nodiscard]] double get_node_inflow(int node_id) const override;
+    void set_node_inflow_fixture(int node_id, double q);
+    [[nodiscard]] double get_node_overflow(int node_id) const override;
+    void set_node_overflow_fixture(int node_id, double q);
+    void set_outfall_stage(int node_id, double stage) override;
+    [[nodiscard]] double outfall_stage(int node_id) const;
 
     [[nodiscard]] double get_link_flow(int link_id) const override;
     void set_link_flow_fixture(int link_id, double q);
@@ -71,6 +80,9 @@ private:
     double elapsed_time_{0.0};
     std::unordered_map<int, double> node_heads_{};
     std::unordered_map<int, double> node_lateral_inflows_{};
+    std::unordered_map<int, double> node_inflows_{};
+    std::unordered_map<int, double> node_overflows_{};
+    std::unordered_map<int, double> outfall_stages_{};
     std::unordered_map<int, double> link_flows_{};
     std::unordered_map<int, bool> node_surcharge_flags_{};
 };
