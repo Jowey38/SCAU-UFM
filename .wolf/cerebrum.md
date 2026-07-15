@@ -25,6 +25,7 @@
 <!-- Format: [YYYY-MM-DD] Description of what went wrong and what to do instead. -->
 
 - [2026-06-12] Vendored C sources failed to configure: root project() only enables CXX. Any cmake/third_party module adding C code must call `enable_language(C)`.
+- [2026-07-16] Building the windows-msvc preset inside a deep worktree path (.worktrees/<name>/build/windows-msvc/tests/unit/coupling) hits the 260-char MAX_PATH limit (MSB3491) for long test target names; 5 fault-controller *_ordering test exes fail to produce .tlog files. Workaround: configure a second build tree at a short path (e.g. H:/b254) with the same cache variables and run ctest --test-dir there. Repo code is unaffected; CI at normal checkout depth is fine.
 - [2026-06-12] Non-ASCII characters (em-dash, section sign) in C/C++ comments break MSVC under codepage 936 (C4819 + warnings-as-errors). Keep code comments ASCII-only.
 - [2026-06-12] `EXPECT_DOUBLE_EQ` on recomposed floating-point aggregates (e.g. system mass from h*phi_t*area) is flaky; use `EXPECT_NEAR` with ~1e-9.
 - [2026-06-13] Friction tests must compare against a frictionless control run, not the initial momentum: closed-box HLLC momentum exchange can legitimately increase per-cell hu.
