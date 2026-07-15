@@ -1925,6 +1925,62 @@ struct FaultControllerSchedulerReleaseGateActionCompletionRecord {
     const std::vector<SharedExchangeIntent>& intents,
     double dt_sub);
 
+// 1D-1D engine-interface exchange (e.g. drainage outfall -> river lateral).
+// The two parallel 1D engines never see each other: the source adapter
+// reports a discharge request, the target adapter reports an acceptance
+// capacity, and the core issues the conservative decision both sides accept.
+struct EngineInterfaceExchangeRequest {
+    SharedExchangeEndpoint source{};
+    SharedExchangeEndpoint target{};
+    double q_request{0.0};
+    double q_capacity{0.0};
+    double dt_sub{0.0};
+};
+
+struct EngineInterfaceExchangeDecision {
+    SharedExchangeEndpoint source{};
+    SharedExchangeEndpoint target{};
+    double q_granted{0.0};
+    double v_granted{0.0};
+    double v_unmet{0.0};
+};
+
+[[nodiscard]] EngineInterfaceExchangeDecision evaluate_engine_interface_exchange(
+    const EngineInterfaceExchangeRequest& request);
+
+// Head-driven exchange intent flow (spec section 7.5 exchange points; regimes:
+// free weir, submerged weir with Villemonte correction, orifice, smoothstep
+// incipient transition). Produces only the INTENT magnitude and direction
+// from the two water surface elevations; Q_limit arbitration, deficit and
+// conservation remain in the exchange pipeline.
+struct ExchangeFlowGeometry {
+    double crest_level{0.0};       // weir crest / sill elevation (m)
+    double exchange_width{0.0};    // effective weir width (m), > 0
+    double weir_coefficient{1.7};  // SI broad-crested default
+    double orifice_coefficient{0.6};
+    double orifice_area{0.0};      // > 0 enables the orifice regime when submerged
+    double smooth_depth{0.0};      // smoothstep ramp depth near the crest; 0 disables
+};
+
+enum class HeadDrivenExchangeRegime {
+    none,
+    free_weir,
+    submerged_weir,
+    orifice,
+};
+
+struct HeadDrivenExchangeFlow {
+    // Positive: surface drains into the engine; negative: engine spills back
+    // onto the surface.
+    double q_surface_to_engine{0.0};
+    HeadDrivenExchangeRegime regime{HeadDrivenExchangeRegime::none};
+};
+
+[[nodiscard]] HeadDrivenExchangeFlow compute_head_driven_exchange_flow(
+    double surface_water_level,
+    double engine_water_level,
+    const ExchangeFlowGeometry& geometry);
+
 struct DrainSplit {
     int micro_steps{1};
     double dt_micro{0.0};
@@ -2125,6 +2181,20 @@ struct RuntimeCounters {
     std::size_t count_negative_depth_fix{0};
 };
 
+// 1D -> 2D return flow (engine_to_surface): manhole surcharge/overflow or
+// river spill returning water onto the 2D surface through the event queue.
+struct ReturnExchangeRequest {
+    SharedExchangeEndpoint source{};
+    double q_return{0.0};
+    double dt_sub{0.0};
+};
+
+struct ReturnExchangeDecision {
+    SharedExchangeEndpoint source{};
+    double q_returned{0.0};
+    double v_returned{0.0};
+};
+
 class CouplingSnapshot {
 public:
     [[nodiscard]] const std::vector<ExchangeCellState>& cells() const noexcept;
@@ -2201,6 +2271,9 @@ public:
     void replay_pending();
     void record_pipeline_decision(const ExchangePipelineDecision& decision);
     ExchangePipelineDecision apply_exchange(std::size_t cell_index, const ExchangeRequest& request);
+    ReturnExchangeDecision apply_return_exchange(
+        std::size_t cell_index,
+        const ReturnExchangeRequest& request);
     std::vector<SharedExchangeDecision> apply_shared_exchange(
         std::size_t cell_index,
         const std::vector<SharedExchangeIntent>& intents,
