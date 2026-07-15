@@ -129,6 +129,12 @@ Fn load_symbol(void* handle, const char* name) {
 
 }  // namespace
 
+// Contract linkage: these function-pointer typedefs mirror the BMI 1.0 C
+// declarations in the vendored interface contract snapshot at
+// extern/dflowfm/include/bmi.h (see extern/dflowfm/README.md for the mapping
+// table). bmi.h is intentionally NOT included here: the adapter resolves the
+// symbols by name at runtime and no third-party header may leak into the
+// main graph. If the vendored header is refreshed, re-verify these typedefs.
 struct DFlowFMEngine::BmiApi {
     using InitializeFn = int (*)(const char*);
     using UpdateFn = int (*)(double);
