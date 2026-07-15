@@ -391,3 +391,12 @@ target_link_libraries(test_coupling_head_driven_exchange
         GTest::gtest_main
 )
 add_test(NAME test_coupling_head_driven_exchange COMMAND test_coupling_head_driven_exchange)
+
+add_executable(test_coupling_tri_driver test_coupling_tri_driver.cpp)
+target_link_libraries(test_coupling_tri_driver
+    PRIVATE
+        scau::coupling_driver
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_tri_driver COMMAND test_coupling_tri_driver)
