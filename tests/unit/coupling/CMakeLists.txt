@@ -87,3 +87,21 @@ target_link_libraries(test_coupling_system_mass_audit
         GTest::gtest_main
 )
 add_test(NAME test_coupling_system_mass_audit COMMAND test_coupling_system_mass_audit)
+
+add_executable(test_coupling_mock_swmm_engine test_coupling_mock_swmm_engine.cpp)
+target_link_libraries(test_coupling_mock_swmm_engine
+    PRIVATE
+        scau::coupling_drainage
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_mock_swmm_engine COMMAND test_coupling_mock_swmm_engine)
+
+add_executable(test_coupling_roof_drainage_adapter test_coupling_roof_drainage_adapter.cpp)
+target_link_libraries(test_coupling_roof_drainage_adapter
+    PRIVATE
+        scau::coupling_drainage
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_roof_drainage_adapter COMMAND test_coupling_roof_drainage_adapter)
