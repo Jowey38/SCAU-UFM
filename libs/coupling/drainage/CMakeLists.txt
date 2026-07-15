@@ -1,9 +1,13 @@
 add_library(scau_coupling_drainage
     src/mock_swmm_engine.cpp
     src/roof_drainage_adapter.cpp
-    src/swmm_engine.cpp
+    src/swmm_boundary.cpp
 )
 add_library(scau::coupling_drainage ALIAS scau_coupling_drainage)
+
+if(SCAU_EMBED_SWMM)
+    target_sources(scau_coupling_drainage PRIVATE src/swmm_adapter/swmm_engine.cpp)
+endif()
 
 target_include_directories(scau_coupling_drainage
     PUBLIC
@@ -17,5 +21,10 @@ target_link_libraries(scau_coupling_drainage
     PRIVATE
         scau::warnings
 )
+
+if(SCAU_EMBED_SWMM)
+    target_link_libraries(scau_coupling_drainage PRIVATE scau::extern_swmm5)
+    target_compile_definitions(scau_coupling_drainage PUBLIC SCAU_HAS_SWMM5=1)
+endif()
 
 target_compile_features(scau_coupling_drainage PUBLIC cxx_std_20)

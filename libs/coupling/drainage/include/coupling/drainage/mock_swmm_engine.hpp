@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "coupling/drainage/swmm_engine.hpp"
+#include "coupling/drainage/swmm_boundary.hpp"
 
 namespace scau::coupling::drainage {
 

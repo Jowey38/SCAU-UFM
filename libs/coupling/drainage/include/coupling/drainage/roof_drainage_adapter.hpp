@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <unordered_map>
 
-#include "coupling/drainage/swmm_engine.hpp"
+#include "coupling/drainage/swmm_boundary.hpp"
 #include "surface2d/source_terms/runoff/result.hpp"
 
 namespace scau::coupling::drainage {
