@@ -28,6 +28,11 @@ public:
     [[nodiscard]] surface2d::RoofDrainageAcceptanceFn acceptance_fn();
     void advance_engine();
 
+    // Discard the current substep's roof writes (surface rollback happened
+    // BEFORE advance_engine): zero engine-side inflows and reset both the
+    // adapter and gate ledgers. Engine time is untouched.
+    void rollback_substep();
+
     [[nodiscard]] Real dt_sub() const noexcept;
     [[nodiscard]] std::size_t substep_count() const noexcept;
 

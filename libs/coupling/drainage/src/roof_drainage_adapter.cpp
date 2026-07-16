@@ -55,6 +55,13 @@ void SwmmRoofDrainageAcceptanceAdapter::begin_step() {
     accumulated_node_flows_.clear();
 }
 
+void SwmmRoofDrainageAcceptanceAdapter::rollback_step() {
+    for (const auto& entry : accumulated_node_flows_) {
+        engine_->set_node_lateral_inflow(entry.first, 0.0);
+    }
+    accumulated_node_flows_.clear();
+}
+
 surface2d::RoofDrainageAcceptance SwmmRoofDrainageAcceptanceAdapter::reject(
     const surface2d::RoofDrainageIntent& intent,
     surface2d::RoofDrainageRejectionReason reason) const {
