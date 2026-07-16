@@ -1,15 +1,19 @@
 # SWMM spike test cases
 
-This directory will hold `.inp` files driving the SWMM 5.2.4 spike host.
-M29 does NOT place real `.inp` files because EPA SWMM5 example licensing must
-be verified first (deferred to M30+ placement decision).
+This directory contains SCAU-UFM-authored `.inp` files for the standalone SWMM
+5.2.x spike host. They are written from scratch for this repository and are not
+copied from EPA or third-party example sets.
 
-Required cases per third-party-spike-design §5.1:
+Cases per third-party-spike-design §5.1:
 
-- `single_pipe.inp`: upstream constant inflow → single pipe → free outfall.
-  Minimal sanity case for §3.1 lifecycle + §3.2 time advance + §3.3 state IO.
-- `manhole_overflow.inp`: case with one surcharging manhole. Backs the
-  §3.3 read assumption and the G8 GoldenTest physical basis.
+- `single_pipe.inp`: upstream constant inflow into one junction, one conduit,
+  and a free outfall. It is the minimal lifecycle/state-IO sanity case for
+  §3.1 lifecycle, §3.2 time advance, and §3.3 state reads.
+- `manhole_overflow.inp`: shallow downstream manhole `J1` with a restricted
+  outlet conduit and sustained upstream inflow. It backs the G8
+  `swmm_single_pipe_surcharge` physical evidence path by making real SWMM
+  `NODE_HEAD` / `NODE_OVERFLOW` transitions observable through the spike host.
 
-Until those files are placed, the spike host can still be compiled to verify
-ABI shape; running requires real `.inp` inputs.
+The main repository CMake graph still does not build or gate real SWMM. Use
+`spikes/swmm/CMakeLists.txt` with an external `SWMM_SOURCE_DIR` checkout to run
+these cases.

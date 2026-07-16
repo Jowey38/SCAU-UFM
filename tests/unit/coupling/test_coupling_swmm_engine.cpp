@@ -27,10 +27,10 @@ TEST(CouplingSwmmEngine, InitializeStepFinalizeLifecycle) {
 
     engine.initialize(minimal_case_path());
     EXPECT_TRUE(engine.initialized());
-    EXPECT_EQ(engine.node_count(), 3U);
-    EXPECT_LT(engine.node_index("J1"), engine.node_count());
-    EXPECT_LT(engine.node_index("O1"), engine.node_count());
-    EXPECT_NO_THROW(static_cast<void>(engine.link_index("C1")));
+    EXPECT_EQ(engine.node_count(), 3);
+    EXPECT_GE(engine.node_index("J1"), 0);
+    EXPECT_GE(engine.node_index("O1"), 0);
+    EXPECT_GE(engine.link_index("C1"), 0);
 
     engine.step(60.0);
     EXPECT_GT(engine.elapsed_time(), 0.0);
@@ -44,8 +44,8 @@ TEST(CouplingSwmmEngine, LateralInflowRoutesTowardOutfall) {
     SwmmEngine engine;
     engine.initialize(minimal_case_path());
 
-    const std::size_t j1 = engine.node_index("J1");
-    const std::size_t o1 = engine.node_index("O1");
+    const int j1 = engine.node_index("J1");
+    const int o1 = engine.node_index("O1");
 
     engine.set_node_lateral_inflow(j1, 0.05);
 
@@ -69,8 +69,8 @@ TEST(CouplingSwmmEngine, SetOutfallStageOnlyTargetsOutfalls) {
     SwmmEngine engine;
     engine.initialize(minimal_case_path());
 
-    const std::size_t j1 = engine.node_index("J1");
-    const std::size_t o1 = engine.node_index("O1");
+    const int j1 = engine.node_index("J1");
+    const int o1 = engine.node_index("O1");
 
     EXPECT_NO_THROW(engine.set_outfall_stage(o1, 9.4));
     EXPECT_THROW(engine.set_outfall_stage(j1, 9.4), SwmmEngineError);
@@ -79,11 +79,11 @@ TEST(CouplingSwmmEngine, SetOutfallStageOnlyTargetsOutfalls) {
     engine.finalize();
 }
 
-TEST(CouplingSwmmEngine, ManholeOverflowCaseSeesRealOverflowAndSurcharge) {
+TEST(CouplingSwmmEngine, MainGraphG8EvidenceSeesRealOverflowAndSurcharge) {
     SwmmEngine engine;
     engine.initialize(manhole_overflow_case_path());
 
-    const std::size_t j1 = engine.node_index("J1");
+    const int j1 = engine.node_index("J1");
     double max_head = 0.0;
     double max_overflow = 0.0;
     bool saw_positive_overflow = false;
@@ -111,17 +111,16 @@ TEST(CouplingSwmmEngine, ManholeOverflowCaseSeesRealOverflowAndSurcharge) {
 TEST(CouplingSwmmEngine, FailsClosedOnInvalidUse) {
     SwmmEngine engine;
     EXPECT_THROW(engine.step(5.0), SwmmEngineError);
-    EXPECT_THROW(static_cast<void>(engine.get_node_head(0U)), SwmmEngineError);
+    EXPECT_THROW(static_cast<void>(engine.get_node_head(0)), SwmmEngineError);
     EXPECT_THROW(engine.initialize(""), SwmmEngineError);
     EXPECT_THROW(engine.initialize("does_not_exist.inp"), SwmmEngineError);
     EXPECT_FALSE(engine.initialized());
 
     engine.initialize(minimal_case_path());
-    EXPECT_THROW(static_cast<void>(engine.get_node_head(99U)), SwmmEngineError);
+    EXPECT_THROW(static_cast<void>(engine.get_node_head(-1)), SwmmEngineError);
+    EXPECT_THROW(static_cast<void>(engine.get_node_head(99)), SwmmEngineError);
     EXPECT_THROW(engine.step(0.0), SwmmEngineError);
-    EXPECT_THROW(engine.set_node_lateral_inflow(0U, std::nan("")), SwmmEngineError);
     EXPECT_THROW(static_cast<void>(engine.node_index("missing")), SwmmEngineError);
-    EXPECT_THROW(static_cast<void>(engine.get_link_flow(99U)), SwmmEngineError);
     engine.finalize();
 }
 

@@ -21,7 +21,7 @@ surface2d::RoofDrainageAcceptance SwmmRoofDrainageAcceptanceAdapter::operator()(
         return reject(intent, surface2d::RoofDrainageRejectionReason::EngineUnavailable);
     }
 
-    const auto node_id = static_cast<std::size_t>(intent.target_swmm_node_index);
+    const int node_id = intent.target_swmm_node_index;
     try {
         if (engine_->is_surcharged(node_id)) {
             return reject(intent, surface2d::RoofDrainageRejectionReason::NodeSurcharged);

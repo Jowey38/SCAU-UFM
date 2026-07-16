@@ -13,13 +13,18 @@ if(NOT DFLOWFM_SOURCE_DIR)
     message(FATAL_ERROR
         "DFLOWFM_SOURCE_DIR must point at a local Delft3D-main checkout, e.g. "
         "/path/to/Delft3D-main. The spike does not vendor any third-party "
-        "source; the caller supplies a built D-Flow FM library and its BMI "
-        "header location via this cache variable.")
+        "engine source; the caller supplies a built D-Flow FM library and its "
+        "BMI header location via this cache variable.")
 endif()
 
+# Primary hint: the external checkout. Fallback: the vendored BMI interface
+# contract snapshot at extern/dflowfm/include (header contract only; the
+# engine library itself must still come from DFLOWFM_SOURCE_DIR).
 find_path(DFLOWFM_BMI_INCLUDE_DIR
     NAMES bmi.h
-    HINTS ${DFLOWFM_SOURCE_DIR}/src/engines_gpl/dimr/packages/dimr_lib/include
+    HINTS
+        ${DFLOWFM_SOURCE_DIR}/src/engines_gpl/dimr/packages/dimr_lib/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../extern/dflowfm/include
     REQUIRED
 )
 

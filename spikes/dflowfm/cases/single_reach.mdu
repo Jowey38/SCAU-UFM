@@ -1,0 +1,22 @@
+[model]
+name = single_reach_skeleton
+
+[time]
+# author placeholder values; replace after first real runtime pass
+refdate = 20000101
+tstart = 0.0
+tstop = 6000.0
+
+[geometry]
+# author placeholder companion reference; fill when the real network file exists
+netfile = single_reach_net.nc
+
+[boundary]
+# author placeholder references for the first real spike pass
+upstream_discharge_boundary = single_reach_upstream_q
+downstream_stage_boundary = single_reach_downstream_h
+
+[output]
+# author placeholder output cadence
+map_interval = 60.0
+his_interval = 60.0

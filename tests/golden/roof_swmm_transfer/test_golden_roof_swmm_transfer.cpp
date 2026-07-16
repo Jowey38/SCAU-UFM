@@ -60,8 +60,8 @@ TEST(GoldenRoofSwmmTransfer, TransferConservationUnderRealRouting) {
     SwmmEngine engine;
     engine.initialize(minimal_case_path());
 
-    const std::size_t j1 = engine.node_index("J1");
-    const std::size_t o1 = engine.node_index("O1");
+    const int j1 = engine.node_index("J1");
+    const int o1 = engine.node_index("O1");
 
     auto state = make_state();
     RoofSwmmStepDriver driver(
@@ -85,7 +85,7 @@ TEST(GoldenRoofSwmmTransfer, TransferConservationUnderRealRouting) {
         driver.begin_substep();
         const RoofDrainageIntent intent{
             .source_cell_index = 0,
-            .target_swmm_node_index = static_cast<int>(j1),
+            .target_swmm_node_index = j1,
             .requested_volume = requested_volumes[i],
             .source_roof_area = 200.0,
         };

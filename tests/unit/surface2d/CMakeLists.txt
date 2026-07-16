@@ -241,6 +241,26 @@ target_link_libraries(test_dpm_closure_laws
 )
 add_test(NAME test_dpm_closure_laws COMMAND test_dpm_closure_laws)
 
+add_executable(test_dpm_phi_t_remap test_dpm_phi_t_remap.cpp)
+target_link_libraries(test_dpm_phi_t_remap
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_dpm_phi_t_remap COMMAND test_dpm_phi_t_remap)
+set_tests_properties(test_dpm_phi_t_remap PROPERTIES LABELS "golden_candidate;cvc;surface2d")
+
+add_executable(test_cvc_spatial_phi_t_dynamic_perturbation test_cvc_spatial_phi_t_dynamic_perturbation.cpp)
+target_link_libraries(test_cvc_spatial_phi_t_dynamic_perturbation
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_cvc_spatial_phi_t_dynamic_perturbation COMMAND test_cvc_spatial_phi_t_dynamic_perturbation)
+set_tests_properties(test_cvc_spatial_phi_t_dynamic_perturbation PROPERTIES LABELS "golden_candidate;cvc;surface2d")
+
 add_executable(test_edge_classification test_edge_classification.cpp)
 target_link_libraries(test_edge_classification
     PRIVATE
@@ -285,6 +305,33 @@ target_link_libraries(test_runoff_green_ampt
         GTest::gtest_main
 )
 add_test(NAME test_runoff_green_ampt COMMAND test_runoff_green_ampt)
+
+add_executable(test_well_balanced_pairing test_well_balanced_pairing.cpp)
+target_link_libraries(test_well_balanced_pairing
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_well_balanced_pairing COMMAND test_well_balanced_pairing)
+
+add_executable(test_well_balanced_phi_t_jump_at_rest test_well_balanced_phi_t_jump_at_rest.cpp)
+target_link_libraries(test_well_balanced_phi_t_jump_at_rest
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_well_balanced_phi_t_jump_at_rest COMMAND test_well_balanced_phi_t_jump_at_rest)
+
+add_executable(test_well_balanced_sloping_bed_at_rest test_well_balanced_sloping_bed_at_rest.cpp)
+target_link_libraries(test_well_balanced_sloping_bed_at_rest
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_well_balanced_sloping_bed_at_rest COMMAND test_well_balanced_sloping_bed_at_rest)
 
 add_executable(test_runoff_result test_runoff_result.cpp)
 target_link_libraries(test_runoff_result

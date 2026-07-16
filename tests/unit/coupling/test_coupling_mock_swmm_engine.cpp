@@ -1,42 +1,54 @@
-#include "coupling/drainage/mock_swmm_engine.hpp"
-
-#include <stdexcept>
+#include "coupling/drainage/swmm_boundary.hpp"
 
 #include <gtest/gtest.h>
 
 using scau::coupling::drainage::MockSwmmEngine;
 using scau::coupling::drainage::SwmmEngineError;
 
-TEST(MockSwmmEngine, SetsAndReadsNodeLateralInflowWithOverrideSemantics) {
-    MockSwmmEngine engine(2U);
+namespace {
 
-    engine.set_node_lateral_inflow(1U, 0.25);
-    EXPECT_NEAR(engine.get_node_lateral_inflow(1U), 0.25, 1.0e-12);
-
-    engine.set_node_lateral_inflow(1U, 0.75);
-    EXPECT_NEAR(engine.get_node_lateral_inflow(1U), 0.75, 1.0e-12);
+MockSwmmEngine make_initialized_engine() {
+    MockSwmmEngine engine;
+    engine.initialize("mock.inp");
+    return engine;
 }
 
-TEST(MockSwmmEngine, InvalidNodeThrows) {
-    MockSwmmEngine engine(1U);
+}  // namespace
 
-    EXPECT_THROW(static_cast<void>(engine.get_node_head(1U)), SwmmEngineError);
-    EXPECT_THROW(static_cast<void>(engine.get_node_lateral_inflow(1U)), SwmmEngineError);
-    EXPECT_THROW(engine.set_node_lateral_inflow(1U, 0.1), SwmmEngineError);
+TEST(MockSwmmEngine, SetsAndReadsNodeLateralInflowWithOverrideSemantics) {
+    auto engine = make_initialized_engine();
+
+    engine.set_node_lateral_inflow(1, 0.25);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(1), 0.25, 1.0e-12);
+
+    engine.set_node_lateral_inflow(1, 0.75);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(1), 0.75, 1.0e-12);
+}
+
+TEST(MockSwmmEngine, NegativeNodeIdThrowsAndUninitializedThrows) {
+    auto engine = make_initialized_engine();
+
+    EXPECT_THROW(static_cast<void>(engine.get_node_head(-1)), SwmmEngineError);
+    EXPECT_THROW(static_cast<void>(engine.get_node_lateral_inflow(-1)), SwmmEngineError);
+    EXPECT_THROW(engine.set_node_lateral_inflow(-1, 0.1), SwmmEngineError);
+
+    MockSwmmEngine uninitialized;
+    EXPECT_THROW(static_cast<void>(uninitialized.get_node_head(0)), SwmmEngineError);
+    EXPECT_THROW(uninitialized.set_node_lateral_inflow(0, 0.1), SwmmEngineError);
 }
 
 TEST(MockSwmmEngine, SurchargeAndHeadCanBeConfigured) {
-    MockSwmmEngine engine(1U);
+    auto engine = make_initialized_engine();
 
-    engine.set_node_head(0U, 1.25);
-    engine.set_surcharged(0U, true);
+    engine.set_node_head_fixture(0, 1.25);
+    engine.set_node_surcharge_fixture(0, true);
 
-    EXPECT_NEAR(engine.get_node_head(0U), 1.25, 1.0e-12);
-    EXPECT_TRUE(engine.is_surcharged(0U));
+    EXPECT_NEAR(engine.get_node_head(0), 1.25, 1.0e-12);
+    EXPECT_TRUE(engine.is_surcharged(0));
 }
 
 TEST(MockSwmmEngine, StepValidatesDtAndAdvancesElapsedTime) {
-    MockSwmmEngine engine(1U);
+    auto engine = make_initialized_engine();
 
     engine.step(0.5);
     engine.step(0.25);
@@ -46,11 +58,11 @@ TEST(MockSwmmEngine, StepValidatesDtAndAdvancesElapsedTime) {
     EXPECT_THROW(engine.step(-1.0), SwmmEngineError);
 }
 
-TEST(MockSwmmEngine, LinkFlowUsesConfiguredLinksAndRejectsInvalidLinks) {
-    MockSwmmEngine engine(1U, 1U);
+TEST(MockSwmmEngine, LinkFlowUsesFixturesAndRejectsNegativeLinkIds) {
+    auto engine = make_initialized_engine();
 
-    engine.set_link_flow(0U, -0.125);
+    engine.set_link_flow_fixture(0, -0.125);
 
-    EXPECT_NEAR(engine.get_link_flow(0U), -0.125, 1.0e-12);
-    EXPECT_THROW(static_cast<void>(engine.get_link_flow(1U)), SwmmEngineError);
+    EXPECT_NEAR(engine.get_link_flow(0), -0.125, 1.0e-12);
+    EXPECT_THROW(static_cast<void>(engine.get_link_flow(-1)), SwmmEngineError);
 }

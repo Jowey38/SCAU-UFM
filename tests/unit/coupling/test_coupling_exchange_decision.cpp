@@ -1,3 +1,4 @@
+#include <limits>
 #include <stdexcept>
 
 #include <gtest/gtest.h>
@@ -8,7 +9,7 @@ namespace {
 
 scau::coupling::core::ExchangeCellState make_cell(double deficit_volume) {
     return scau::coupling::core::ExchangeCellState{
-        .volume = 0.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = deficit_volume},
         .phi_t = 0.4,
         .h = 2.0,
@@ -68,6 +69,33 @@ TEST(CouplingExchangeDecision, DeficitAtOrAboveHardGateBlocksNewRequest) {
     EXPECT_DOUBLE_EQ(decision.q_granted, 0.0);
     EXPECT_DOUBLE_EQ(decision.v_granted, 0.0);
     EXPECT_DOUBLE_EQ(decision.v_unmet, 20.0);
+}
+
+TEST(CouplingExchangeDecision, RejectsNonFiniteRequestOrDeficitVolume) {
+    const auto cell = make_cell(1.0);
+    auto nonfinite_deficit_cell = make_cell(std::numeric_limits<double>::quiet_NaN());
+
+    EXPECT_THROW(
+        static_cast<void>(scau::coupling::core::evaluate_exchange(
+            cell,
+            scau::coupling::core::ExchangeRequest{
+                .q_request = std::numeric_limits<double>::quiet_NaN(),
+                .dt_sub = 4.0,
+            })),
+        std::invalid_argument);
+    EXPECT_THROW(
+        static_cast<void>(scau::coupling::core::evaluate_exchange(
+            cell,
+            scau::coupling::core::ExchangeRequest{
+                .q_request = 1.0,
+                .dt_sub = std::numeric_limits<double>::infinity(),
+            })),
+        std::invalid_argument);
+    EXPECT_THROW(
+        static_cast<void>(scau::coupling::core::evaluate_exchange(
+            nonfinite_deficit_cell,
+            scau::coupling::core::ExchangeRequest{.q_request = 1.0, .dt_sub = 4.0})),
+        std::invalid_argument);
 }
 
 TEST(CouplingExchangeDecision, RejectsNegativeRequestOrDeficitVolume) {

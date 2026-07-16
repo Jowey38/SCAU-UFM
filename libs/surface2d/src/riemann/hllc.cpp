@@ -21,6 +21,11 @@ core::Real physical_normal_momentum_flux(const CellState& state, Normal2 normal,
     return state.conserved.h * un * un + 0.5 * gravity * state.conserved.h * state.conserved.h;
 }
 
+core::Real advective_normal_momentum_flux(const CellState& state, Normal2 normal) {
+    const core::Real un = normal_velocity(state, normal);
+    return state.conserved.h * un * un;
+}
+
 Normal2 tangent_from_normal(Normal2 normal) {
     return Normal2{.x = -normal.y, .y = normal.x};
 }
@@ -48,16 +53,15 @@ core::Real hllc_star_normal_momentum_flux(
     const CellState& state,
     Normal2 normal,
     core::Real s_k,
-    core::Real s_star,
-    core::Real gravity) {
+    core::Real s_star) {
     const core::Real un = normal_velocity(state, normal);
     const core::Real denominator = s_k - s_star;
     if (denominator == 0.0) {
-        return physical_normal_momentum_flux(state, normal, gravity);
+        return advective_normal_momentum_flux(state, normal);
     }
     const core::Real h_star = state.conserved.h * (s_k - un) / denominator;
     const core::Real momentum_star = h_star * s_star;
-    return physical_normal_momentum_flux(state, normal, gravity) + s_k * (momentum_star - state.conserved.h * un);
+    return advective_normal_momentum_flux(state, normal) + s_k * (momentum_star - state.conserved.h * un);
 }
 
 }  // namespace
@@ -110,19 +114,19 @@ EdgeFlux hllc_normal_flux(
     core::Real tangential = 0.0;
     if (0.0 <= speeds.s_l) {
         mass = physical_normal_mass_flux(pair.left, normal);
-        momentum_n = physical_normal_momentum_flux(pair.left, normal, 9.81);
+        momentum_n = advective_normal_momentum_flux(pair.left, normal);
         tangential = tangential_velocity(pair.left, normal);
     } else if (speeds.s_l <= 0.0 && 0.0 <= speeds.s_star) {
         mass = hllc_star_normal_mass_flux(pair.left, normal, speeds.s_l, speeds.s_star);
-        momentum_n = hllc_star_normal_momentum_flux(pair.left, normal, speeds.s_l, speeds.s_star, 9.81);
+        momentum_n = hllc_star_normal_momentum_flux(pair.left, normal, speeds.s_l, speeds.s_star);
         tangential = tangential_velocity(pair.left, normal);
     } else if (speeds.s_star <= 0.0 && 0.0 <= speeds.s_r) {
         mass = hllc_star_normal_mass_flux(pair.right, normal, speeds.s_r, speeds.s_star);
-        momentum_n = hllc_star_normal_momentum_flux(pair.right, normal, speeds.s_r, speeds.s_star, 9.81);
+        momentum_n = hllc_star_normal_momentum_flux(pair.right, normal, speeds.s_r, speeds.s_star);
         tangential = tangential_velocity(pair.right, normal);
     } else {
         mass = physical_normal_mass_flux(pair.right, normal);
-        momentum_n = physical_normal_momentum_flux(pair.right, normal, 9.81);
+        momentum_n = advective_normal_momentum_flux(pair.right, normal);
         tangential = tangential_velocity(pair.right, normal);
     }
 

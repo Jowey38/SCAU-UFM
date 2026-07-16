@@ -12,7 +12,7 @@ scau::coupling::core::ExchangeCellState make_cell(
     double h = 2.0,
     double area = 50.0) {
     return scau::coupling::core::ExchangeCellState{
-        .volume = 0.0,
+        .volume = phi_t * h * area,
         .mass_deficit_account = {.volume = deficit_volume},
         .phi_t = phi_t,
         .h = h,
@@ -83,9 +83,9 @@ TEST(CouplingExchangePipeline, DeficitRepaymentPrecedesNewRequestGrant) {
     EXPECT_DOUBLE_EQ(decision.exchange.q_granted, 5.0);
     EXPECT_DOUBLE_EQ(decision.exchange.v_granted, 20.0);
     EXPECT_DOUBLE_EQ(decision.exchange.v_unmet, 0.0);
-    EXPECT_EQ(decision.drain_split.micro_steps, 3);
-    EXPECT_DOUBLE_EQ(decision.drain_split.dt_micro, 4.0 / 3.0);
-    EXPECT_DOUBLE_EQ(decision.drain_split.v_per_micro_step, 20.0 / 3.0);
+    EXPECT_EQ(decision.drain_split.micro_steps, 4);
+    EXPECT_DOUBLE_EQ(decision.drain_split.dt_micro, 1.0);
+    EXPECT_DOUBLE_EQ(decision.drain_split.v_per_micro_step, 7.0);
     EXPECT_TRUE(decision.drain_split_engaged);
     EXPECT_FALSE(decision.negative_depth_fix_engaged);
 }

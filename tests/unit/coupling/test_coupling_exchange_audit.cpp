@@ -12,7 +12,7 @@ scau::coupling::core::ExchangeCellState make_cell(
     double h = 2.0,
     double area = 50.0) {
     return scau::coupling::core::ExchangeCellState{
-        .volume = 0.0,
+        .volume = phi_t * h * area,
         .mass_deficit_account = {.volume = deficit_volume},
         .phi_t = phi_t,
         .h = h,

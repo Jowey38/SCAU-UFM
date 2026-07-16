@@ -3,7 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "coupling/driver/roof_exchange_gate.hpp"
-#include "coupling/drainage/mock_swmm_engine.hpp"
+#include "coupling/drainage/swmm_boundary.hpp"
 #include "coupling/drainage/roof_drainage_adapter.hpp"
 
 namespace {
@@ -41,7 +41,8 @@ ExchangeCellState make_endpoint(double deficit_volume = 0.0) {
 }  // namespace
 
 TEST(RoofExchangeGate, PassesThroughUnderHeadroom) {
-    MockSwmmEngine engine(1U);
+    MockSwmmEngine engine;
+    engine.initialize("mock.inp");
     SwmmRoofDrainageAcceptanceAdapter adapter(engine, kDtSub);
     RoofExchangeGate gate(
         [](const RoofDrainageIntent&) { return std::make_optional(make_endpoint()); },
@@ -55,11 +56,12 @@ TEST(RoofExchangeGate, PassesThroughUnderHeadroom) {
     EXPECT_NEAR(acceptance.requested_volume, 30.0, 1.0e-12);
     EXPECT_NEAR(acceptance.accepted_volume, 30.0, 1.0e-12);
     EXPECT_NEAR(acceptance.rejected_volume, 0.0, 1.0e-12);
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 3.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 3.0, 1.0e-12);
 }
 
 TEST(RoofExchangeGate, ClampsToQLimitAndReportsCapacityLimited) {
-    MockSwmmEngine engine(1U);
+    MockSwmmEngine engine;
+    engine.initialize("mock.inp");
     SwmmRoofDrainageAcceptanceAdapter adapter(engine, kDtSub);
     RoofExchangeGate gate(
         [](const RoofDrainageIntent&) { return std::make_optional(make_endpoint()); },
@@ -74,11 +76,12 @@ TEST(RoofExchangeGate, ClampsToQLimitAndReportsCapacityLimited) {
     EXPECT_NEAR(acceptance.accepted_volume, 90.0, 1.0e-12);
     EXPECT_NEAR(acceptance.rejected_volume, 30.0, 1.0e-12);
     // Downstream sees only the granted flow.
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 9.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 9.0, 1.0e-12);
 }
 
 TEST(RoofExchangeGate, OutstandingDeficitReservesRepaymentHeadroom) {
-    MockSwmmEngine engine(1U);
+    MockSwmmEngine engine;
+    engine.initialize("mock.inp");
     SwmmRoofDrainageAcceptanceAdapter adapter(engine, kDtSub);
     // Endpoint owes 20 m3: q_repay = min(20/10, 9) = 2 m3/s -> roof headroom 7 m3/s.
     RoofExchangeGate gate(
@@ -91,11 +94,12 @@ TEST(RoofExchangeGate, OutstandingDeficitReservesRepaymentHeadroom) {
     EXPECT_EQ(acceptance.rejection_reason, RoofDrainageRejectionReason::CapacityLimited);
     EXPECT_NEAR(acceptance.accepted_volume, 70.0, 1.0e-12);
     EXPECT_NEAR(acceptance.rejected_volume, 50.0, 1.0e-12);
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 7.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 7.0, 1.0e-12);
 }
 
 TEST(RoofExchangeGate, MissingEndpointStateFailsClosedWithoutDownstreamWrite) {
-    MockSwmmEngine engine(1U);
+    MockSwmmEngine engine;
+    engine.initialize("mock.inp");
     SwmmRoofDrainageAcceptanceAdapter adapter(engine, kDtSub);
     RoofExchangeGate gate(
         [](const RoofDrainageIntent&) { return std::optional<ExchangeCellState>{}; },
@@ -107,12 +111,13 @@ TEST(RoofExchangeGate, MissingEndpointStateFailsClosedWithoutDownstreamWrite) {
     EXPECT_EQ(acceptance.rejection_reason, RoofDrainageRejectionReason::HealthBlocked);
     EXPECT_NEAR(acceptance.accepted_volume, 0.0, 1.0e-12);
     EXPECT_NEAR(acceptance.rejected_volume, 30.0, 1.0e-12);
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 0.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 0.0, 1.0e-12);
 }
 
 TEST(RoofExchangeGate, DownstreamRejectionReasonWinsWithOriginalAccounting) {
-    MockSwmmEngine engine(1U);
-    engine.set_surcharged(0U, true);
+    MockSwmmEngine engine;
+    engine.initialize("mock.inp");
+    engine.set_node_surcharge_fixture(0, true);
     SwmmRoofDrainageAcceptanceAdapter adapter(engine, kDtSub);
     RoofExchangeGate gate(
         [](const RoofDrainageIntent&) { return std::make_optional(make_endpoint()); },
@@ -127,11 +132,12 @@ TEST(RoofExchangeGate, DownstreamRejectionReasonWinsWithOriginalAccounting) {
     EXPECT_NEAR(acceptance.requested_volume, 120.0, 1.0e-12);
     EXPECT_NEAR(acceptance.accepted_volume, 0.0, 1.0e-12);
     EXPECT_NEAR(acceptance.rejected_volume, 120.0, 1.0e-12);
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 0.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 0.0, 1.0e-12);
 }
 
 TEST(RoofExchangeGate, ZeroHeadroomSkipsDownstream) {
-    MockSwmmEngine engine(1U);
+    MockSwmmEngine engine;
+    engine.initialize("mock.inp");
     SwmmRoofDrainageAcceptanceAdapter adapter(engine, kDtSub);
     // Dry endpoint: V_limit = 0 -> Q_limit = 0 -> nothing can be granted.
     RoofExchangeGate gate(
@@ -148,11 +154,12 @@ TEST(RoofExchangeGate, ZeroHeadroomSkipsDownstream) {
     EXPECT_EQ(acceptance.rejection_reason, RoofDrainageRejectionReason::CapacityLimited);
     EXPECT_NEAR(acceptance.accepted_volume, 0.0, 1.0e-12);
     EXPECT_NEAR(acceptance.rejected_volume, 30.0, 1.0e-12);
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 0.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 0.0, 1.0e-12);
 }
 
 TEST(RoofExchangeGate, InvalidVolumeForwardsToDownstreamFailClosed) {
-    MockSwmmEngine engine(1U);
+    MockSwmmEngine engine;
+    engine.initialize("mock.inp");
     SwmmRoofDrainageAcceptanceAdapter adapter(engine, kDtSub);
     RoofExchangeGate gate(
         [](const RoofDrainageIntent&) { return std::make_optional(make_endpoint()); },
@@ -164,11 +171,12 @@ TEST(RoofExchangeGate, InvalidVolumeForwardsToDownstreamFailClosed) {
     EXPECT_EQ(acceptance.rejection_reason, RoofDrainageRejectionReason::EngineUnavailable);
     EXPECT_NEAR(acceptance.accepted_volume, 0.0, 1.0e-12);
     EXPECT_NEAR(acceptance.rejected_volume, 5.0, 1.0e-12);
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 0.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 0.0, 1.0e-12);
 }
 
 TEST(RoofExchangeGate, GrantedFlowAccumulatesAgainstQLimitWithinSubstep) {
-    MockSwmmEngine engine(1U);
+    MockSwmmEngine engine;
+    engine.initialize("mock.inp");
     SwmmRoofDrainageAcceptanceAdapter adapter(engine, kDtSub);
     RoofExchangeGate gate(
         [](const RoofDrainageIntent&) { return std::make_optional(make_endpoint()); },
@@ -184,18 +192,19 @@ TEST(RoofExchangeGate, GrantedFlowAccumulatesAgainstQLimitWithinSubstep) {
     EXPECT_EQ(second.rejection_reason, RoofDrainageRejectionReason::CapacityLimited);
     EXPECT_NEAR(second.accepted_volume, 60.0, 1.0e-12);
     EXPECT_NEAR(second.rejected_volume, 60.0, 1.0e-12);
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 9.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 9.0, 1.0e-12);
 
     // A new substep resets the per-endpoint grant ledger.
     gate.begin_substep();
     adapter.begin_step();
     const auto third = gate(make_intent(30.0));
     EXPECT_EQ(third.rejection_reason, RoofDrainageRejectionReason::None);
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 3.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 3.0, 1.0e-12);
 }
 
 TEST(RoofExchangeGate, ZeroVolumeIntentPassesThroughAsFullAccept) {
-    MockSwmmEngine engine(1U);
+    MockSwmmEngine engine;
+    engine.initialize("mock.inp");
     SwmmRoofDrainageAcceptanceAdapter adapter(engine, kDtSub);
     RoofExchangeGate gate(
         [](const RoofDrainageIntent&) { return std::make_optional(make_endpoint()); },
