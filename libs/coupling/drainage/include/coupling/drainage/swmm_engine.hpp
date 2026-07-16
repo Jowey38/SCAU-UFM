@@ -34,21 +34,21 @@ public:
     SwmmEngine& operator=(SwmmEngine&&) = delete;
 
     void initialize(const std::string& inp_path) override;
-    void step(core::Real dt_swmm) override;
+    void step(scau::core::Real dt_swmm) override;
     void finalize() override;
 
-    [[nodiscard]] core::Real get_node_head(std::size_t node_id) const override;
-    [[nodiscard]] core::Real get_node_lateral_inflow(std::size_t node_id) const override;
-    void set_node_lateral_inflow(std::size_t node_id, core::Real q) override;
-    [[nodiscard]] core::Real get_node_inflow(std::size_t node_id) const;
-    [[nodiscard]] core::Real get_node_overflow(std::size_t node_id) const;
-    void set_outfall_stage(std::size_t node_id, core::Real stage);
+    [[nodiscard]] scau::core::Real get_node_head(std::size_t node_id) const override;
+    [[nodiscard]] scau::core::Real get_node_lateral_inflow(std::size_t node_id) const override;
+    void set_node_lateral_inflow(std::size_t node_id, scau::core::Real q) override;
+    [[nodiscard]] scau::core::Real get_node_inflow(std::size_t node_id) const;
+    [[nodiscard]] scau::core::Real get_node_overflow(std::size_t node_id) const;
+    void set_outfall_stage(std::size_t node_id, scau::core::Real stage);
 
-    [[nodiscard]] core::Real get_link_flow(std::size_t link_id) const override;
+    [[nodiscard]] scau::core::Real get_link_flow(std::size_t link_id) const override;
     [[nodiscard]] bool is_surcharged(std::size_t node_id) const override;
 
     [[nodiscard]] bool initialized() const noexcept;
-    [[nodiscard]] core::Real elapsed_time() const noexcept;  // seconds since start
+    [[nodiscard]] scau::core::Real elapsed_time() const noexcept;  // seconds since start
     [[nodiscard]] std::size_t node_count() const;
     [[nodiscard]] std::size_t node_index(const std::string& node_name) const;
     [[nodiscard]] std::size_t link_index(const std::string& link_name) const;

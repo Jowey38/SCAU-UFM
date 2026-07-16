@@ -85,7 +85,7 @@ void SwmmEngine::initialize(const std::string& inp_path) {
     simulation_ended_ = false;
 }
 
-void SwmmEngine::step(core::Real dt_swmm) {
+void SwmmEngine::step(scau::core::Real dt_swmm) {
     require_initialized();
     if (!std::isfinite(dt_swmm) || dt_swmm <= 0.0) {
         throw SwmmEngineError("dt_swmm must be finite and positive");
@@ -121,17 +121,17 @@ void SwmmEngine::finalize() {
     g_swmm_project_open.store(false);
 }
 
-core::Real SwmmEngine::get_node_head(std::size_t node_id) const {
+scau::core::Real SwmmEngine::get_node_head(std::size_t node_id) const {
     require_valid_node(node_id);
     return swmm_getValue(swmm_NODE_HEAD, static_cast<int>(node_id));
 }
 
-core::Real SwmmEngine::get_node_lateral_inflow(std::size_t node_id) const {
+scau::core::Real SwmmEngine::get_node_lateral_inflow(std::size_t node_id) const {
     require_valid_node(node_id);
     return swmm_getValue(swmm_NODE_LATFLOW, static_cast<int>(node_id));
 }
 
-void SwmmEngine::set_node_lateral_inflow(std::size_t node_id, core::Real q) {
+void SwmmEngine::set_node_lateral_inflow(std::size_t node_id, scau::core::Real q) {
     require_valid_node(node_id);
     if (!std::isfinite(q)) {
         throw SwmmEngineError("node lateral inflow must be finite");
@@ -139,17 +139,17 @@ void SwmmEngine::set_node_lateral_inflow(std::size_t node_id, core::Real q) {
     swmm_setValue(swmm_NODE_LATFLOW, static_cast<int>(node_id), q);
 }
 
-core::Real SwmmEngine::get_node_inflow(std::size_t node_id) const {
+scau::core::Real SwmmEngine::get_node_inflow(std::size_t node_id) const {
     require_valid_node(node_id);
     return swmm_getValue(swmm_NODE_INFLOW, static_cast<int>(node_id));
 }
 
-core::Real SwmmEngine::get_node_overflow(std::size_t node_id) const {
+scau::core::Real SwmmEngine::get_node_overflow(std::size_t node_id) const {
     require_valid_node(node_id);
     return swmm_getValue(swmm_NODE_OVERFLOW, static_cast<int>(node_id));
 }
 
-void SwmmEngine::set_outfall_stage(std::size_t node_id, core::Real stage) {
+void SwmmEngine::set_outfall_stage(std::size_t node_id, scau::core::Real stage) {
     require_valid_node(node_id);
     if (!std::isfinite(stage)) {
         throw SwmmEngineError("outfall stage must be finite");
@@ -162,7 +162,7 @@ void SwmmEngine::set_outfall_stage(std::size_t node_id, core::Real stage) {
     swmm_setValue(swmm_NODE_HEAD, static_cast<int>(node_id), stage);
 }
 
-core::Real SwmmEngine::get_link_flow(std::size_t link_id) const {
+scau::core::Real SwmmEngine::get_link_flow(std::size_t link_id) const {
     require_valid_link(link_id);
     return swmm_getValue(swmm_LINK_FLOW, static_cast<int>(link_id));
 }
@@ -181,7 +181,7 @@ bool SwmmEngine::initialized() const noexcept {
     return initialized_;
 }
 
-core::Real SwmmEngine::elapsed_time() const noexcept {
+scau::core::Real SwmmEngine::elapsed_time() const noexcept {
     return elapsed_days_ * kSecondsPerDay;
 }
 

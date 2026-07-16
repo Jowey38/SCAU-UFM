@@ -10,7 +10,7 @@ namespace scau::coupling::drainage {
 
 class SwmmRoofDrainageAcceptanceAdapter final {
 public:
-    SwmmRoofDrainageAcceptanceAdapter(ISwmmEngine& engine, core::Real dt_sub);
+    SwmmRoofDrainageAcceptanceAdapter(ISwmmEngine& engine, scau::core::Real dt_sub);
 
     [[nodiscard]] surface2d::RoofDrainageAcceptance operator()(const surface2d::RoofDrainageIntent& intent);
 
@@ -22,8 +22,8 @@ private:
         surface2d::RoofDrainageRejectionReason reason) const;
 
     ISwmmEngine* engine_{nullptr};
-    core::Real dt_sub_{0.0};
-    std::unordered_map<std::size_t, core::Real> accumulated_node_flows_;
+    scau::core::Real dt_sub_{0.0};
+    std::unordered_map<std::size_t, scau::core::Real> accumulated_node_flows_;
 };
 
 }  // namespace scau::coupling::drainage

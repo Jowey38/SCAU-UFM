@@ -5,7 +5,7 @@
 
 namespace scau::coupling::drainage {
 
-SwmmRoofDrainageAcceptanceAdapter::SwmmRoofDrainageAcceptanceAdapter(ISwmmEngine& engine, core::Real dt_sub)
+SwmmRoofDrainageAcceptanceAdapter::SwmmRoofDrainageAcceptanceAdapter(ISwmmEngine& engine, scau::core::Real dt_sub)
     : engine_(&engine), dt_sub_(dt_sub) {
     if (!std::isfinite(dt_sub_) || dt_sub_ <= 0.0) {
         throw SwmmEngineError("roof drainage adapter dt_sub must be finite and positive");
@@ -30,8 +30,8 @@ surface2d::RoofDrainageAcceptance SwmmRoofDrainageAcceptanceAdapter::operator()(
         return reject(intent, surface2d::RoofDrainageRejectionReason::InvalidTargetNode);
     }
 
-    const core::Real q_increment = intent.requested_volume / dt_sub_;
-    const core::Real q_total = accumulated_node_flows_[node_id] + q_increment;
+    const scau::core::Real q_increment = intent.requested_volume / dt_sub_;
+    const scau::core::Real q_total = accumulated_node_flows_[node_id] + q_increment;
     if (!std::isfinite(q_total)) {
         return reject(intent, surface2d::RoofDrainageRejectionReason::EngineUnavailable);
     }
@@ -59,7 +59,7 @@ surface2d::RoofDrainageAcceptance SwmmRoofDrainageAcceptanceAdapter::reject(
     const surface2d::RoofDrainageIntent& intent,
     surface2d::RoofDrainageRejectionReason reason) const {
     surface2d::RoofDrainageAcceptance acceptance;
-    const core::Real requested_volume = std::isfinite(intent.requested_volume)
+    const scau::core::Real requested_volume = std::isfinite(intent.requested_volume)
         ? std::abs(intent.requested_volume)
         : 0.0;
     acceptance.requested_volume = requested_volume;
