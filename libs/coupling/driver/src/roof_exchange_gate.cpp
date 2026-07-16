@@ -28,7 +28,9 @@ surface2d::RoofDrainageAcceptance RoofExchangeGate::operator()(
     const surface2d::RoofDrainageIntent& intent) {
     // Invalid volumes are the downstream adapter's fail-closed contract;
     // forward unchanged so there is a single source of truth for them.
-    if (!std::isfinite(intent.requested_volume) || intent.requested_volume < 0.0) {
+    // A zero request is a trivially-full accept: forward it too (the adapter
+    // keeps the node write-through consistent) instead of arbitrating.
+    if (!std::isfinite(intent.requested_volume) || intent.requested_volume <= 0.0) {
         return downstream_(intent);
     }
 

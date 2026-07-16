@@ -7,5 +7,14 @@
     "reference_path": "superpowers/specs/2026-06-21-m247e-golden-runoff-urban-block-evidence.md",
     "ci_gate": true,
     "status": "implemented"
+  },
+  {
+    "test_id": "M240-ROOF",
+    "name": "roof_swmm_transfer",
+    "test_path": "tests/golden/roof_swmm_transfer/",
+    "applicable_phase": "Phase 1+",
+    "reference_path": "superpowers/specs/2026-07-16-m240-roof-swmm-transfer-golden-evidence.md",
+    "ci_gate": true,
+    "status": "implemented"
   }
 ]

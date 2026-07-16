@@ -7,6 +7,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 MANIFEST = ROOT / "tests" / "golden" / "suite_manifest" / "goldensuite.json"
 GOLDEN_CMAKELISTS = ROOT / "tests" / "golden" / "CMakeLists.txt"
 RUNOFF_CMAKELISTS = ROOT / "tests" / "golden" / "runoff_urban_block" / "CMakeLists.txt"
+ROOF_CMAKELISTS = ROOT / "tests" / "golden" / "roof_swmm_transfer" / "CMakeLists.txt"
 
 REQUIRED = {
     "M247-EF": {
@@ -14,6 +15,13 @@ REQUIRED = {
         "status": "implemented",
         "ci_gate": True,
         "reference_path": "superpowers/specs/2026-06-21-m247e-golden-runoff-urban-block-evidence.md",
+        "applicable_phase": "Phase 1+",
+    },
+    "M240-ROOF": {
+        "name": "roof_swmm_transfer",
+        "status": "implemented",
+        "ci_gate": True,
+        "reference_path": "superpowers/specs/2026-07-16-m240-roof-swmm-transfer-golden-evidence.md",
         "applicable_phase": "Phase 1+",
     },
 }
@@ -61,17 +69,21 @@ def main() -> None:
 
     cmake_text = "\n".join(
         path.read_text(encoding="utf-8")
-        for path in (GOLDEN_CMAKELISTS, RUNOFF_CMAKELISTS)
+        for path in (GOLDEN_CMAKELISTS, RUNOFF_CMAKELISTS, ROOF_CMAKELISTS)
         if path.exists()
     )
     if "add_test(NAME test_golden_runoff_urban_block" not in cmake_text:
         fail("M247-EF: missing test_golden_runoff_urban_block add_test registration")
     if "LABELS \"golden;runoff;m247\"" not in cmake_text:
         fail("M247-EF: missing golden/runoff/m247 test labels")
+    if "add_test(NAME test_golden_roof_swmm_transfer" not in cmake_text:
+        fail("M240-ROOF: missing test_golden_roof_swmm_transfer add_test registration")
+    if "LABELS \"golden;roof;swmm;m240\"" not in cmake_text:
+        fail("M240-ROOF: missing golden/roof/swmm/m240 test labels")
     if "add_test(\n    NAME test_goldensuite_manifest" not in cmake_text:
         fail("manifest check must be registered as a CTest test")
 
-    print("OK GoldenSuite M247 runoff manifest completeness passes")
+    print("OK GoldenSuite manifest completeness passes (M247-EF, M240-ROOF)")
 
 
 if __name__ == "__main__":

@@ -52,6 +52,12 @@ surface2d::RoofDrainageAcceptance SwmmRoofDrainageAcceptanceAdapter::operator()(
 }
 
 void SwmmRoofDrainageAcceptanceAdapter::begin_step() {
+    // Zero the engine-side inflow of every node written last substep: the
+    // SWMM API lateral-inflow buffer persists until overwritten, so a node
+    // not re-written this substep would otherwise keep routing stale flow.
+    for (const auto& entry : accumulated_node_flows_) {
+        engine_->set_node_lateral_inflow(entry.first, 0.0);
+    }
     accumulated_node_flows_.clear();
 }
 

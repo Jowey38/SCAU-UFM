@@ -1,6 +1,7 @@
 include_directories(${CMAKE_SOURCE_DIR})
 
 add_subdirectory(runoff_urban_block)
+add_subdirectory(roof_swmm_transfer)
 
 add_test(
     NAME test_goldensuite_manifest
