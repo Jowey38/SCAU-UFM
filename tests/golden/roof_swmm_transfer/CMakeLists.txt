@@ -4,7 +4,7 @@ endif()
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/cases DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
-add_executable(test_roof_swmm_transfer test_roof_swmm_transfer.cpp)
+add_executable(test_roof_swmm_transfer test_golden_roof_swmm_transfer.cpp)
 target_link_libraries(test_roof_swmm_transfer
     PRIVATE
         scau::coupling_driver
