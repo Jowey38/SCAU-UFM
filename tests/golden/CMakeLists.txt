@@ -9,3 +9,10 @@ add_subdirectory(phi_c_spd_reject)
 add_subdirectory(swmm_single_pipe_surcharge)
 add_subdirectory(snapshot_replay_mass_deficit)
 add_subdirectory(runoff_urban_block)
+add_subdirectory(roof_swmm_transfer)
+
+add_test(
+    NAME test_goldensuite_manifest
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/suite_manifest/check_manifest.py
+)
+set_tests_properties(test_goldensuite_manifest PROPERTIES LABELS "golden;manifest")

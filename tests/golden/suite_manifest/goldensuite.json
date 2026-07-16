@@ -115,5 +115,14 @@
     "reference_path": "tests/golden/reference/tolerances.md",
     "ci_gate": true,
     "status": "implemented"
+  },
+  {
+    "test_id": "G14",
+    "name": "roof_swmm_transfer",
+    "test_path": "tests/golden/roof_swmm_transfer/",
+    "applicable_phase": "Phase 1+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": true,
+    "status": "implemented"
   }
 ]

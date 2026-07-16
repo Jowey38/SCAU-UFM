@@ -51,6 +51,20 @@ TEST(SwmmRoofDrainageAcceptanceAdapter, BeginStepClearsPerNodeAccumulation) {
     EXPECT_NEAR(engine.get_node_lateral_inflow(0), 0.125, 1.0e-12);
 }
 
+TEST(SwmmRoofDrainageAcceptanceAdapter, BeginStepZeroesStaleNodesNotRewritten) {
+    MockSwmmEngine engine;
+    engine.initialize("mock.inp");
+    SwmmRoofDrainageAcceptanceAdapter adapter(engine, 2.0);
+
+    (void)adapter(RoofDrainageIntent{.source_cell_index = 0, .target_swmm_node_index = 0, .requested_volume = 0.5, .source_roof_area = 1.0});
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 0.25, 1.0e-12);
+
+    // A node not re-written after begin_step must not keep routing stale
+    // flow: the SWMM API inflow buffer persists until overwritten.
+    adapter.begin_step();
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 0.0, 1.0e-12);
+}
+
 TEST(SwmmRoofDrainageAcceptanceAdapter, InvalidNodeRejectsFailClosedAndDoesNotWrite) {
     MockSwmmEngine engine;
     engine.initialize("mock.inp");

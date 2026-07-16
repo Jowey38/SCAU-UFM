@@ -21,6 +21,7 @@ REQUIRED = {
     "G11": ("dflowfm_river_steady", "pending", False),
     "G12": ("dual_engine_shared_cell", "pending", False),
     "G13": ("runoff_urban_block", "implemented", True),
+    "G14": ("roof_swmm_transfer", "implemented", True),
 }
 
 

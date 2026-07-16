@@ -202,6 +202,23 @@ TEST(RoofExchangeGate, GrantedFlowAccumulatesAgainstQLimitWithinSubstep) {
     EXPECT_NEAR(engine.get_node_lateral_inflow(0), 3.0, 1.0e-12);
 }
 
+TEST(RoofExchangeGate, ZeroVolumeIntentPassesThroughAsFullAccept) {
+    MockSwmmEngine engine;
+    engine.initialize("mock.inp");
+    SwmmRoofDrainageAcceptanceAdapter adapter(engine, kDtSub);
+    RoofExchangeGate gate(
+        [](const RoofDrainageIntent&) { return std::make_optional(make_endpoint()); },
+        [&adapter](const RoofDrainageIntent& intent) { return adapter(intent); },
+        kDtSub);
+
+    // Nothing requested is trivially fully accepted, never CapacityLimited.
+    const auto acceptance = gate(make_intent(0.0));
+
+    EXPECT_EQ(acceptance.rejection_reason, RoofDrainageRejectionReason::None);
+    EXPECT_NEAR(acceptance.accepted_volume, 0.0, 1.0e-12);
+    EXPECT_NEAR(acceptance.rejected_volume, 0.0, 1.0e-12);
+}
+
 TEST(RoofExchangeGate, RejectsInvalidDtAtConstruction) {
     EXPECT_THROW(
         RoofExchangeGate(
