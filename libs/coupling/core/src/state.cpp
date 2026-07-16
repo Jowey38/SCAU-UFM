@@ -2491,6 +2491,114 @@ ExchangeDecision enforce_nonnegative_storage(
     };
 }
 
+EngineInterfaceExchangeDecision evaluate_engine_interface_exchange(
+    const EngineInterfaceExchangeRequest& request) {
+    if (request.source.engine == request.target.engine) {
+        throw std::invalid_argument(
+            "engine interface exchange source and target must belong to different engines");
+    }
+    if (!std::isfinite(request.q_request) || request.q_request < 0.0) {
+        throw std::invalid_argument(
+            "engine interface exchange q_request must be finite and non-negative");
+    }
+    if (!std::isfinite(request.q_capacity) || request.q_capacity < 0.0) {
+        throw std::invalid_argument(
+            "engine interface exchange q_capacity must be finite and non-negative");
+    }
+    if (!std::isfinite(request.dt_sub) || request.dt_sub <= 0.0) {
+        throw std::invalid_argument(
+            "engine interface exchange dt_sub must be finite and positive");
+    }
+
+    const double q_granted =
+        request.q_request < request.q_capacity ? request.q_request : request.q_capacity;
+    return EngineInterfaceExchangeDecision{
+        .source = request.source,
+        .target = request.target,
+        .q_granted = q_granted,
+        .v_granted = q_granted * request.dt_sub,
+        .v_unmet = (request.q_request - q_granted) * request.dt_sub,
+    };
+}
+
+HeadDrivenExchangeFlow compute_head_driven_exchange_flow(
+    double surface_water_level,
+    double engine_water_level,
+    const ExchangeFlowGeometry& geometry) {
+    if (!std::isfinite(surface_water_level) || !std::isfinite(engine_water_level)) {
+        throw std::invalid_argument(
+            "head driven exchange water levels must be finite");
+    }
+    if (!std::isfinite(geometry.crest_level)) {
+        throw std::invalid_argument("head driven exchange crest_level must be finite");
+    }
+    if (!std::isfinite(geometry.exchange_width) || geometry.exchange_width <= 0.0) {
+        throw std::invalid_argument(
+            "head driven exchange exchange_width must be finite and positive");
+    }
+    if (!std::isfinite(geometry.weir_coefficient) || geometry.weir_coefficient <= 0.0) {
+        throw std::invalid_argument(
+            "head driven exchange weir_coefficient must be finite and positive");
+    }
+    if (!std::isfinite(geometry.orifice_coefficient) || geometry.orifice_coefficient <= 0.0) {
+        throw std::invalid_argument(
+            "head driven exchange orifice_coefficient must be finite and positive");
+    }
+    if (!std::isfinite(geometry.orifice_area) || geometry.orifice_area < 0.0) {
+        throw std::invalid_argument(
+            "head driven exchange orifice_area must be finite and non-negative");
+    }
+    if (!std::isfinite(geometry.smooth_depth) || geometry.smooth_depth < 0.0) {
+        throw std::invalid_argument(
+            "head driven exchange smooth_depth must be finite and non-negative");
+    }
+
+    constexpr double kGravity = 9.80665;
+
+    const bool surface_is_upstream = surface_water_level >= engine_water_level;
+    const double h_up =
+        (surface_is_upstream ? surface_water_level : engine_water_level) -
+        geometry.crest_level;
+    const double h_down =
+        (surface_is_upstream ? engine_water_level : surface_water_level) -
+        geometry.crest_level;
+
+    if (h_up <= 0.0 || surface_water_level == engine_water_level) {
+        return HeadDrivenExchangeFlow{};
+    }
+
+    double magnitude = 0.0;
+    HeadDrivenExchangeRegime regime = HeadDrivenExchangeRegime::none;
+    if (h_down > 0.0 && geometry.orifice_area > 0.0) {
+        // Fully submerged opening (gate_outlet / culvert_link): orifice flow.
+        magnitude = geometry.orifice_coefficient * geometry.orifice_area *
+            std::sqrt(2.0 * kGravity * (h_up - h_down));
+        regime = HeadDrivenExchangeRegime::orifice;
+    } else {
+        magnitude = geometry.weir_coefficient * geometry.exchange_width *
+            std::pow(h_up, 1.5);
+        regime = HeadDrivenExchangeRegime::free_weir;
+        if (h_down > 0.0) {
+            // Villemonte submerged-weir reduction.
+            const double submergence = h_down / h_up;
+            magnitude *= std::pow(1.0 - std::pow(submergence, 1.5), 0.385);
+            regime = HeadDrivenExchangeRegime::submerged_weir;
+        }
+    }
+
+    if (geometry.smooth_depth > 0.0 && h_up < geometry.smooth_depth) {
+        // Smoothstep incipient transition: continuous activation near the
+        // crest avoids on/off flickering of the exchange.
+        const double t = h_up / geometry.smooth_depth;
+        magnitude *= t * t * (3.0 - 2.0 * t);
+    }
+
+    return HeadDrivenExchangeFlow{
+        .q_surface_to_engine = surface_is_upstream ? magnitude : -magnitude,
+        .regime = regime,
+    };
+}
+
 ExchangePipelineDecision evaluate_exchange_pipeline(
     const ExchangeCellState& cell,
     const ExchangeRequest& request) {
@@ -2968,6 +3076,36 @@ ExchangePipelineDecision CouplingState::apply_exchange(
     record_pipeline_decision(decision);
 
     return decision;
+}
+
+ReturnExchangeDecision CouplingState::apply_return_exchange(
+    std::size_t cell_index,
+    const ReturnExchangeRequest& request) {
+    if (cell_index >= cells_.size()) {
+        throw std::out_of_range("apply_return_exchange cell index is out of range");
+    }
+    if (!std::isfinite(request.q_return) || request.q_return < 0.0) {
+        throw std::invalid_argument(
+            "return exchange q_return must be finite and non-negative");
+    }
+    if (!std::isfinite(request.dt_sub) || request.dt_sub <= 0.0) {
+        throw std::invalid_argument("return exchange dt_sub must be finite and positive");
+    }
+
+    const double v_returned = request.q_return * request.dt_sub;
+    if (v_returned > 0.0) {
+        enqueue_event(CouplingEvent{
+            .exchange_cell_index = cell_index,
+            .direction = ExchangeDirection::engine_to_surface,
+            .volume_delta = v_returned,
+        });
+    }
+
+    return ReturnExchangeDecision{
+        .source = request.source,
+        .q_returned = request.q_return,
+        .v_returned = v_returned,
+    };
 }
 
 std::vector<SharedExchangeDecision> CouplingState::apply_shared_exchange(

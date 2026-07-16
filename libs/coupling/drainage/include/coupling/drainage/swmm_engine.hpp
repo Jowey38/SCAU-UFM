@@ -37,9 +37,9 @@ public:
     [[nodiscard]] double get_node_head(int node_id) const override;
     [[nodiscard]] double get_node_lateral_inflow(int node_id) const override;
     void set_node_lateral_inflow(int node_id, double q) override;
-    [[nodiscard]] double get_node_inflow(int node_id) const;
-    [[nodiscard]] double get_node_overflow(int node_id) const;
-    void set_outfall_stage(int node_id, double stage);
+    [[nodiscard]] double get_node_inflow(int node_id) const override;
+    [[nodiscard]] double get_node_overflow(int node_id) const override;
+    void set_outfall_stage(int node_id, double stage) override;
 
     [[nodiscard]] double get_link_flow(int link_id) const override;
     [[nodiscard]] bool is_surcharged(int node_id) const override;

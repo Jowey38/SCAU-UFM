@@ -1,0 +1,25 @@
+name: dflowfm
+upstream: Deltares Delft3D / D-Flow FM (Delft3D Flexible Mesh Suite)
+upstream-repo: https://github.com/Deltares/Delft3D (Delft3D-main snapshot)
+branch: main
+version: BMI_API_VERSION 1.0 (BMI_API_VERSION_MAJOR 1, BMI_API_VERSION_MINOR 0, include/bmi.h)
+extracted-from: Delft3D-main/ (local checkout at repo root)
+extracted-on: 2026-07-15
+extracted-scope: src/engines_gpl/dimr/packages/dimr_lib/include/bmi.h ONLY
+                 (BMI interface contract snapshot; no Fortran kernel, no engine source)
+vendored-to: extern/dflowfm/include/bmi.h
+license: Delft3D multi-license (Deltares-owned code AGPL/GPL/LGPL family; see
+         third_party/licenses/dflowfm-LICENSE, verbatim copy of upstream LICENSE).
+         Decided approach: contract-snapshot-only. The AGPL/GPL D-Flow FM kernel
+         is NOT vendored, NOT statically linked, and NOT compiled into this repo;
+         the engine is consumed only as a runtime-loaded shared library resolved
+         by symbol name (libs/coupling/river DFlowFMEngine). Only the BMI header
+         contract is copied for interface documentation and spike fallback use.
+patches: none
+build: not built. cmake main graph does not compile anything under extern/dflowfm/.
+       spikes/dflowfm/CMakeLists.txt may use extern/dflowfm/include as a bmi.h
+       find_path fallback when DFLOWFM_SOURCE_DIR does not provide it.
+abi-boundary: bmi.h must not be included by any main-graph public header or DTO;
+              DFlowFMEngine declares its own function-pointer typedefs and loads
+              the DLL at runtime (project-layout-design.md firewall; IDFlowFMEngine
+              wraps lifecycle and state read/write only).
