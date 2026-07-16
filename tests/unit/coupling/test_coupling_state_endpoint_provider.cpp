@@ -4,7 +4,7 @@
 
 #include "coupling/driver/coupling_state_endpoint_provider.hpp"
 #include "coupling/driver/roof_exchange_gate.hpp"
-#include "coupling/drainage/mock_swmm_engine.hpp"
+#include "coupling/drainage/swmm_boundary.hpp"
 #include "coupling/drainage/roof_drainage_adapter.hpp"
 
 namespace {
@@ -102,7 +102,8 @@ TEST(CouplingStateEndpointProvider, SeesLiveStateMutationsAfterReplay) {
 
 TEST(CouplingStateEndpointProvider, GateArbitratesAgainstLiveDeficit) {
     auto state = make_state();
-    MockSwmmEngine engine(1U);
+    MockSwmmEngine engine;
+    engine.initialize("mock.inp");
     SwmmRoofDrainageAcceptanceAdapter adapter(engine, kDtSub);
     RoofExchangeGate gate(
         CouplingStateEndpointProvider(state, RoofEndpointMap{{7, 0U}, {8, 1U}}),
@@ -121,7 +122,7 @@ TEST(CouplingStateEndpointProvider, GateArbitratesAgainstLiveDeficit) {
     const auto clamped = gate(make_intent(7, 120.0));
     EXPECT_EQ(clamped.rejection_reason, RoofDrainageRejectionReason::CapacityLimited);
     EXPECT_NEAR(clamped.accepted_volume, 70.0, 1.0e-12);
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 7.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 7.0, 1.0e-12);
 
     // Dry mapped cell: zero headroom.
     gate.begin_substep();

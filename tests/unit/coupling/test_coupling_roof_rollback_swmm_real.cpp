@@ -37,7 +37,7 @@ TEST(RoofRollbackRealSwmm, RolledBackWriteDoesNotReachRealRouting) {
     SwmmEngine engine;
     engine.initialize(minimal_case_path());
 
-    const std::size_t j1 = engine.node_index("J1");
+    const int j1 = engine.node_index("J1");
 
     constexpr double dt_sub = 600.0;
     RoofSwmmStepDriver driver(
@@ -49,7 +49,7 @@ TEST(RoofRollbackRealSwmm, RolledBackWriteDoesNotReachRealRouting) {
     const auto accept = driver.acceptance_fn();
     const auto acceptance = accept(RoofDrainageIntent{
         .source_cell_index = 0,
-        .target_swmm_node_index = static_cast<int>(j1),
+        .target_swmm_node_index = j1,
         .requested_volume = 30.0,
         .source_roof_area = 100.0,
     });
@@ -66,7 +66,7 @@ TEST(RoofRollbackRealSwmm, RolledBackWriteDoesNotReachRealRouting) {
     driver.begin_substep();
     const auto replayed = accept(RoofDrainageIntent{
         .source_cell_index = 0,
-        .target_swmm_node_index = static_cast<int>(j1),
+        .target_swmm_node_index = j1,
         .requested_volume = 30.0,
         .source_roof_area = 100.0,
     });
