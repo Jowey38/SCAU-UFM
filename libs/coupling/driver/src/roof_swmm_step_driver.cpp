@@ -34,6 +34,11 @@ void RoofSwmmStepDriver::advance_engine() {
     engine_->step(dt_sub_);
 }
 
+void RoofSwmmStepDriver::rollback_substep() {
+    adapter_.rollback_step();
+    gate_.begin_substep();
+}
+
 Real RoofSwmmStepDriver::dt_sub() const noexcept {
     return dt_sub_;
 }

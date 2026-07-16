@@ -362,6 +362,24 @@ target_link_libraries(test_coupling_roof_swmm_step_driver
 )
 add_test(NAME test_coupling_roof_swmm_step_driver COMMAND test_coupling_roof_swmm_step_driver)
 
+add_executable(test_coupling_state_endpoint_provider test_coupling_state_endpoint_provider.cpp)
+target_link_libraries(test_coupling_state_endpoint_provider
+    PRIVATE
+        scau::coupling_driver
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_state_endpoint_provider COMMAND test_coupling_state_endpoint_provider)
+
+add_executable(test_coupling_roof_rollback test_coupling_roof_rollback.cpp)
+target_link_libraries(test_coupling_roof_rollback
+    PRIVATE
+        scau::coupling_driver
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_roof_rollback COMMAND test_coupling_roof_rollback)
+
 if(SCAU_EMBED_SWMM)
     file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/cases DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
@@ -403,6 +421,19 @@ if(SCAU_EMBED_SWMM)
             SCAU_SWMM_TEST_CASE_DIR="${CMAKE_CURRENT_BINARY_DIR}/cases"
     )
     add_test(NAME test_coupling_roof_qlimit_swmm_real COMMAND test_coupling_roof_qlimit_swmm_real)
+
+    add_executable(test_coupling_roof_rollback_swmm_real test_coupling_roof_rollback_swmm_real.cpp)
+    target_link_libraries(test_coupling_roof_rollback_swmm_real
+        PRIVATE
+            scau::coupling_driver
+            scau::warnings
+            GTest::gtest_main
+    )
+    target_compile_definitions(test_coupling_roof_rollback_swmm_real
+        PRIVATE
+            SCAU_SWMM_TEST_CASE_DIR="${CMAKE_CURRENT_BINARY_DIR}/cases"
+    )
+    add_test(NAME test_coupling_roof_rollback_swmm_real COMMAND test_coupling_roof_rollback_swmm_real)
 endif()
 
 if(SCAU_ENABLE_DFLOWFM_BMI_RUNTIME)

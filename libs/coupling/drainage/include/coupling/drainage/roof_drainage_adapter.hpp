@@ -15,6 +15,12 @@ public:
 
     void begin_step();
 
+    // Undo this substep's writes: zero the engine-side lateral inflow of
+    // every node written since begin_step(), then clear the ledger. For use
+    // by the rollback path BEFORE the engine advances; nothing rolled back
+    // may enter routing.
+    void rollback_step();
+
 private:
     [[nodiscard]] surface2d::RoofDrainageAcceptance reject(
         const surface2d::RoofDrainageIntent& intent,
