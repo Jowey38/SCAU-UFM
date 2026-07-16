@@ -10,9 +10,9 @@
 #include "surface2d/riemann/hllc.hpp"
 #include "surface2d/source_terms/coupling_exchange.hpp"
 #include "surface2d/source_terms/friction.hpp"
-#include "surface2d/source_terms/infiltration.hpp"
 #include "surface2d/source_terms/phi_t.hpp"
-#include "surface2d/source_terms/rainfall.hpp"
+#include "surface2d/source_terms/runoff/runoff_generation.hpp"
+#include "surface2d/source_terms/runoff/step_inputs.hpp"
 #include "surface2d/source_terms/well_balanced.hpp"
 #include "surface2d/wetting_drying/limits.hpp"
 
@@ -144,7 +144,7 @@ void apply_momentum_update(
     }
 }
 
-void apply_source_terms(
+void apply_coupling_and_friction(
     SurfaceState& state,
     const StepConfig& config,
     const DpmFields& dpm_fields,
@@ -158,87 +158,35 @@ void apply_source_terms(
         }
         auto& cell = state.cells[cell_index];
         const core::Real phi_t = dpm_fields.cells[cell_index].phi_t;
-
-        if (sources.rainfall_rate[cell_index] > 0.0) {
-            const core::Real dh = rainfall_depth_increment(
-                sources.rainfall_rate[cell_index], phi_t, config.dt);
-            cell.conserved.h += dh;
-            diagnostics.rainfall_volume += dh * phi_t * area;
-        }
-
         if (sources.exchange_volume[cell_index] != 0.0) {
             const auto exchange = exchange_depth_increment(
                 sources.exchange_volume[cell_index], cell.conserved.h, phi_t, area);
             cell.conserved.h += exchange.depth_increment;
             diagnostics.exchange_volume += exchange.applied_volume;
         }
-
-        if (sources.infiltration_rate[cell_index] > 0.0) {
-            const core::Real dh = infiltration_depth_decrement(
-                sources.infiltration_rate[cell_index], cell.conserved.h, phi_t, config.dt);
-            cell.conserved.h -= dh;
-            diagnostics.infiltration_volume += dh * phi_t * area;
-        }
-
         cell.conserved = apply_manning_friction(
             apply_dry_cell_momentum_limit(cell.conserved, config.h_min),
-            sources.manning_n[cell_index],
-            config.dt,
-            config.h_min,
-            config.gravity);
+            sources.manning_n[cell_index], config.dt, config.h_min, config.gravity);
     }
 }
 
-}  // namespace
-
-StepDiagnostics advance_one_step_cpu(const mesh::Mesh& mesh, SurfaceState& state, const StepConfig& config) {
-    validate_step_inputs(mesh, state, config);
-    const auto geometry = GeometryCache::for_mesh(mesh);
-    return base_diagnostics(mesh, state, config, BoundaryConditions::for_mesh(mesh), geometry);
-}
-
-StepDiagnostics advance_one_step_cpu(
-    const mesh::Mesh& mesh,
-    SurfaceState& state,
-    const StepConfig& config,
-    const DpmFields& dpm_fields) {
-    return advance_one_step_cpu(mesh, state, config, dpm_fields, BoundaryConditions::for_mesh(mesh));
-}
-
-StepDiagnostics advance_one_step_cpu(
-    const mesh::Mesh& mesh,
+void apply_source_terms(
     SurfaceState& state,
     const StepConfig& config,
     const DpmFields& dpm_fields,
-    const BoundaryConditions& boundary) {
-    return advance_one_step_cpu(mesh, state, config, dpm_fields, boundary, SourceTermFields::for_mesh(mesh));
-}
-
-StepDiagnostics advance_one_step_cpu(
-    const mesh::Mesh& mesh,
-    SurfaceState& state,
-    const StepConfig& config,
-    const DpmFields& dpm_fields,
-    const BoundaryConditions& boundary,
-    const SourceTermFields& sources) {
-    const auto geometry = GeometryCache::for_mesh(mesh);
-    return advance_one_step_cpu(mesh, state, config, dpm_fields, boundary, sources, geometry);
-}
-
-StepDiagnostics advance_one_step_cpu(
-    const mesh::Mesh& mesh,
-    SurfaceState& state,
-    const StepConfig& config,
-    const DpmFields& dpm_fields,
-    const BoundaryConditions& boundary,
     const SourceTermFields& sources,
-    const GeometryCache& geometry) {
-    validate_step_inputs(mesh, state, config);
-    validate_dpm_fields_match_mesh(dpm_fields, mesh);
-    validate_boundary_conditions_match_mesh(boundary, mesh);
-    validate_source_term_fields_match_mesh(sources, mesh);
-    validate_geometry_cache_matches_mesh(geometry, mesh);
+    const GeometryCache& geometry,
+    StepDiagnostics& diagnostics) {
+    apply_coupling_and_friction(state, config, dpm_fields, sources, geometry, diagnostics);
+}
 
+StepDiagnostics run_flux_core(
+    const mesh::Mesh& mesh,
+    SurfaceState& state,
+    const StepConfig& config,
+    const DpmFields& dpm_fields,
+    const BoundaryConditions& boundary,
+    const GeometryCache& geometry) {
     auto diagnostics = base_diagnostics(mesh, state, config, boundary, geometry);
     diagnostics.edges.reserve(mesh.edges.size());
     for (std::size_t edge_index = 0; edge_index < mesh.edges.size(); ++edge_index) {
@@ -294,9 +242,9 @@ StepDiagnostics advance_one_step_cpu(
             // Reflective wall (main-spec hard-block / wall boundary): zero mass
             // flux, but the inside cell's hydrostatic pressure pushes back so
             // the closed-polygon pressure sum of a boundary cell balances and a
-            // lake at rest stays at rest. Uses the same gravity (9.81) and
-            // unscaled 0.5 g h^2 form as the interior HLLC pressure so the
-            // balance is exact for uniform fields.
+            // lake at rest stays at rest. Uses the same phi_t-scaled WB pressure
+            // form as the interior pairing so the balance is exact for uniform
+            // fields (S_phi_t momentum coupling, scope A).
             const std::size_t inside_index = adjacency.inside();
             const core::Real h_inside = state.cells[inside_index].conserved.h;
             const core::Real wall_pressure = well_balanced_boundary_pressure(
@@ -346,7 +294,184 @@ StepDiagnostics advance_one_step_cpu(
     }
     apply_depth_update(state, config, diagnostics.cells, geometry);
     apply_momentum_update(state, config, diagnostics.cells, geometry);
+    return diagnostics;
+}
+
+}  // namespace
+
+void apply_ground_runoff_stage(
+    SurfaceState& state,
+    const StepConfig& config,
+    const DpmFields& dpm_fields,
+    const RunoffStepInputs& inputs,
+    RunoffState& runoff_state,
+    const GeometryCache& geometry,
+    StepDiagnostics& diagnostics) {
+    for (std::size_t i = 0; i < state.cells.size(); ++i) {
+        const core::Real area = geometry.cell_areas[i];
+        if (area <= 0.0) {
+            continue;
+        }
+        const core::Real phi_t = dpm_fields.cells[i].phi_t;
+
+        RunoffCellInputs cell_inputs;
+        cell_inputs.rainfall_rate = inputs.rainfall_rate[i];
+        cell_inputs.phi_t = phi_t;
+        cell_inputs.cell_area = area;
+        // Current post-flux, pre-runoff surface depth; the ground chain may
+        // infiltrate this ponded water (M247-F). Read before the writeback.
+        cell_inputs.surface_depth = state.cells[i].conserved.h;
+
+        RunoffCellParams params;
+        params.pervious_fraction = inputs.fields.pervious_fraction[i];
+        params.impervious_fraction = inputs.fields.impervious_fraction[i];
+        params.roof_fraction = inputs.fields.roof_fraction[i];
+        params.initial_abstraction_capacity = inputs.fields.initial_abstraction_capacity[i];
+        params.depression_storage_capacity = inputs.fields.depression_storage_capacity[i];
+        params.roof_abstraction_capacity = inputs.fields.roof_abstraction_capacity[i];
+        params.roof_storage_capacity = inputs.fields.roof_storage_capacity[i];
+        params.roof_drain_capacity = 0.0;
+        params.soil = inputs.lut.at(inputs.fields.soil_type[i]);
+
+        RunoffCellState cell_state;
+        cell_state.cumulative_infiltration = runoff_state.cumulative_infiltration[i];
+        cell_state.ponding_time = runoff_state.ponding_time[i];
+        cell_state.abstraction_filled = runoff_state.abstraction_filled[i];
+        cell_state.depression_storage_filled = runoff_state.depression_storage_filled[i];
+        cell_state.roof_abstraction_filled = runoff_state.roof_abstraction_filled[i];
+        cell_state.roof_pending_volume = runoff_state.roof_pending_volume[i];
+
+        const GroundRunoffResult g = evaluate_ground_runoff(
+            cell_inputs, params, cell_state, config.dt, inputs.f_inf_floor);
+
+        state.cells[i].conserved.h +=
+            (g.surface_added_volume - g.ponded_infiltration_volume) / (phi_t * area);
+
+        runoff_state.cumulative_infiltration[i] = cell_state.cumulative_infiltration;
+        runoff_state.ponding_time[i] = cell_state.ponding_time;
+        runoff_state.abstraction_filled[i] = cell_state.abstraction_filled;
+        runoff_state.depression_storage_filled[i] = cell_state.depression_storage_filled;
+
+        const core::Real area_ground =
+            (params.pervious_fraction + params.impervious_fraction) * area;
+        diagnostics.rainfall_volume += cell_inputs.rainfall_rate * config.dt * area_ground;
+        diagnostics.surface_added_volume += g.surface_added_volume;
+        diagnostics.ponded_infiltration_volume += g.ponded_infiltration_volume;
+        diagnostics.infiltration_volume += g.infiltration_volume;
+        diagnostics.abstraction_volume += g.abstraction_volume;
+        diagnostics.depression_storage_delta_volume += g.depression_storage_delta_volume;
+    }
+}
+
+StepDiagnostics advance_one_step_cpu(const mesh::Mesh& mesh, SurfaceState& state, const StepConfig& config) {
+    validate_step_inputs(mesh, state, config);
+    const auto geometry = GeometryCache::for_mesh(mesh);
+    return base_diagnostics(mesh, state, config, BoundaryConditions::for_mesh(mesh), geometry);
+}
+
+StepDiagnostics advance_one_step_cpu(
+    const mesh::Mesh& mesh,
+    SurfaceState& state,
+    const StepConfig& config,
+    const DpmFields& dpm_fields) {
+    return advance_one_step_cpu(mesh, state, config, dpm_fields, BoundaryConditions::for_mesh(mesh));
+}
+
+StepDiagnostics advance_one_step_cpu(
+    const mesh::Mesh& mesh,
+    SurfaceState& state,
+    const StepConfig& config,
+    const DpmFields& dpm_fields,
+    const BoundaryConditions& boundary) {
+    return advance_one_step_cpu(mesh, state, config, dpm_fields, boundary, SourceTermFields::for_mesh(mesh));
+}
+
+StepDiagnostics advance_one_step_cpu(
+    const mesh::Mesh& mesh,
+    SurfaceState& state,
+    const StepConfig& config,
+    const DpmFields& dpm_fields,
+    const BoundaryConditions& boundary,
+    const SourceTermFields& sources) {
+    const auto geometry = GeometryCache::for_mesh(mesh);
+    return advance_one_step_cpu(mesh, state, config, dpm_fields, boundary, sources, geometry);
+}
+
+StepDiagnostics advance_one_step_cpu(
+    const mesh::Mesh& mesh,
+    SurfaceState& state,
+    const StepConfig& config,
+    const DpmFields& dpm_fields,
+    const BoundaryConditions& boundary,
+    const SourceTermFields& sources,
+    const GeometryCache& geometry) {
+    validate_step_inputs(mesh, state, config);
+    validate_dpm_fields_match_mesh(dpm_fields, mesh);
+    validate_boundary_conditions_match_mesh(boundary, mesh);
+    validate_source_term_fields_match_mesh(sources, mesh);
+    validate_geometry_cache_matches_mesh(geometry, mesh);
+    auto diagnostics = run_flux_core(mesh, state, config, dpm_fields, boundary, geometry);
+    if (diagnostics.rollback_required) {
+        return diagnostics;
+    }
     apply_source_terms(state, config, dpm_fields, sources, geometry, diagnostics);
+    return diagnostics;
+}
+
+StepDiagnostics advance_one_step_cpu(
+    const mesh::Mesh& mesh,
+    SurfaceState& state,
+    const StepConfig& config,
+    const DpmFields& dpm_fields,
+    const BoundaryConditions& boundary,
+    const SourceTermFields& sources,
+    const GeometryCache& geometry,
+    const RunoffStepInputs& runoff_inputs,
+    RunoffState& runoff_state) {
+    validate_step_inputs(mesh, state, config);
+    validate_dpm_fields_match_mesh(dpm_fields, mesh);
+    validate_boundary_conditions_match_mesh(boundary, mesh);
+    validate_source_term_fields_match_mesh(sources, mesh);
+    validate_geometry_cache_matches_mesh(geometry, mesh);
+    validate_runoff_step_inputs_match_mesh(runoff_inputs, mesh);
+    validate_runoff_state_match_mesh(runoff_state, mesh);
+
+    auto diagnostics = run_flux_core(mesh, state, config, dpm_fields, boundary, geometry);
+    if (diagnostics.rollback_required) {
+        return diagnostics;  // runoff_state untouched
+    }
+    apply_ground_runoff_stage(state, config, dpm_fields, runoff_inputs, runoff_state, geometry, diagnostics);
+    apply_coupling_and_friction(state, config, dpm_fields, sources, geometry, diagnostics);
+    return diagnostics;
+}
+
+StepDiagnostics advance_one_step_cpu(
+    const mesh::Mesh& mesh,
+    SurfaceState& state,
+    const StepConfig& config,
+    const DpmFields& dpm_fields,
+    const BoundaryConditions& boundary,
+    const SourceTermFields& sources,
+    const GeometryCache& geometry,
+    const RunoffStepInputs& runoff_inputs,
+    const RoofStepInputs& roof_inputs,
+    RunoffState& runoff_state) {
+    validate_step_inputs(mesh, state, config);
+    validate_dpm_fields_match_mesh(dpm_fields, mesh);
+    validate_boundary_conditions_match_mesh(boundary, mesh);
+    validate_source_term_fields_match_mesh(sources, mesh);
+    validate_geometry_cache_matches_mesh(geometry, mesh);
+    validate_runoff_step_inputs_match_mesh(runoff_inputs, mesh);
+    validate_roof_step_inputs_match_mesh(roof_inputs, mesh);
+    validate_runoff_state_match_mesh(runoff_state, mesh);
+
+    auto diagnostics = run_flux_core(mesh, state, config, dpm_fields, boundary, geometry);
+    if (diagnostics.rollback_required) {
+        return diagnostics;  // runoff_state + h untouched
+    }
+    apply_ground_runoff_stage(state, config, dpm_fields, runoff_inputs, runoff_state, geometry, diagnostics);
+    apply_roof_runoff_stage(state, config, dpm_fields, runoff_inputs, roof_inputs, runoff_state, geometry, diagnostics);
+    apply_coupling_and_friction(state, config, dpm_fields, sources, geometry, diagnostics);
     return diagnostics;
 }
 

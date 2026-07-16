@@ -8,13 +8,13 @@
 namespace scau::surface2d {
 
 // Per-cell source-term inputs for one substep. Defaults are neutral:
-// zero Manning roughness, no rainfall, no infiltration, no exchange.
+// zero Manning roughness, no exchange. Rainfall and infiltration are
+// owned by the runoff stage (RunoffStepInputs); these fields carry only
+// the coupling-decided exchange volumes and Manning roughness.
 // exchange_volume carries coupling-decided volumes only; the surface layer
 // never originates exchange decisions (CouplingLib sovereignty).
 struct SourceTermFields {
     std::vector<core::Real> manning_n;
-    std::vector<core::Real> rainfall_rate;
-    std::vector<core::Real> infiltration_rate;
     std::vector<core::Real> exchange_volume;
 
     [[nodiscard]] static SourceTermFields for_mesh(const mesh::Mesh& mesh);

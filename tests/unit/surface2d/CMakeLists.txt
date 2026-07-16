@@ -332,3 +332,66 @@ target_link_libraries(test_well_balanced_sloping_bed_at_rest
         GTest::gtest_main
 )
 add_test(NAME test_well_balanced_sloping_bed_at_rest COMMAND test_well_balanced_sloping_bed_at_rest)
+
+add_executable(test_runoff_result test_runoff_result.cpp)
+target_link_libraries(test_runoff_result
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_runoff_result COMMAND test_runoff_result)
+
+add_executable(test_runoff_ground test_runoff_ground.cpp)
+target_link_libraries(test_runoff_ground
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_runoff_ground COMMAND test_runoff_ground)
+
+add_executable(test_runoff_roof test_runoff_roof.cpp)
+target_link_libraries(test_runoff_roof
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_runoff_roof COMMAND test_runoff_roof)
+
+add_executable(test_runoff_generation test_runoff_generation.cpp)
+target_link_libraries(test_runoff_generation
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_runoff_generation COMMAND test_runoff_generation)
+
+add_executable(test_runoff_step test_runoff_step.cpp)
+target_link_libraries(test_runoff_step
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_runoff_step COMMAND test_runoff_step)
+
+add_executable(test_runoff_roof_step test_runoff_roof_step.cpp)
+target_link_libraries(test_runoff_roof_step
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_runoff_roof_step COMMAND test_runoff_roof_step)
+
+add_executable(test_runoff_golden_urban_block test_runoff_golden_urban_block.cpp)
+target_link_libraries(test_runoff_golden_urban_block
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_runoff_golden_urban_block COMMAND test_runoff_golden_urban_block)

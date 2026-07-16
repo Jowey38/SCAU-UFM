@@ -1,4 +1,6 @@
 add_library(scau_coupling_driver
+    src/roof_exchange_gate.cpp
+    src/roof_swmm_step_driver.cpp
     src/tri_coupling.cpp
 )
 add_library(scau::coupling_driver ALIAS scau_coupling_driver)

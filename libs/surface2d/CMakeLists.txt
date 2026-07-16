@@ -18,7 +18,11 @@ add_library(scau_surface2d
     src/source_terms/rainfall.cpp
     src/source_terms/runoff/fields.cpp
     src/source_terms/runoff/green_ampt.cpp
+    src/source_terms/runoff/result.cpp
+    src/source_terms/runoff/runoff_generation.cpp
     src/source_terms/runoff/soil_params.cpp
+    src/source_terms/runoff/roof_step.cpp
+    src/source_terms/runoff/step_inputs.cpp
     src/source_terms/well_balanced.cpp
     src/time_integration/step.cpp
     src/wetting_drying/limits.cpp

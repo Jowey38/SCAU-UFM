@@ -106,5 +106,14 @@
     "reference_path": "tests/golden/reference/tolerances.md",
     "ci_gate": false,
     "status": "pending"
+  },
+  {
+    "test_id": "G13",
+    "name": "runoff_urban_block",
+    "test_path": "tests/golden/runoff_urban_block/",
+    "applicable_phase": "Phase 1+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": true,
+    "status": "implemented"
   }
 ]

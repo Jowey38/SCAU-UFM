@@ -30,8 +30,6 @@ void validate_cell_sized_finite(
 SourceTermFields SourceTermFields::for_mesh(const mesh::Mesh& mesh) {
     SourceTermFields fields;
     fields.manning_n.assign(mesh.cells.size(), 0.0);
-    fields.rainfall_rate.assign(mesh.cells.size(), 0.0);
-    fields.infiltration_rate.assign(mesh.cells.size(), 0.0);
     fields.exchange_volume.assign(mesh.cells.size(), 0.0);
     return fields;
 }
@@ -39,8 +37,6 @@ SourceTermFields SourceTermFields::for_mesh(const mesh::Mesh& mesh) {
 void validate_source_term_fields_match_mesh(const SourceTermFields& fields, const mesh::Mesh& mesh) {
     const std::size_t cell_count = mesh.cells.size();
     validate_cell_sized_finite(fields.manning_n, cell_count, false, "manning_n");
-    validate_cell_sized_finite(fields.rainfall_rate, cell_count, false, "rainfall_rate");
-    validate_cell_sized_finite(fields.infiltration_rate, cell_count, false, "infiltration_rate");
     validate_cell_sized_finite(fields.exchange_volume, cell_count, true, "exchange_volume");
 }
 

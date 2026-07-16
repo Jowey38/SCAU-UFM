@@ -1,4 +1,5 @@
 find_package(GTest CONFIG REQUIRED)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 add_subdirectory(unit/core)
 add_subdirectory(unit/mesh)
