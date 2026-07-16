@@ -1,0 +1,71 @@
+[TITLE]
+;; SCAU-UFM authored shallow-manhole SWMM overflow/surcharge case for G8 evidence.
+
+[OPTIONS]
+FLOW_UNITS           CMS
+INFILTRATION         HORTON
+FLOW_ROUTING         DYNWAVE
+START_DATE           01/01/2026
+START_TIME           00:00:00
+REPORT_START_DATE    01/01/2026
+REPORT_START_TIME    00:00:00
+END_DATE             01/01/2026
+END_TIME             00:20:00
+SWEEP_START          01/01
+SWEEP_END            12/31
+DRY_DAYS             0
+REPORT_STEP          00:00:30
+WET_STEP             00:00:30
+DRY_STEP             00:00:30
+ROUTING_STEP         00:00:10
+ALLOW_PONDING        NO
+INERTIAL_DAMPING     PARTIAL
+VARIABLE_STEP        0.75
+LENGTHENING_STEP     0
+MIN_SURFAREA         0
+NORMAL_FLOW_LIMITED  BOTH
+SKIP_STEADY_STATE    NO
+
+[JUNCTIONS]
+;;Name           Elevation  MaxDepth  InitDepth  SurDepth  Aponded
+J0               0.20       1.00      0.0        0.0       0.0
+J1               0.00       0.35      0.0        0.0       0.0
+
+[OUTFALLS]
+;;Name           Elevation  Type       Stage Data       Gated    Route To
+OUT1             0.00       FREE                        NO
+
+[CONDUITS]
+;;Name           From Node  To Node    Length    Roughness  InOffset  OutOffset  InitFlow  MaxFlow
+C0               J0         J1         40.0      0.013      0.0       0.0        0.0       0.0
+C1               J1         OUT1       120.0     0.013      0.0       0.0        0.0       0.0
+
+[XSECTIONS]
+;;Link           Shape      Geom1      Geom2      Geom3      Geom4      Barrels
+C0               CIRCULAR   0.45       0.0        0.0        0.0        1
+C1               CIRCULAR   0.20       0.0        0.0        0.0        1
+
+[INFLOWS]
+;;Node           Constituent Time Series      Type     Mfactor  Sfactor  Baseline Pattern
+J0               FLOW        TS_SURCHARGE     FLOW     1.0      1.0      0.0
+
+[TIMESERIES]
+;;Name           Date        Time       Value
+TS_SURCHARGE                 00:00      0.35
+TS_SURCHARGE                 00:20      0.35
+
+[REPORT]
+INPUT      NO
+CONTROLS   NO
+SUBCATCHMENTS ALL
+NODES ALL
+LINKS ALL
+
+[COORDINATES]
+;;Node           X-Coord     Y-Coord
+J0               -40.0       0.0
+J1               0.0         0.0
+OUT1             120.0       0.0
+
+[VERTICES]
+;;Link           X-Coord     Y-Coord

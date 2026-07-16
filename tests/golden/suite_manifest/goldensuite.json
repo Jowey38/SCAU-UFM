@@ -1,10 +1,118 @@
 [
   {
-    "test_id": "M247-EF",
+    "test_id": "G1",
+    "name": "hydrostatic_step",
+    "test_path": "tests/golden/hydrostatic_step/",
+    "applicable_phase": "Phase 1+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": true,
+    "status": "implemented"
+  },
+  {
+    "test_id": "G2",
+    "name": "phi_t_jump_hydrostatic",
+    "test_path": "tests/golden/phi_t_jump_hydrostatic/",
+    "applicable_phase": "Phase 1+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": true,
+    "status": "implemented"
+  },
+  {
+    "test_id": "G3",
+    "name": "phi_c_edge_zero_velocity",
+    "test_path": "tests/golden/phi_c_edge_zero_velocity/",
+    "applicable_phase": "Phase 1+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": true,
+    "status": "implemented"
+  },
+  {
+    "test_id": "G4",
+    "name": "narrow_gap_blockage",
+    "test_path": "tests/golden/narrow_gap_blockage/",
+    "applicable_phase": "Phase 1+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": true,
+    "status": "implemented"
+  },
+  {
+    "test_id": "G5",
+    "name": "dpm_drag_decay",
+    "test_path": "tests/golden/dpm_drag_decay/",
+    "applicable_phase": "Phase 1+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": true,
+    "status": "implemented"
+  },
+  {
+    "test_id": "G6",
+    "name": "phi_c_spd_reject",
+    "test_path": "tests/golden/phi_c_spd_reject/",
+    "applicable_phase": "Phase 1+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": true,
+    "status": "implemented"
+  },
+  {
+    "test_id": "G7",
+    "name": "stcf_v4_to_v5_migration",
+    "test_path": "tests/golden/stcf_v4_to_v5_migration/",
+    "applicable_phase": "Phase 1+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": false,
+    "status": "pending"
+  },
+  {
+    "test_id": "G8",
+    "name": "swmm_single_pipe_surcharge",
+    "test_path": "tests/golden/swmm_single_pipe_surcharge/",
+    "applicable_phase": "Phase 1+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": true,
+    "status": "implemented"
+  },
+  {
+    "test_id": "G9",
+    "name": "cpu_gpu_deterministic_match",
+    "test_path": "tests/golden/cpu_gpu_deterministic_match/",
+    "applicable_phase": "Phase 1+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": false,
+    "status": "pending"
+  },
+  {
+    "test_id": "G10",
+    "name": "snapshot_replay_mass_deficit",
+    "test_path": "tests/golden/snapshot_replay_mass_deficit/",
+    "applicable_phase": "Phase 1+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": false,
+    "status": "implemented"
+  },
+  {
+    "test_id": "G11",
+    "name": "dflowfm_river_steady",
+    "test_path": "tests/golden/dflowfm_river_steady/",
+    "applicable_phase": "Phase 2+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": false,
+    "status": "pending"
+  },
+  {
+    "test_id": "G12",
+    "name": "dual_engine_shared_cell",
+    "test_path": "tests/golden/dual_engine_shared_cell/",
+    "applicable_phase": "Phase 2+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": false,
+    "status": "pending"
+  },
+  {
+    "test_id": "G13",
     "name": "runoff_urban_block",
     "test_path": "tests/golden/runoff_urban_block/",
     "applicable_phase": "Phase 1+",
-    "reference_path": "superpowers/specs/2026-06-21-m247e-golden-runoff-urban-block-evidence.md",
+    "reference_path": "tests/golden/reference/tolerances.md",
     "ci_gate": true,
     "status": "implemented"
   }

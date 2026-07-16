@@ -15,7 +15,7 @@ scau::coupling::core::ExchangeCellState wet_cell(
     double area = 50.0,
     double deficit = 0.0) {
     return scau::coupling::core::ExchangeCellState{
-        .volume = 0.0,
+        .volume = phi_t * h * area,
         .mass_deficit_account = {.volume = deficit},
         .phi_t = phi_t,
         .h = h,
@@ -84,6 +84,9 @@ TEST(CouplingSystemMassAudit, RejectsInvalidInputs) {
                  std::invalid_argument);
     EXPECT_THROW(static_cast<void>(scau::coupling::core::compute_system_mass(good, -1e-6)),
                  std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(scau::coupling::core::compute_system_mass(
+                     good, std::numeric_limits<double>::quiet_NaN())),
+                 std::invalid_argument);
 
     EXPECT_THROW(static_cast<void>(scau::coupling::core::compute_system_mass(
                      std::vector{wet_cell(2.0, -0.1)}, kHWet)),
@@ -96,6 +99,12 @@ TEST(CouplingSystemMassAudit, RejectsInvalidInputs) {
                  std::invalid_argument);
     EXPECT_THROW(static_cast<void>(scau::coupling::core::compute_system_mass(
                      std::vector{wet_cell(2.0, 0.4, 50.0, -0.1)}, kHWet)),
+                 std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(scau::coupling::core::compute_system_mass(
+                     std::vector{wet_cell(std::numeric_limits<double>::quiet_NaN())}, kHWet)),
+                 std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(scau::coupling::core::compute_system_mass(
+                     std::vector{wet_cell(2.0, std::numeric_limits<double>::infinity())}, kHWet)),
                  std::invalid_argument);
 }
 
@@ -138,6 +147,25 @@ TEST(CouplingSystemMassAudit, AuditPreservesConservationWhenGrantedMatchedByDefi
 
     EXPECT_DOUBLE_EQ(delta.residual, 0.0);
     EXPECT_TRUE(delta.conserved);
+}
+
+TEST(CouplingSystemMassAudit, AuditDetectsReplayedExchangeStorageChange) {
+    scau::coupling::core::CouplingState state{{{
+        .volume = 100.0,
+        .mass_deficit_account = {.volume = 0.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.compute_system_mass(kHWet);
+    const auto decision = state.apply_exchange(0U, {.q_request = 4.0, .dt_sub = 4.0});
+    state.replay_pending();
+
+    const auto delta = state.audit_system_mass_against_reference(baseline, kHWet);
+
+    EXPECT_DOUBLE_EQ(delta.residual, -(decision.exchange.v_granted + decision.exchange.v_repay));
+    EXPECT_FALSE(delta.conserved);
 }
 
 TEST(CouplingSystemMassAudit, RejectsNegativeBaseline) {

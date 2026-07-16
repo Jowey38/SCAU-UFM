@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstddef>
 #include <unordered_map>
 
 #include "coupling/drainage/swmm_boundary.hpp"
@@ -29,7 +28,7 @@ private:
 
     ISwmmEngine* engine_{nullptr};
     scau::core::Real dt_sub_{0.0};
-    std::unordered_map<std::size_t, scau::core::Real> accumulated_node_flows_;
+    std::unordered_map<int, scau::core::Real> accumulated_node_flows_;
 };
 
 }  // namespace scau::coupling::drainage

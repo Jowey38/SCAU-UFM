@@ -10,6 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(SWMM_SOURCE_DIR "" CACHE PATH "Path to a local SWMM 5.2.4 checkout")
+set(SWMM_BUILD_DIR "" CACHE PATH "Optional path to a separately configured SWMM build tree")
 if(NOT SWMM_SOURCE_DIR)
     message(FATAL_ERROR
         "SWMM_SOURCE_DIR must point at a local SWMM 5.2.4 checkout, e.g. "
@@ -27,6 +28,9 @@ find_path(SWMM_INCLUDE_DIR
 find_library(SWMM_SOLVER_LIB
     NAMES swmm5 libswmm5
     HINTS
+        ${SWMM_BUILD_DIR}/src/solver
+        ${SWMM_BUILD_DIR}/src/solver/Release
+        ${SWMM_BUILD_DIR}/src/solver/Debug
         ${SWMM_SOURCE_DIR}/build/src/solver
         ${SWMM_SOURCE_DIR}/build/src/solver/Release
         ${SWMM_SOURCE_DIR}/build/src/solver/Debug

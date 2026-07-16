@@ -3,7 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "coupling/driver/roof_swmm_step_driver.hpp"
-#include "coupling/drainage/mock_swmm_engine.hpp"
+#include "coupling/drainage/swmm_boundary.hpp"
 
 namespace {
 
@@ -38,7 +38,8 @@ ExchangeCellState make_endpoint() {
 }  // namespace
 
 TEST(RoofSwmmStepDriver, AcceptanceFnArbitratesThenWritesEngine) {
-    MockSwmmEngine engine(1U);
+    MockSwmmEngine engine;
+    engine.initialize("mock.inp");
     RoofSwmmStepDriver driver(
         engine,
         [](const RoofDrainageIntent&) { return std::make_optional(make_endpoint()); },
@@ -50,17 +51,18 @@ TEST(RoofSwmmStepDriver, AcceptanceFnArbitratesThenWritesEngine) {
     // Under headroom: fully granted and written as q = 30/10 = 3 m3/s.
     const auto full = acceptance_fn(make_intent(30.0));
     EXPECT_EQ(full.rejection_reason, RoofDrainageRejectionReason::None);
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 3.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 3.0, 1.0e-12);
 
     // Over headroom: Q_limit = 9 m3/s; per-node accumulation makes the total
     // request 3 + 12 = 15 m3/s -> only 6 m3/s more can be granted.
     const auto clamped = acceptance_fn(make_intent(120.0));
     EXPECT_EQ(clamped.rejection_reason, RoofDrainageRejectionReason::CapacityLimited);
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 9.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 9.0, 1.0e-12);
 }
 
 TEST(RoofSwmmStepDriver, BeginSubstepResetsAccumulationAndCounts) {
-    MockSwmmEngine engine(1U);
+    MockSwmmEngine engine;
+    engine.initialize("mock.inp");
     RoofSwmmStepDriver driver(
         engine,
         [](const RoofDrainageIntent&) { return std::make_optional(make_endpoint()); },
@@ -71,17 +73,18 @@ TEST(RoofSwmmStepDriver, BeginSubstepResetsAccumulationAndCounts) {
     driver.begin_substep();
     const auto acceptance_fn = driver.acceptance_fn();
     (void)acceptance_fn(make_intent(30.0));
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 3.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 3.0, 1.0e-12);
 
     driver.begin_substep();
     EXPECT_EQ(driver.substep_count(), 2U);
     (void)acceptance_fn(make_intent(10.0));
     // Accumulation restarted: 10/10 = 1 m3/s, not 3 + 1.
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 1.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 1.0, 1.0e-12);
 }
 
 TEST(RoofSwmmStepDriver, AdvanceEngineStepsByDtSub) {
-    MockSwmmEngine engine(1U);
+    MockSwmmEngine engine;
+    engine.initialize("mock.inp");
     RoofSwmmStepDriver driver(
         engine,
         [](const RoofDrainageIntent&) { return std::make_optional(make_endpoint()); },
@@ -97,7 +100,8 @@ TEST(RoofSwmmStepDriver, AdvanceEngineStepsByDtSub) {
 }
 
 TEST(RoofSwmmStepDriver, RejectsInvalidDtAtConstruction) {
-    MockSwmmEngine engine(1U);
+    MockSwmmEngine engine;
+    engine.initialize("mock.inp");
     // The owned acceptance adapter validates dt_sub first; its error type is
     // the drainage-layer contract.
     EXPECT_THROW(

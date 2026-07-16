@@ -40,8 +40,8 @@ TEST(RoofQLimitToRealSwmm, ClampedIntentIsWrittenAndRoutedByRealEngine) {
     SwmmEngine engine;
     engine.initialize(minimal_case_path());
 
-    const std::size_t j1 = engine.node_index("J1");
-    const std::size_t o1 = engine.node_index("O1");
+    const int j1 = engine.node_index("J1");
+    const int o1 = engine.node_index("O1");
 
     constexpr double dt_sub = 600.0;
     RoofSwmmStepDriver driver(
@@ -55,7 +55,7 @@ TEST(RoofQLimitToRealSwmm, ClampedIntentIsWrittenAndRoutedByRealEngine) {
     // 60 m3 over 600 s = 0.1 m3/s > Q_limit 0.075 m3/s: clamp to 45 m3.
     const auto acceptance = accept(RoofDrainageIntent{
         .source_cell_index = 0,
-        .target_swmm_node_index = static_cast<int>(j1),
+        .target_swmm_node_index = j1,
         .requested_volume = 60.0,
         .source_roof_area = 200.0,
     });
@@ -78,7 +78,7 @@ TEST(RoofQLimitToRealSwmm, DriverSchedulesRealEngineOnDtSub) {
     SwmmEngine engine;
     engine.initialize(minimal_case_path());
 
-    const std::size_t j1 = engine.node_index("J1");
+    const int j1 = engine.node_index("J1");
 
     constexpr double dt_sub = 300.0;
     RoofSwmmStepDriver driver(
@@ -91,7 +91,7 @@ TEST(RoofQLimitToRealSwmm, DriverSchedulesRealEngineOnDtSub) {
         driver.begin_substep();
         const auto acceptance = accept(RoofDrainageIntent{
             .source_cell_index = 0,
-            .target_swmm_node_index = static_cast<int>(j1),
+            .target_swmm_node_index = j1,
             .requested_volume = 6.0,  // 0.02 m3/s, far under the hard gate
             .source_roof_area = 50.0,
         });

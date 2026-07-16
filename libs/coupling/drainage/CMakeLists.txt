@@ -1,5 +1,4 @@
 add_library(scau_coupling_drainage
-    src/mock_swmm_engine.cpp
     src/roof_drainage_adapter.cpp
     src/swmm_boundary.cpp
 )
@@ -16,7 +15,7 @@ target_include_directories(scau_coupling_drainage
 
 target_link_libraries(scau_coupling_drainage
     PUBLIC
-        scau::core
+        scau::coupling_core
         scau::surface2d
     PRIVATE
         scau::warnings

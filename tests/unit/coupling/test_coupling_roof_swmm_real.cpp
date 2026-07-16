@@ -29,8 +29,8 @@ TEST(RoofToRealSwmm, AcceptedRoofVolumeIsRoutedByRealEngine) {
     SwmmEngine engine;
     engine.initialize(minimal_case_path());
 
-    const std::size_t j1 = engine.node_index("J1");
-    const std::size_t o1 = engine.node_index("O1");
+    const int j1 = engine.node_index("J1");
+    const int o1 = engine.node_index("O1");
 
     constexpr double dt_sub = 600.0;
     SwmmRoofDrainageAcceptanceAdapter adapter(engine, dt_sub);
@@ -38,7 +38,7 @@ TEST(RoofToRealSwmm, AcceptedRoofVolumeIsRoutedByRealEngine) {
     adapter.begin_step();
     const RoofDrainageIntent intent{
         .source_cell_index = 0,
-        .target_swmm_node_index = static_cast<int>(j1),
+        .target_swmm_node_index = j1,
         .requested_volume = 30.0,  // m3 over dt_sub -> q = 0.05 m3/s
         .source_roof_area = 120.0,
     };
@@ -63,7 +63,7 @@ TEST(RoofToRealSwmm, MultipleRoofIntentsAccumulateOnRealEngineNode) {
     SwmmEngine engine;
     engine.initialize(minimal_case_path());
 
-    const std::size_t j1 = engine.node_index("J1");
+    const int j1 = engine.node_index("J1");
 
     constexpr double dt_sub = 600.0;
     SwmmRoofDrainageAcceptanceAdapter adapter(engine, dt_sub);
@@ -71,13 +71,13 @@ TEST(RoofToRealSwmm, MultipleRoofIntentsAccumulateOnRealEngineNode) {
     adapter.begin_step();
     const auto first = adapter(RoofDrainageIntent{
         .source_cell_index = 0,
-        .target_swmm_node_index = static_cast<int>(j1),
+        .target_swmm_node_index = j1,
         .requested_volume = 18.0,
         .source_roof_area = 60.0,
     });
     const auto second = adapter(RoofDrainageIntent{
         .source_cell_index = 1,
-        .target_swmm_node_index = static_cast<int>(j1),
+        .target_swmm_node_index = j1,
         .requested_volume = 12.0,
         .source_roof_area = 40.0,
     });
@@ -97,7 +97,7 @@ TEST(RoofToRealSwmm, SurchargedRealNodeRejectsRoofIntentFailClosed) {
     SwmmEngine engine;
     engine.initialize(manhole_overflow_case_path());
 
-    const std::size_t j1 = engine.node_index("J1");
+    const int j1 = engine.node_index("J1");
 
     // Drive the overloaded case until the manhole is genuinely surcharged.
     bool surcharged = false;
@@ -111,7 +111,7 @@ TEST(RoofToRealSwmm, SurchargedRealNodeRejectsRoofIntentFailClosed) {
     adapter.begin_step();
     const auto acceptance = adapter(RoofDrainageIntent{
         .source_cell_index = 0,
-        .target_swmm_node_index = static_cast<int>(j1),
+        .target_swmm_node_index = j1,
         .requested_volume = 5.0,
         .source_roof_area = 50.0,
     });

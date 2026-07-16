@@ -5,7 +5,7 @@
 
 #include "coupling/driver/coupling_state_endpoint_provider.hpp"
 #include "coupling/driver/roof_swmm_step_driver.hpp"
-#include "coupling/drainage/mock_swmm_engine.hpp"
+#include "coupling/drainage/swmm_boundary.hpp"
 #include "coupling/drainage/roof_drainage_adapter.hpp"
 
 namespace {
@@ -45,28 +45,30 @@ ExchangeCellState make_endpoint() {
 }  // namespace
 
 TEST(RoofRollback, AdapterRollbackZeroesWrittenNodesAndClearsLedger) {
-    MockSwmmEngine engine(2U);
+    MockSwmmEngine engine;
+    engine.initialize("mock.inp");
     SwmmRoofDrainageAcceptanceAdapter adapter(engine, kDtSub);
 
     (void)adapter(make_intent(0, 20.0));
     (void)adapter(make_intent(1, 10.0));
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 2.0, 1.0e-12);
-    EXPECT_NEAR(engine.get_node_lateral_inflow(1U), 1.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 2.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(1), 1.0, 1.0e-12);
 
     adapter.rollback_step();
 
     // The engine-side API buffer is zeroed; nothing survives into routing.
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 0.0, 1.0e-12);
-    EXPECT_NEAR(engine.get_node_lateral_inflow(1U), 0.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 0.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(1), 0.0, 1.0e-12);
 
     // The per-step ledger restarted: a fresh write is not accumulated onto
     // the rolled-back flows.
     (void)adapter(make_intent(0, 20.0));
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 2.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 2.0, 1.0e-12);
 }
 
 TEST(RoofRollback, DriverRollbackDiscardsSubstepWithoutAdvancingEngine) {
-    MockSwmmEngine engine(1U);
+    MockSwmmEngine engine;
+    engine.initialize("mock.inp");
     RoofSwmmStepDriver driver(
         engine,
         [](const RoofDrainageIntent&) { return std::make_optional(make_endpoint()); },
@@ -76,12 +78,12 @@ TEST(RoofRollback, DriverRollbackDiscardsSubstepWithoutAdvancingEngine) {
     const auto accept = driver.acceptance_fn();
     const auto acceptance = accept(make_intent(0, 30.0));
     EXPECT_EQ(acceptance.rejection_reason, RoofDrainageRejectionReason::None);
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 3.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 3.0, 1.0e-12);
 
     driver.rollback_substep();
 
     // Rolled back: engine buffer zeroed, engine time untouched.
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 0.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 0.0, 1.0e-12);
     EXPECT_NEAR(engine.elapsed_time(), 0.0, 1.0e-12);
     EXPECT_EQ(driver.substep_count(), 1U);
 
@@ -90,12 +92,13 @@ TEST(RoofRollback, DriverRollbackDiscardsSubstepWithoutAdvancingEngine) {
     driver.begin_substep();
     const auto replayed = accept(make_intent(0, 90.0));
     EXPECT_EQ(replayed.rejection_reason, RoofDrainageRejectionReason::None);
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 9.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 9.0, 1.0e-12);
 }
 
 TEST(RoofRollback, LiveStateProviderAndRollbackComposeOnRealisticFlow) {
     auto state = CouplingState{{make_endpoint()}};
-    MockSwmmEngine engine(1U);
+    MockSwmmEngine engine;
+    engine.initialize("mock.inp");
     RoofSwmmStepDriver driver(
         engine,
         CouplingStateEndpointProvider(state, RoofEndpointMap{{0, 0U}}),
@@ -110,10 +113,10 @@ TEST(RoofRollback, LiveStateProviderAndRollbackComposeOnRealisticFlow) {
     EXPECT_NEAR(clamped.accepted_volume, 90.0, 1.0e-12);
 
     driver.rollback_substep();
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 0.0, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 0.0, 1.0e-12);
 
     driver.begin_substep();
     const auto retried = accept(make_intent(0, 45.0));
     EXPECT_EQ(retried.rejection_reason, RoofDrainageRejectionReason::None);
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0U), 4.5, 1.0e-12);
+    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 4.5, 1.0e-12);
 }

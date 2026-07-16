@@ -2,6 +2,7 @@ add_library(scau_coupling_driver
     src/coupling_state_endpoint_provider.cpp
     src/roof_exchange_gate.cpp
     src/roof_swmm_step_driver.cpp
+    src/tri_coupling.cpp
 )
 add_library(scau::coupling_driver ALIAS scau_coupling_driver)
 
@@ -14,6 +15,7 @@ target_link_libraries(scau_coupling_driver
     PUBLIC
         scau::coupling_core
         scau::coupling_drainage
+        scau::coupling_river
     PRIVATE
         scau::warnings
 )

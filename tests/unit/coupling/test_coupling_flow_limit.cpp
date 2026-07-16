@@ -6,7 +6,7 @@
 
 TEST(CouplingFlowLimit, ComputesCanonicalVolumeAndFlowLimit) {
     const scau::coupling::core::ExchangeCellState cell{
-        .volume = 0.0,
+        .volume = 40.0,
         .phi_t = 0.4,
         .h = 2.0,
         .area = 50.0,
@@ -48,7 +48,7 @@ TEST(CouplingFlowLimit, ZeroStorageInputsProduceZeroLimits) {
 
 TEST(CouplingFlowLimit, RejectsNonPositiveDtSub) {
     const scau::coupling::core::ExchangeCellState cell{
-        .volume = 0.0,
+        .volume = 40.0,
         .phi_t = 0.4,
         .h = 2.0,
         .area = 50.0,

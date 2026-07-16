@@ -11,19 +11,19 @@ TEST(HllcFlux, NormalVelocityProjectsMomentum) {
     EXPECT_EQ(scau::surface2d::normal_velocity(state, scau::surface2d::Normal2{.x = 0.0, .y = 1.0}), 4.0);
 }
 
-TEST(HllcFlux, ZeroVelocityHydrostaticStateHasZeroMassFluxAndPressureMomentum) {
+TEST(HllcFlux, ZeroVelocityHydrostaticStateHasZeroMassAndZeroAdvectiveMomentum) {
     const scau::surface2d::CellState left{.conserved = {.h = 1.0, .hu = 0.0, .hv = 0.0}, .eta = 1.0};
     const scau::surface2d::CellState right{.conserved = {.h = 1.0, .hu = 0.0, .hv = 0.0}, .eta = 1.0};
     const scau::surface2d::EdgeDpmFields edge_fields{.phi_e_n = 1.0, .omega_edge = 1.0};
 
     const auto flux = scau::surface2d::hllc_normal_flux(
-        left,
-        right,
-        edge_fields,
-        scau::surface2d::Normal2{.x = 1.0, .y = 0.0});
+        left, right, edge_fields, scau::surface2d::Normal2{.x = 1.0, .y = 0.0});
 
+    // Advective-only momentum: at rest the momentum flux carries no pressure.
     EXPECT_EQ(flux.mass, 0.0);
-    EXPECT_DOUBLE_EQ(flux.momentum_n, 4.905);
+    EXPECT_EQ(flux.momentum_n, 0.0);
+    EXPECT_EQ(flux.momentum_x, 0.0);
+    EXPECT_EQ(flux.momentum_y, 0.0);
 }
 
 TEST(HllcFlux, WaveSpeedsBracketLeftAndRightNormalVelocities) {

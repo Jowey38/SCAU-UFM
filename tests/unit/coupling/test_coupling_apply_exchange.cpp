@@ -6,7 +6,7 @@
 
 TEST(CouplingApplyExchange, ReturnsDecisionConsistentWithPipeline) {
     scau::coupling::core::CouplingState state{{
-        {.volume = 100.0, .mass_deficit_account = {.volume = 0.0},
+        {.volume = 40.0, .mass_deficit_account = {.volume = 0.0},
          .phi_t = 0.4, .h = 2.0, .area = 50.0},
     }};
     const scau::coupling::core::ExchangeRequest request{.q_request = 4.0, .dt_sub = 4.0};
@@ -29,21 +29,24 @@ TEST(CouplingApplyExchange, ReturnsDecisionConsistentWithPipeline) {
 
 TEST(CouplingApplyExchange, EnqueuesEventButDoesNotMutateVolume) {
     scau::coupling::core::CouplingState state{{
-        {.volume = 100.0, .mass_deficit_account = {.volume = 0.0},
+        {.volume = 40.0, .mass_deficit_account = {.volume = 0.0},
          .phi_t = 0.4, .h = 2.0, .area = 50.0},
     }};
     const scau::coupling::core::ExchangeRequest request{.q_request = 4.0, .dt_sub = 4.0};
 
     const auto decision = state.apply_exchange(0U, request);
-    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 100.0);
+    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 40.0);
 
     state.replay_pending();
-    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 100.0 + decision.exchange.v_granted);
+    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 40.0 - decision.exchange.v_granted - decision.exchange.v_repay);
+    EXPECT_DOUBLE_EQ(
+        state.cells()[0].h,
+        2.0 - (decision.exchange.v_granted + decision.exchange.v_repay) / (0.4 * 50.0));
 }
 
 TEST(CouplingApplyExchange, UpdatesRuntimeCounters) {
     scau::coupling::core::CouplingState state{{
-        {.volume = 100.0, .mass_deficit_account = {.volume = 0.0},
+        {.volume = 40.0, .mass_deficit_account = {.volume = 0.0},
          .phi_t = 0.4, .h = 2.0, .area = 50.0},
     }};
     const scau::coupling::core::ExchangeRequest request{.q_request = 4.0, .dt_sub = 4.0};
@@ -60,7 +63,7 @@ TEST(CouplingApplyExchange, UpdatesRuntimeCounters) {
 
 TEST(CouplingApplyExchange, ReplayUpdatesMassDeficitAccount) {
     scau::coupling::core::CouplingState state{{
-        {.volume = 100.0, .mass_deficit_account = {.volume = 5.0},
+        {.volume = 40.0, .mass_deficit_account = {.volume = 5.0},
          .phi_t = 0.4, .h = 2.0, .area = 50.0},
     }};
     const scau::coupling::core::ExchangeRequest request{.q_request = 4.0, .dt_sub = 4.0};
@@ -74,9 +77,70 @@ TEST(CouplingApplyExchange, ReplayUpdatesMassDeficitAccount) {
     EXPECT_DOUBLE_EQ(state.cells()[0].mass_deficit_account.volume, clamped);
 }
 
+TEST(CouplingApplyExchange, ReplayAppliesGrantedAndRepaymentVolumesToCellVolume) {
+    scau::coupling::core::CouplingState state{{
+        {.volume = 40.0, .mass_deficit_account = {.volume = 5.0},
+         .phi_t = 0.4, .h = 2.0, .area = 50.0},
+    }};
+    const scau::coupling::core::ExchangeRequest request{.q_request = 4.0, .dt_sub = 4.0};
+
+    const auto decision = state.apply_exchange(0U, request);
+    state.replay_pending();
+
+    EXPECT_GT(decision.exchange.v_repay, 0.0);
+    EXPECT_DOUBLE_EQ(
+        state.cells()[0].volume,
+        40.0 - decision.exchange.v_granted - decision.exchange.v_repay);
+    EXPECT_DOUBLE_EQ(
+        state.cells()[0].h,
+        2.0 - (decision.exchange.v_granted + decision.exchange.v_repay) / (0.4 * 50.0));
+}
+
+TEST(CouplingApplyExchange, RejectsAggregateExchangePipelineOnSharedCell) {
+    const scau::coupling::core::ExchangeCellState shared_cell{
+        .volume = 40.0,
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+        .shared_deficit_accounts = {
+            {
+                .endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::drainage, .node_id = 10U},
+                .mass_deficit_account = {.volume = 4.0},
+            },
+        },
+    };
+
+    EXPECT_THROW(
+        static_cast<void>(scau::coupling::core::evaluate_exchange_pipeline(
+            shared_cell,
+            {.q_request = 1.0, .dt_sub = 4.0})),
+        std::invalid_argument);
+}
+
+TEST(CouplingApplyExchange, RejectsAggregateApplyExchangeOnSharedCell) {
+    scau::coupling::core::CouplingState state{{
+        {
+            .volume = 40.0,
+            .phi_t = 0.4,
+            .h = 2.0,
+            .area = 50.0,
+            .shared_deficit_accounts = {
+                {
+                    .endpoint = {.engine = scau::coupling::core::SharedExchangeEngine::drainage, .node_id = 10U},
+                    .mass_deficit_account = {.volume = 4.0},
+                },
+            },
+        },
+    }};
+
+    EXPECT_THROW(
+        static_cast<void>(state.apply_exchange(0U, {.q_request = 1.0, .dt_sub = 4.0})),
+        std::invalid_argument);
+}
+
 TEST(CouplingApplyExchange, RejectsOutOfRangeCellIndex) {
     scau::coupling::core::CouplingState state{{
-        {.volume = 100.0, .phi_t = 0.4, .h = 2.0, .area = 50.0},
+        {.volume = 40.0, .phi_t = 0.4, .h = 2.0, .area = 50.0},
     }};
     const scau::coupling::core::ExchangeRequest request{.q_request = 1.0, .dt_sub = 4.0};
 

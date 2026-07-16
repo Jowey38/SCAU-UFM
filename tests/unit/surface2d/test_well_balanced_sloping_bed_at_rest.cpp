@@ -1,0 +1,45 @@
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+
+#include <gtest/gtest.h>
+
+#include "mesh/mesh.hpp"
+#include "surface2d/dpm/fields.hpp"
+#include "surface2d/state/state.hpp"
+#include "surface2d/time_integration/step.hpp"
+
+namespace {
+double max_abs_momentum(const scau::surface2d::SurfaceState& state) {
+    double worst = 0.0;
+    for (const auto& cell : state.cells) {
+        worst = std::max({worst, std::abs(cell.conserved.hu), std::abs(cell.conserved.hv)});
+    }
+    return worst;
+}
+}  // namespace
+
+// G5: sloping bed via a varying z_b = eta - h. Free surface eta is uniform
+// (1.5 everywhere); each cell's depth h = eta - z_b differs (z_b = cell-index
+// fraction). Zero velocity, walled domain, uniform phi_t. The Audusse
+// square-difference S_topo pairing keeps the lake at rest, mesh-independent.
+// Enabled after the main-spec 5.4 Audusse reconstruction fix.
+TEST(WellBalancedSlopingBedAtRest, SlopingBedKeepsMomentumZero) {
+    const auto mesh = scau::mesh::build_mixed_minimal_mesh();
+    const double eta = 1.5;
+    auto state = scau::surface2d::SurfaceState::for_mesh(mesh);
+    for (std::size_t i = 0; i < state.cells.size(); ++i) {
+        const double z_b = 0.1 * static_cast<double>(i);  // sloping bed
+        state.cells[i].eta = eta;
+        state.cells[i].conserved.h = eta - z_b;            // h_i = eta - z_b > 0
+        state.cells[i].conserved.hu = 0.0;
+        state.cells[i].conserved.hv = 0.0;
+    }
+    const auto dpm_fields = scau::surface2d::DpmFields::for_mesh(mesh);  // uniform phi_t = 1
+    const scau::surface2d::StepConfig config{.dt = 0.1, .cfl_safety = 0.45, .c_rollback = 100.0, .h_min = 1.0e-8};
+
+    const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields);
+
+    ASSERT_FALSE(diagnostics.rollback_required);
+    EXPECT_NEAR(max_abs_momentum(state), 0.0, 1.0e-12);
+}

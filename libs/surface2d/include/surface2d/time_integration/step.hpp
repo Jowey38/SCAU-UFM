@@ -33,6 +33,8 @@ struct EdgeStepDiagnostics {
     core::Real momentum_y{0.0};
     core::Real pressure_pairing{0.0};
     core::Real s_phi_t{0.0};
+    core::Real wb_pressure{0.0};  // F_p,e: phi_t-scaled WB pressure flux magnitude
+    core::Real s_topo{0.0};       // S_topo^(left) diagnostic for the edge
     core::Real residual{0.0};
 };
 

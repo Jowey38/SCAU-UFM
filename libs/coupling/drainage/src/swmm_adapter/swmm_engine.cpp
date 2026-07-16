@@ -28,8 +28,7 @@ std::atomic<bool> g_swmm_project_open{false};
         text += ": ";
         text += message.data();
     }
-    text += " [swmm_error_" + std::to_string(error_code) + "]";
-    throw SwmmEngineError(text);
+    throw SwmmEngineError(text, "SWMM", "swmm_error_" + std::to_string(error_code));
 }
 
 std::string sibling_path_with_extension(const std::string& inp_path, const std::string& extension) {
@@ -63,7 +62,9 @@ void SwmmEngine::initialize(const std::string& inp_path) {
     bool expected = false;
     if (!g_swmm_project_open.compare_exchange_strong(expected, true)) {
         throw SwmmEngineError(
-            "another SWMM engine instance already owns the process-wide solver state");
+            "another SWMM engine instance already owns the process-wide solver state",
+            "SWMM",
+            "swmm_project_already_open");
     }
 
     const std::string report_path = sibling_path_with_extension(inp_path, ".rpt");
@@ -85,13 +86,14 @@ void SwmmEngine::initialize(const std::string& inp_path) {
     simulation_ended_ = false;
 }
 
-void SwmmEngine::step(scau::core::Real dt_swmm) {
+void SwmmEngine::step(double dt_swmm) {
     require_initialized();
     if (!std::isfinite(dt_swmm) || dt_swmm <= 0.0) {
         throw SwmmEngineError("dt_swmm must be finite and positive");
     }
     if (simulation_ended_) {
-        throw SwmmEngineError("SWMM simulation period has already ended");
+        throw SwmmEngineError(
+            "SWMM simulation period has already ended", "SWMM", "swmm_simulation_ended");
     }
     const double target_days = elapsed_days_ + dt_swmm / kSecondsPerDay;
     while (elapsed_days_ + kStepTargetToleranceDays < target_days) {
@@ -121,56 +123,58 @@ void SwmmEngine::finalize() {
     g_swmm_project_open.store(false);
 }
 
-scau::core::Real SwmmEngine::get_node_head(std::size_t node_id) const {
+double SwmmEngine::get_node_head(int node_id) const {
     require_valid_node(node_id);
-    return swmm_getValue(swmm_NODE_HEAD, static_cast<int>(node_id));
+    return swmm_getValue(swmm_NODE_HEAD, node_id);
 }
 
-scau::core::Real SwmmEngine::get_node_lateral_inflow(std::size_t node_id) const {
+double SwmmEngine::get_node_lateral_inflow(int node_id) const {
     require_valid_node(node_id);
-    return swmm_getValue(swmm_NODE_LATFLOW, static_cast<int>(node_id));
+    return swmm_getValue(swmm_NODE_LATFLOW, node_id);
 }
 
-void SwmmEngine::set_node_lateral_inflow(std::size_t node_id, scau::core::Real q) {
+void SwmmEngine::set_node_lateral_inflow(int node_id, double q) {
     require_valid_node(node_id);
     if (!std::isfinite(q)) {
         throw SwmmEngineError("node lateral inflow must be finite");
     }
-    swmm_setValue(swmm_NODE_LATFLOW, static_cast<int>(node_id), q);
+    swmm_setValue(swmm_NODE_LATFLOW, node_id, q);
 }
 
-scau::core::Real SwmmEngine::get_node_inflow(std::size_t node_id) const {
+double SwmmEngine::get_node_inflow(int node_id) const {
     require_valid_node(node_id);
-    return swmm_getValue(swmm_NODE_INFLOW, static_cast<int>(node_id));
+    return swmm_getValue(swmm_NODE_INFLOW, node_id);
 }
 
-scau::core::Real SwmmEngine::get_node_overflow(std::size_t node_id) const {
+double SwmmEngine::get_node_overflow(int node_id) const {
     require_valid_node(node_id);
-    return swmm_getValue(swmm_NODE_OVERFLOW, static_cast<int>(node_id));
+    return swmm_getValue(swmm_NODE_OVERFLOW, node_id);
 }
 
-void SwmmEngine::set_outfall_stage(std::size_t node_id, scau::core::Real stage) {
+void SwmmEngine::set_outfall_stage(int node_id, double stage) {
     require_valid_node(node_id);
     if (!std::isfinite(stage)) {
         throw SwmmEngineError("outfall stage must be finite");
     }
-    const auto node_type =
-        static_cast<int>(swmm_getValue(swmm_NODE_TYPE, static_cast<int>(node_id)));
+    const auto node_type = static_cast<int>(swmm_getValue(swmm_NODE_TYPE, node_id));
     if (node_type != swmm_OUTFALL) {
-        throw SwmmEngineError("set_outfall_stage target node is not an outfall");
+        throw SwmmEngineError(
+            "set_outfall_stage target node is not an outfall",
+            "SWMM",
+            "swmm_node_not_outfall");
     }
-    swmm_setValue(swmm_NODE_HEAD, static_cast<int>(node_id), stage);
+    swmm_setValue(swmm_NODE_HEAD, node_id, stage);
 }
 
-scau::core::Real SwmmEngine::get_link_flow(std::size_t link_id) const {
+double SwmmEngine::get_link_flow(int link_id) const {
     require_valid_link(link_id);
-    return swmm_getValue(swmm_LINK_FLOW, static_cast<int>(link_id));
+    return swmm_getValue(swmm_LINK_FLOW, link_id);
 }
 
-bool SwmmEngine::is_surcharged(std::size_t node_id) const {
+bool SwmmEngine::is_surcharged(int node_id) const {
     require_valid_node(node_id);
-    const double depth = swmm_getValue(swmm_NODE_DEPTH, static_cast<int>(node_id));
-    const double max_depth = swmm_getValue(swmm_NODE_MAXDEPTH, static_cast<int>(node_id));
+    const double depth = swmm_getValue(swmm_NODE_DEPTH, node_id);
+    const double max_depth = swmm_getValue(swmm_NODE_MAXDEPTH, node_id);
     if (max_depth <= 0.0) {
         return false;
     }
@@ -181,31 +185,33 @@ bool SwmmEngine::initialized() const noexcept {
     return initialized_;
 }
 
-scau::core::Real SwmmEngine::elapsed_time() const noexcept {
+double SwmmEngine::elapsed_time() const noexcept {
     return elapsed_days_ * kSecondsPerDay;
 }
 
-std::size_t SwmmEngine::node_count() const {
+int SwmmEngine::node_count() const {
     require_initialized();
-    return static_cast<std::size_t>(swmm_getCount(swmm_NODE));
+    return swmm_getCount(swmm_NODE);
 }
 
-std::size_t SwmmEngine::node_index(const std::string& node_name) const {
+int SwmmEngine::node_index(const std::string& node_name) const {
     require_initialized();
     const int index = swmm_getIndex(swmm_NODE, node_name.c_str());
     if (index < 0) {
-        throw SwmmEngineError("SWMM node '" + node_name + "' was not found");
+        throw SwmmEngineError(
+            "SWMM node '" + node_name + "' was not found", "SWMM", "swmm_node_not_found");
     }
-    return static_cast<std::size_t>(index);
+    return index;
 }
 
-std::size_t SwmmEngine::link_index(const std::string& link_name) const {
+int SwmmEngine::link_index(const std::string& link_name) const {
     require_initialized();
     const int index = swmm_getIndex(swmm_LINK, link_name.c_str());
     if (index < 0) {
-        throw SwmmEngineError("SWMM link '" + link_name + "' was not found");
+        throw SwmmEngineError(
+            "SWMM link '" + link_name + "' was not found", "SWMM", "swmm_link_not_found");
     }
-    return static_cast<std::size_t>(index);
+    return index;
 }
 
 void SwmmEngine::require_initialized() const {
@@ -214,18 +220,27 @@ void SwmmEngine::require_initialized() const {
     }
 }
 
-void SwmmEngine::require_valid_node(std::size_t node_id) const {
+void SwmmEngine::require_valid_node(int node_id) const {
     require_initialized();
-    if (node_id >= static_cast<std::size_t>(swmm_getCount(swmm_NODE))) {
-        throw SwmmEngineError("node_id is out of range");
+    if (node_id < 0 || node_id >= swmm_getCount(swmm_NODE)) {
+        throw SwmmEngineError("node_id is out of range", "SWMM", "swmm_node_out_of_range");
     }
 }
 
-void SwmmEngine::require_valid_link(std::size_t link_id) const {
+void SwmmEngine::require_valid_link(int link_id) const {
     require_initialized();
-    if (link_id >= static_cast<std::size_t>(swmm_getCount(swmm_LINK))) {
-        throw SwmmEngineError("link_id is out of range");
+    if (link_id < 0 || link_id >= swmm_getCount(swmm_LINK)) {
+        throw SwmmEngineError("link_id is out of range", "SWMM", "swmm_link_out_of_range");
     }
+}
+
+core::EngineReport make_swmm_engine_report(const SwmmEngine& engine) {
+    return core::EngineReport{
+        .healthy = engine.initialized(),
+        .engine_id = "SWMM",
+        .error_code = engine.initialized() ? "" : "swmm_engine_not_initialized",
+        .elapsed_time = engine.elapsed_time(),
+    };
 }
 
 }  // namespace scau::coupling::drainage

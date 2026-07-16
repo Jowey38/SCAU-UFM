@@ -65,7 +65,14 @@ TEST(DpmEdgeConveyanceAssembly, DerivedPhiEnDrivesHllcStep) {
 
     auto make_state = [&]() {
         auto state = scau::surface2d::SurfaceState::hydrostatic_for_mesh(mesh, 1.0, 1.0);
+        // Audusse reconstruction (main-spec 5.4) keys the reconstructed depths off
+        // the free surface eta, so the raised cell must carry a consistent eta=h
+        // (flat bed z_b=0). A genuine eta jump (1.5 vs 1.0) yields a nonzero
+        // advective mass flux that phi_e_n then scales; raising h alone while
+        // leaving eta=1.0 would imply a lowered bed and reconstruct both sides
+        // back to a lake at rest (zero flux), masking the phi_e_n dependence.
         state.cells[0].conserved.h = 1.5;
+        state.cells[0].eta = 1.5;
         return state;
     };
 

@@ -1,3 +1,4 @@
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -7,58 +8,72 @@
 
 TEST(CouplingCoreState, SnapshotCapturesCurrentCellsAndRemainsImmutable) {
     scau::coupling::core::CouplingState state{{
-        {.volume = 10.0},
-        {.volume = 20.0},
+        {.volume = 0.0, .phi_t = 1.0, .h = 0.0, .area = 1.0},
+        {.volume = 0.0, .phi_t = 1.0, .h = 0.0, .area = 1.0},
     }};
 
     const auto snapshot = state.snapshot();
-    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 5.0});
+    state.enqueue_event({.exchange_cell_index = 0U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 5.0});
     state.replay_pending();
 
     ASSERT_EQ(snapshot.cells().size(), 2U);
-    EXPECT_DOUBLE_EQ(snapshot.cells()[0].volume, 10.0);
-    EXPECT_DOUBLE_EQ(snapshot.cells()[1].volume, 20.0);
-    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 15.0);
+    EXPECT_DOUBLE_EQ(snapshot.cells()[0].volume, 0.0);
+    EXPECT_DOUBLE_EQ(snapshot.cells()[1].volume, 0.0);
+    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 5.0);
 }
 
 TEST(CouplingCoreState, RollbackRestoresSnapshotVolumes) {
     scau::coupling::core::CouplingState state{{
-        {.volume = 10.0},
-        {.volume = 20.0},
+        {.volume = 0.0, .phi_t = 1.0, .h = 0.0, .area = 1.0},
+        {.volume = 0.0, .phi_t = 1.0, .h = 0.0, .area = 1.0},
     }};
 
     const auto snapshot = state.snapshot();
-    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = -3.0});
-    state.enqueue_event({.exchange_cell_index = 1U, .volume_delta = 7.0});
+    state.enqueue_event({.exchange_cell_index = 0U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 3.0});
+    state.enqueue_event({.exchange_cell_index = 1U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 7.0});
     state.replay_pending();
     state.rollback(snapshot);
 
     ASSERT_EQ(state.cells().size(), 2U);
-    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 10.0);
-    EXPECT_DOUBLE_EQ(state.cells()[1].volume, 20.0);
+    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 0.0);
+    EXPECT_DOUBLE_EQ(state.cells()[1].volume, 0.0);
 }
 
-TEST(CouplingCoreState, RollbackPreservesPendingEventsForReplay) {
+TEST(CouplingCoreState, RollbackRestoresSnapshotPendingEventsForReplay) {
     scau::coupling::core::CouplingState state{{
-        {.volume = 10.0},
-        {.volume = 20.0},
+        {.volume = 0.0, .phi_t = 1.0, .h = 0.0, .area = 1.0},
+        {.volume = 0.0, .phi_t = 1.0, .h = 0.0, .area = 1.0},
     }};
 
+    state.enqueue_event({.exchange_cell_index = 0U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 2.0});
     const auto snapshot = state.snapshot();
-    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 2.0});
-    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 3.0});
-    state.enqueue_event({.exchange_cell_index = 1U, .volume_delta = -4.0});
+    state.enqueue_event({.exchange_cell_index = 0U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 3.0});
+    state.enqueue_event({.exchange_cell_index = 1U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 4.0});
     state.rollback(snapshot);
     state.replay_pending();
 
     ASSERT_EQ(state.cells().size(), 2U);
-    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 15.0);
-    EXPECT_DOUBLE_EQ(state.cells()[1].volume, 16.0);
+    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 2.0);
+    EXPECT_DOUBLE_EQ(state.cells()[1].volume, 0.0);
+}
+
+TEST(CouplingCoreState, ConstructorRejectsInvalidCellState) {
+    EXPECT_THROW(
+        static_cast<void>(scau::coupling::core::CouplingState{{{
+            .volume = std::numeric_limits<double>::quiet_NaN(),
+        }}}),
+        std::invalid_argument);
+    EXPECT_THROW(
+        static_cast<void>(scau::coupling::core::CouplingState{{{
+            .volume = 10.0,
+            .phi_t = std::numeric_limits<double>::infinity(),
+        }}}),
+        std::invalid_argument);
 }
 
 TEST(CouplingCoreState, EnqueueRejectsOutOfRangeExchangeCellIndex) {
     scau::coupling::core::CouplingState state{{
-        {.volume = 10.0},
+        {.volume = 0.0, .phi_t = 1.0, .h = 0.0, .area = 1.0},
     }};
 
     EXPECT_THROW(
@@ -66,14 +81,182 @@ TEST(CouplingCoreState, EnqueueRejectsOutOfRangeExchangeCellIndex) {
         std::out_of_range);
 }
 
+TEST(CouplingCoreState, EnqueueRejectsNegativeVolumeDelta) {
+    scau::coupling::core::CouplingState state{{{
+        .volume = 0.0,
+        .phi_t = 0.0,
+        .h = 0.0,
+        .area = 0.0,
+    }}};
+
+    EXPECT_THROW(
+        state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = -1.0}),
+        std::invalid_argument);
+}
+
+TEST(CouplingCoreState, EnqueueRejectsDuplicateSharedEndpointEvents) {
+    scau::coupling::core::CouplingState state{{{
+        .volume = 40.0,
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    EXPECT_THROW(
+        state.enqueue_event({
+            .exchange_cell_index = 0U,
+            .direction = scau::coupling::core::ExchangeDirection::surface_to_engine,
+            .volume_delta = 0.0,
+            .unmet_volume = 10.0,
+            .repayment_volume = 10.0,
+            .shared_endpoint_events = {
+                {
+                    .endpoint = {
+                        .engine = scau::coupling::core::SharedExchangeEngine::drainage,
+                        .node_id = 10U,
+                    },
+                    .repayment_volume = 10.0,
+                },
+                {
+                    .endpoint = {
+                        .engine = scau::coupling::core::SharedExchangeEngine::drainage,
+                        .node_id = 10U,
+                    },
+                    .unmet_volume = 10.0,
+                },
+            },
+        }),
+        std::invalid_argument);
+}
+
+TEST(CouplingCoreState, ReplayRejectsNonzeroSharedEventVolumeIntoZeroStorageCellWithoutPartialMutation) {
+    scau::coupling::core::CouplingState state{{{
+        .volume = 0.0,
+        .phi_t = 0.0,
+        .h = 0.0,
+        .area = 10.0,
+    }}};
+
+    state.enqueue_event({
+        .exchange_cell_index = 0U,
+        .direction = scau::coupling::core::ExchangeDirection::engine_to_surface,
+        .volume_delta = 1.0,
+        .unmet_volume = 2.0,
+        .shared_endpoint_events = {
+            {
+                .endpoint = {
+                    .engine = scau::coupling::core::SharedExchangeEngine::drainage,
+                    .node_id = 10U,
+                },
+                .unmet_volume = 2.0,
+            },
+        },
+    });
+
+    EXPECT_THROW(state.replay_pending(), std::invalid_argument);
+    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 0.0);
+    EXPECT_DOUBLE_EQ(state.cells()[0].h, 0.0);
+    EXPECT_TRUE(state.cells()[0].shared_deficit_accounts.empty());
+}
+
+TEST(CouplingCoreState, ReplayRejectsNonzeroVolumeIntoZeroStorageCell) {
+    scau::coupling::core::CouplingState state{{{
+        .volume = 0.0,
+        .phi_t = 0.0,
+        .h = 0.0,
+        .area = 10.0,
+    }}};
+
+    state.enqueue_event({
+        .exchange_cell_index = 0U,
+        .direction = scau::coupling::core::ExchangeDirection::engine_to_surface,
+        .volume_delta = 1.0,
+    });
+
+    EXPECT_THROW(state.replay_pending(), std::invalid_argument);
+    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 0.0);
+    EXPECT_DOUBLE_EQ(state.cells()[0].h, 0.0);
+}
+
+TEST(CouplingCoreState, ReplayRejectsNonzeroVolumeOutOfZeroStorageCell) {
+    scau::coupling::core::CouplingState state{{{
+        .volume = 0.0,
+        .phi_t = 0.0,
+        .h = 0.0,
+        .area = 10.0,
+    }}};
+
+    state.enqueue_event({
+        .exchange_cell_index = 0U,
+        .direction = scau::coupling::core::ExchangeDirection::surface_to_engine,
+        .volume_delta = 1.0,
+    });
+
+    EXPECT_THROW(state.replay_pending(), std::invalid_argument);
+    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 0.0);
+    EXPECT_DOUBLE_EQ(state.cells()[0].h, 0.0);
+}
+
+TEST(CouplingCoreState, ReplayRejectsSurfaceToEngineVolumeBeyondStorage) {
+    scau::coupling::core::CouplingState state{{{
+        .volume = 4.0,
+        .phi_t = 0.4,
+        .h = 1.0,
+        .area = 10.0,
+    }}};
+
+    state.enqueue_event({
+        .exchange_cell_index = 0U,
+        .direction = scau::coupling::core::ExchangeDirection::surface_to_engine,
+        .volume_delta = 5.0,
+    });
+
+    EXPECT_THROW(state.replay_pending(), std::invalid_argument);
+    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 4.0);
+    EXPECT_DOUBLE_EQ(state.cells()[0].h, 1.0);
+}
+
+TEST(CouplingCoreState, ReplayRejectsInvalidDepthWithoutPartialMutation) {
+    scau::coupling::core::CouplingState state{{{
+        .volume = 10.0,
+        .phi_t = 0.4,
+        .h = 1.0,
+        .area = 10.0,
+    }}};
+
+    state.enqueue_event({.exchange_cell_index = 0U, .direction = scau::coupling::core::ExchangeDirection::surface_to_engine, .volume_delta = 11.0});
+
+    EXPECT_THROW(state.replay_pending(), std::invalid_argument);
+    ASSERT_EQ(state.cells().size(), 1U);
+    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 10.0);
+    EXPECT_DOUBLE_EQ(state.cells()[0].h, 1.0);
+}
+
+TEST(CouplingCoreState, ReplayRejectsLaterInvalidEventWithoutPartialMutation) {
+    scau::coupling::core::CouplingState state{{
+        {.volume = 10.0, .phi_t = 0.4, .h = 1.0, .area = 10.0},
+        {.volume = 4.0, .phi_t = 0.4, .h = 1.0, .area = 10.0},
+    }};
+
+    state.enqueue_event({.exchange_cell_index = 0U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 2.0});
+    state.enqueue_event({.exchange_cell_index = 1U, .direction = scau::coupling::core::ExchangeDirection::surface_to_engine, .volume_delta = 5.0});
+
+    EXPECT_THROW(state.replay_pending(), std::invalid_argument);
+    ASSERT_EQ(state.cells().size(), 2U);
+    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 10.0);
+    EXPECT_DOUBLE_EQ(state.cells()[0].h, 1.0);
+    EXPECT_DOUBLE_EQ(state.cells()[1].volume, 4.0);
+    EXPECT_DOUBLE_EQ(state.cells()[1].h, 1.0);
+}
+
 TEST(CouplingCoreState, SnapshotCapturesDeficitAccountsAndRemainsImmutable) {
     scau::coupling::core::CouplingState state{{
-        {.volume = 10.0, .mass_deficit_account = {.volume = 1.0}},
-        {.volume = 20.0, .mass_deficit_account = {.volume = 2.0}},
+        {.volume = 0.0, .mass_deficit_account = {.volume = 1.0}, .phi_t = 1.0, .h = 0.0, .area = 1.0},
+        {.volume = 0.0, .mass_deficit_account = {.volume = 2.0}, .phi_t = 1.0, .h = 0.0, .area = 1.0},
     }};
 
     const auto snapshot = state.snapshot();
-    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 5.0, .unmet_volume = 3.0});
+    state.enqueue_event({.exchange_cell_index = 0U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 5.0, .unmet_volume = 3.0});
     state.replay_pending();
 
     ASSERT_EQ(snapshot.cells().size(), 2U);
@@ -84,13 +267,13 @@ TEST(CouplingCoreState, SnapshotCapturesDeficitAccountsAndRemainsImmutable) {
 
 TEST(CouplingCoreState, RollbackRestoresSnapshotDeficitAccounts) {
     scau::coupling::core::CouplingState state{{
-        {.volume = 10.0, .mass_deficit_account = {.volume = 1.0}},
-        {.volume = 20.0, .mass_deficit_account = {.volume = 2.0}},
+        {.volume = 0.0, .mass_deficit_account = {.volume = 1.0}, .phi_t = 1.0, .h = 0.0, .area = 1.0},
+        {.volume = 0.0, .mass_deficit_account = {.volume = 2.0}, .phi_t = 1.0, .h = 0.0, .area = 1.0},
     }};
 
     const auto snapshot = state.snapshot();
-    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = -3.0, .unmet_volume = 4.0});
-    state.enqueue_event({.exchange_cell_index = 1U, .volume_delta = 7.0, .repayment_volume = 1.5});
+    state.enqueue_event({.exchange_cell_index = 0U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 3.0, .unmet_volume = 4.0});
+    state.enqueue_event({.exchange_cell_index = 1U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 7.0, .repayment_volume = 1.5});
     state.replay_pending();
     state.rollback(snapshot);
 
@@ -99,34 +282,34 @@ TEST(CouplingCoreState, RollbackRestoresSnapshotDeficitAccounts) {
     EXPECT_DOUBLE_EQ(state.cells()[1].mass_deficit_account.volume, 2.0);
 }
 
-TEST(CouplingCoreState, RollbackPreservesPendingDeficitEventsForReplay) {
+TEST(CouplingCoreState, RollbackRestoresSnapshotPendingDeficitEventsForReplay) {
     scau::coupling::core::CouplingState state{{
-        {.volume = 10.0, .mass_deficit_account = {.volume = 1.0}},
-        {.volume = 20.0, .mass_deficit_account = {.volume = 5.0}},
+        {.volume = 0.0, .mass_deficit_account = {.volume = 1.0}, .phi_t = 1.0, .h = 0.0, .area = 1.0},
+        {.volume = 0.0, .mass_deficit_account = {.volume = 5.0}, .phi_t = 1.0, .h = 0.0, .area = 1.0},
     }};
 
+    state.enqueue_event({.exchange_cell_index = 0U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 2.0, .unmet_volume = 3.0});
     const auto snapshot = state.snapshot();
-    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 2.0, .unmet_volume = 3.0});
-    state.enqueue_event({.exchange_cell_index = 1U, .volume_delta = -4.0, .repayment_volume = 2.5});
+    state.enqueue_event({.exchange_cell_index = 1U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 4.0, .repayment_volume = 2.5});
     state.rollback(snapshot);
     state.replay_pending();
 
     ASSERT_EQ(state.cells().size(), 2U);
-    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 12.0);
+    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 2.0);
     EXPECT_DOUBLE_EQ(state.cells()[0].mass_deficit_account.volume, 4.0);
-    EXPECT_DOUBLE_EQ(state.cells()[1].volume, 16.0);
-    EXPECT_DOUBLE_EQ(state.cells()[1].mass_deficit_account.volume, 2.5);
+    EXPECT_DOUBLE_EQ(state.cells()[1].volume, 0.0);
+    EXPECT_DOUBLE_EQ(state.cells()[1].mass_deficit_account.volume, 5.0);
 }
 
 TEST(CouplingCoreState, RuntimeCountersStartAtZero) {
-    scau::coupling::core::CouplingState state{{{.volume = 10.0}}};
+    scau::coupling::core::CouplingState state{{{.volume = 0.0, .phi_t = 1.0, .h = 0.0, .area = 1.0}}};
 
     EXPECT_EQ(state.runtime_counters().count_drain_split, 0U);
     EXPECT_EQ(state.runtime_counters().count_negative_depth_fix, 0U);
 }
 
 TEST(CouplingCoreState, RecordPipelineDecisionIncrementsDrainSplitCounter) {
-    scau::coupling::core::CouplingState state{{{.volume = 10.0}}};
+    scau::coupling::core::CouplingState state{{{.volume = 0.0, .phi_t = 1.0, .h = 0.0, .area = 1.0}}};
 
     state.record_pipeline_decision({
         .drain_split_engaged = true,
@@ -138,7 +321,7 @@ TEST(CouplingCoreState, RecordPipelineDecisionIncrementsDrainSplitCounter) {
 }
 
 TEST(CouplingCoreState, RecordPipelineDecisionIncrementsNegativeDepthFixCounter) {
-    scau::coupling::core::CouplingState state{{{.volume = 10.0}}};
+    scau::coupling::core::CouplingState state{{{.volume = 0.0, .phi_t = 1.0, .h = 0.0, .area = 1.0}}};
 
     state.record_pipeline_decision({
         .drain_split_engaged = false,
@@ -150,7 +333,7 @@ TEST(CouplingCoreState, RecordPipelineDecisionIncrementsNegativeDepthFixCounter)
 }
 
 TEST(CouplingCoreState, RecordPipelineDecisionIncrementsBothCountersWhenBothFlagsEngaged) {
-    scau::coupling::core::CouplingState state{{{.volume = 10.0}}};
+    scau::coupling::core::CouplingState state{{{.volume = 0.0, .phi_t = 1.0, .h = 0.0, .area = 1.0}}};
 
     state.record_pipeline_decision({
         .drain_split_engaged = true,
@@ -166,7 +349,7 @@ TEST(CouplingCoreState, RecordPipelineDecisionIncrementsBothCountersWhenBothFlag
 }
 
 TEST(CouplingCoreState, RecordPipelineDecisionLeavesCountersUnchangedWhenNoFlagsEngaged) {
-    scau::coupling::core::CouplingState state{{{.volume = 10.0}}};
+    scau::coupling::core::CouplingState state{{{.volume = 0.0, .phi_t = 1.0, .h = 0.0, .area = 1.0}}};
 
     state.record_pipeline_decision({
         .drain_split_engaged = false,
@@ -178,7 +361,7 @@ TEST(CouplingCoreState, RecordPipelineDecisionLeavesCountersUnchangedWhenNoFlags
 }
 
 TEST(CouplingCoreState, SnapshotCapturesRuntimeCountersAndRemainsImmutable) {
-    scau::coupling::core::CouplingState state{{{.volume = 10.0}}};
+    scau::coupling::core::CouplingState state{{{.volume = 0.0, .phi_t = 1.0, .h = 0.0, .area = 1.0}}};
     state.record_pipeline_decision({.drain_split_engaged = true});
     state.record_pipeline_decision({.negative_depth_fix_engaged = true});
 
@@ -194,8 +377,21 @@ TEST(CouplingCoreState, SnapshotCapturesRuntimeCountersAndRemainsImmutable) {
     EXPECT_EQ(state.runtime_counters().count_negative_depth_fix, 2U);
 }
 
+TEST(CouplingCoreState, SnapshotCapturesPendingEventsAndRemainsImmutable) {
+    scau::coupling::core::CouplingState state{{{.volume = 0.0, .phi_t = 1.0, .h = 0.0, .area = 1.0}}};
+    state.enqueue_event({.exchange_cell_index = 0U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 2.0, .unmet_volume = 1.0});
+
+    const auto snapshot = state.snapshot();
+    state.enqueue_event({.exchange_cell_index = 0U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 3.0, .repayment_volume = 0.5});
+
+    ASSERT_EQ(snapshot.pending_events().size(), 1U);
+    EXPECT_DOUBLE_EQ(snapshot.pending_events()[0].volume_delta, 2.0);
+    EXPECT_DOUBLE_EQ(snapshot.pending_events()[0].unmet_volume, 1.0);
+    EXPECT_DOUBLE_EQ(snapshot.pending_events()[0].repayment_volume, 0.0);
+}
+
 TEST(CouplingCoreState, RollbackRestoresSnapshotRuntimeCounters) {
-    scau::coupling::core::CouplingState state{{{.volume = 10.0}}};
+    scau::coupling::core::CouplingState state{{{.volume = 0.0, .phi_t = 1.0, .h = 0.0, .area = 1.0}}};
     state.record_pipeline_decision({.drain_split_engaged = true});
 
     const auto snapshot = state.snapshot();
@@ -210,22 +406,22 @@ TEST(CouplingCoreState, RollbackRestoresSnapshotRuntimeCounters) {
 }
 
 TEST(CouplingCoreState, ReplayPendingDoesNotMutateRuntimeCounters) {
-    scau::coupling::core::CouplingState state{{{.volume = 10.0}}};
+    scau::coupling::core::CouplingState state{{{.volume = 0.0, .phi_t = 1.0, .h = 0.0, .area = 1.0}}};
     state.record_pipeline_decision({.drain_split_engaged = true});
 
-    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 2.0, .unmet_volume = 1.0});
+    state.enqueue_event({.exchange_cell_index = 0U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 2.0, .unmet_volume = 1.0});
     state.replay_pending();
 
     EXPECT_EQ(state.runtime_counters().count_drain_split, 1U);
     EXPECT_EQ(state.runtime_counters().count_negative_depth_fix, 0U);
-    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 12.0);
+    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 2.0);
     EXPECT_DOUBLE_EQ(state.cells()[0].mass_deficit_account.volume, 1.0);
 }
 
 TEST(CouplingCoreState, DeterministicReplayPreservesCellsAndCountersWithIdenticalSequence) {
     const std::vector<scau::coupling::core::ExchangeCellState> initial_cells{
-        {.volume = 10.0, .mass_deficit_account = {.volume = 1.0}},
-        {.volume = 20.0, .mass_deficit_account = {.volume = 2.0}},
+        {.volume = 0.0, .mass_deficit_account = {.volume = 1.0}, .phi_t = 1.0, .h = 0.0, .area = 1.0},
+        {.volume = 0.0, .mass_deficit_account = {.volume = 2.0}, .phi_t = 1.0, .h = 0.0, .area = 1.0},
     };
 
     scau::coupling::core::CouplingState state_a{initial_cells};
@@ -233,8 +429,8 @@ TEST(CouplingCoreState, DeterministicReplayPreservesCellsAndCountersWithIdentica
 
     const auto drive = [](scau::coupling::core::CouplingState& state) {
         state.record_pipeline_decision({.drain_split_engaged = true});
-        state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 4.0, .unmet_volume = 1.5});
-        state.enqueue_event({.exchange_cell_index = 1U, .volume_delta = -2.0, .repayment_volume = 0.5});
+        state.enqueue_event({.exchange_cell_index = 0U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 4.0, .unmet_volume = 1.5});
+        state.enqueue_event({.exchange_cell_index = 1U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 2.0, .repayment_volume = 0.5});
         state.replay_pending();
         state.record_pipeline_decision({.negative_depth_fix_engaged = true});
         state.record_pipeline_decision({.drain_split_engaged = true, .negative_depth_fix_engaged = true});
@@ -260,8 +456,8 @@ TEST(CouplingCoreState, DeterministicReplayPreservesCellsAndCountersWithIdentica
 
 TEST(CouplingCoreState, RollbackAndReplayProducesIdenticalStateToFreshRun) {
     const std::vector<scau::coupling::core::ExchangeCellState> initial_cells{
-        {.volume = 10.0, .mass_deficit_account = {.volume = 1.0}},
-        {.volume = 20.0, .mass_deficit_account = {.volume = 2.0}},
+        {.volume = 0.0, .mass_deficit_account = {.volume = 1.0}, .phi_t = 1.0, .h = 0.0, .area = 1.0},
+        {.volume = 0.0, .mass_deficit_account = {.volume = 2.0}, .phi_t = 1.0, .h = 0.0, .area = 1.0},
     };
 
     scau::coupling::core::CouplingState fresh{initial_cells};
@@ -269,8 +465,8 @@ TEST(CouplingCoreState, RollbackAndReplayProducesIdenticalStateToFreshRun) {
 
     const auto authoritative_sequence = [](scau::coupling::core::CouplingState& state) {
         state.record_pipeline_decision({.drain_split_engaged = true});
-        state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 3.0, .unmet_volume = 2.0});
-        state.enqueue_event({.exchange_cell_index = 1U, .volume_delta = -1.0, .repayment_volume = 1.0});
+        state.enqueue_event({.exchange_cell_index = 0U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 3.0, .unmet_volume = 2.0});
+        state.enqueue_event({.exchange_cell_index = 1U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 1.0, .repayment_volume = 1.0});
         state.replay_pending();
         state.record_pipeline_decision({.negative_depth_fix_engaged = true});
     };
@@ -280,7 +476,7 @@ TEST(CouplingCoreState, RollbackAndReplayProducesIdenticalStateToFreshRun) {
 
     const auto rolled_back_snapshot = rolled_back.snapshot();
     rolled_back.record_pipeline_decision({.drain_split_engaged = true, .negative_depth_fix_engaged = true});
-    rolled_back.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 999.0, .unmet_volume = 999.0});
+    rolled_back.enqueue_event({.exchange_cell_index = 0U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 999.0, .unmet_volume = 999.0});
     rolled_back.replay_pending();
     rolled_back.rollback(rolled_back_snapshot);
     authoritative_sequence(rolled_back);
@@ -303,14 +499,14 @@ TEST(CouplingCoreState, RollbackAndReplayProducesIdenticalStateToFreshRun) {
 
 TEST(CouplingCoreState, ReReplayAfterRollbackAndReEnqueueIsBitwiseIdentical) {
     scau::coupling::core::CouplingState state{{
-        {.volume = 10.0, .mass_deficit_account = {.volume = 1.0}},
-        {.volume = 20.0, .mass_deficit_account = {.volume = 5.0}},
+        {.volume = 0.0, .mass_deficit_account = {.volume = 1.0}, .phi_t = 1.0, .h = 0.0, .area = 1.0},
+        {.volume = 0.0, .mass_deficit_account = {.volume = 5.0}, .phi_t = 1.0, .h = 0.0, .area = 1.0},
     }};
 
     const auto snapshot = state.snapshot();
     const std::vector<scau::coupling::core::CouplingEvent> input_events{
-        {.exchange_cell_index = 0U, .volume_delta = 2.0, .unmet_volume = 3.0},
-        {.exchange_cell_index = 1U, .volume_delta = -4.0, .repayment_volume = 2.5},
+        {.exchange_cell_index = 0U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 2.0, .unmet_volume = 3.0},
+        {.exchange_cell_index = 1U, .direction = scau::coupling::core::ExchangeDirection::engine_to_surface, .volume_delta = 4.0, .repayment_volume = 2.5},
     };
 
     for (const auto& event : input_events) {
@@ -346,14 +542,14 @@ TEST(CouplingCoreState, ComputeSystemMassAuditsCurrentCellsWithoutMutatingState)
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{
         {
-            .volume = 10.0,
+            .volume = 40.0,
             .mass_deficit_account = {.volume = 1.0},
             .phi_t = 0.4,
             .h = 2.0,
             .area = 50.0,
         },
         {
-            .volume = 20.0,
+            .volume = 0.4 * (kHWet / 2.0) * 50.0,
             .mass_deficit_account = {.volume = 3.0},
             .phi_t = 0.4,
             .h = kHWet / 2.0,
@@ -368,14 +564,14 @@ TEST(CouplingCoreState, ComputeSystemMassAuditsCurrentCellsWithoutMutatingState)
     EXPECT_DOUBLE_EQ(audit.total_mass, 44.0);
     EXPECT_EQ(audit.wet_cell_count, 1U);
     ASSERT_EQ(state.cells().size(), 2U);
-    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 10.0);
-    EXPECT_DOUBLE_EQ(state.cells()[1].volume, 20.0);
+    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 40.0);
+    EXPECT_DOUBLE_EQ(state.cells()[1].volume, 0.4 * (kHWet / 2.0) * 50.0);
 }
 
 TEST(CouplingCoreState, AuditSystemMassAgainstReferenceUsesCurrentCells) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 0.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -398,7 +594,7 @@ TEST(CouplingCoreState, AuditSystemMassAgainstReferenceUsesCurrentCells) {
 TEST(CouplingCoreState, SnapshotComputeSystemMassUsesCapturedCellsAfterStateMutates) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -421,7 +617,7 @@ TEST(CouplingCoreState, SnapshotComputeSystemMassUsesCapturedCellsAfterStateMuta
 TEST(CouplingCoreState, AuditSystemMassAgainstSnapshotUsesSnapshotBaselineAndCurrentCells) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -443,7 +639,7 @@ TEST(CouplingCoreState, AuditSystemMassAgainstSnapshotUsesSnapshotBaselineAndCur
 TEST(CouplingCoreState, DiagnoseSystemMassAgainstSnapshotUsesSnapshotBaselineAndCurrentCells) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -465,7 +661,7 @@ TEST(CouplingCoreState, DiagnoseSystemMassAgainstSnapshotUsesSnapshotBaselineAnd
 TEST(CouplingCoreState, DiagnoseSystemMassAgainstReferenceContinuesWhenMassIsConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -485,7 +681,7 @@ TEST(CouplingCoreState, DiagnoseSystemMassAgainstReferenceContinuesWhenMassIsCon
 TEST(CouplingCoreState, DiagnoseSystemMassAgainstReferenceDetectsMassDrift) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -507,7 +703,7 @@ TEST(CouplingCoreState, DiagnoseSystemMassAgainstReferenceDetectsMassDrift) {
 TEST(CouplingCoreState, GateDecisionAgainstReferenceContinuesWhenMassIsConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -528,7 +724,7 @@ TEST(CouplingCoreState, GateDecisionAgainstReferenceContinuesWhenMassIsConserved
 TEST(CouplingCoreState, GateDecisionAgainstReferenceAbortsWhenMassDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -551,7 +747,7 @@ TEST(CouplingCoreState, GateDecisionAgainstReferenceAbortsWhenMassDrifted) {
 TEST(CouplingCoreState, GateDecisionAgainstSnapshotContinuesWhenMassIsConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -572,7 +768,7 @@ TEST(CouplingCoreState, GateDecisionAgainstSnapshotContinuesWhenMassIsConserved)
 TEST(CouplingCoreState, GateDecisionAgainstSnapshotAbortsWhenMassDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -669,7 +865,7 @@ TEST(CouplingCoreState, RuntimeGateOutcomeHelperAbortsForDriftedDiagnostic) {
 TEST(CouplingCoreState, RuntimeGateAgainstReferenceKeepsRunningWhenMassIsConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -691,7 +887,7 @@ TEST(CouplingCoreState, RuntimeGateAgainstReferenceKeepsRunningWhenMassIsConserv
 TEST(CouplingCoreState, RuntimeGateAgainstReferenceSignalsAbortWhenMassDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -715,7 +911,7 @@ TEST(CouplingCoreState, RuntimeGateAgainstReferenceSignalsAbortWhenMassDrifted) 
 TEST(CouplingCoreState, RuntimeGateAgainstSnapshotKeepsRunningWhenMassIsConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -737,7 +933,7 @@ TEST(CouplingCoreState, RuntimeGateAgainstSnapshotKeepsRunningWhenMassIsConserve
 TEST(CouplingCoreState, RuntimeGateAgainstSnapshotSignalsAbortWhenMassDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -923,7 +1119,7 @@ TEST(CouplingCoreState, RuntimeControlDecisionHelperAbortsForDriftedDiagnostic) 
 TEST(CouplingCoreState, ShouldAbortSystemMassRuntimeAgainstSnapshotReturnsFalseWhenMassIsConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -940,7 +1136,7 @@ TEST(CouplingCoreState, ShouldAbortSystemMassRuntimeAgainstSnapshotReturnsFalseW
 TEST(CouplingCoreState, ShouldAbortSystemMassRuntimeAgainstSnapshotReturnsTrueWhenMassDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -959,7 +1155,7 @@ TEST(CouplingCoreState, ShouldAbortSystemMassRuntimeAgainstSnapshotReturnsTrueWh
 TEST(CouplingCoreState, ShouldAbortSystemMassRuntimeAgainstReferenceReturnsFalseWhenMassIsConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -976,7 +1172,7 @@ TEST(CouplingCoreState, ShouldAbortSystemMassRuntimeAgainstReferenceReturnsFalse
 TEST(CouplingCoreState, ShouldAbortSystemMassRuntimeAgainstReferenceReturnsTrueWhenMassDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -995,7 +1191,7 @@ TEST(CouplingCoreState, ShouldAbortSystemMassRuntimeAgainstReferenceReturnsTrueW
 TEST(CouplingCoreState, RuntimeControlDecisionAgainstReferenceContinuesWhenMassIsConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1021,7 +1217,7 @@ TEST(CouplingCoreState, RuntimeControlDecisionAgainstReferenceContinuesWhenMassI
 TEST(CouplingCoreState, RuntimeControlDecisionAgainstReferenceAbortsWhenMassDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1049,7 +1245,7 @@ TEST(CouplingCoreState, RuntimeControlDecisionAgainstReferenceAbortsWhenMassDrif
 TEST(CouplingCoreState, RuntimeControlAbortPredicateAgainstReferenceContinuesWhenMassIsConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1066,7 +1262,7 @@ TEST(CouplingCoreState, RuntimeControlAbortPredicateAgainstReferenceContinuesWhe
 TEST(CouplingCoreState, RuntimeControlAbortPredicateAgainstReferenceAbortsWhenMassDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1085,7 +1281,7 @@ TEST(CouplingCoreState, RuntimeControlAbortPredicateAgainstReferenceAbortsWhenMa
 TEST(CouplingCoreState, RuntimeControlDecisionAgainstSnapshotContinuesWhenMassIsConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1111,7 +1307,7 @@ TEST(CouplingCoreState, RuntimeControlDecisionAgainstSnapshotContinuesWhenMassIs
 TEST(CouplingCoreState, RuntimeControlDecisionAgainstSnapshotAbortsWhenMassDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1139,7 +1335,7 @@ TEST(CouplingCoreState, RuntimeControlDecisionAgainstSnapshotAbortsWhenMassDrift
 TEST(CouplingCoreState, RuntimeControlAbortPredicateAgainstSnapshotContinuesWhenMassIsConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1156,7 +1352,7 @@ TEST(CouplingCoreState, RuntimeControlAbortPredicateAgainstSnapshotContinuesWhen
 TEST(CouplingCoreState, RuntimeControlAbortPredicateAgainstSnapshotAbortsWhenMassDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1175,7 +1371,7 @@ TEST(CouplingCoreState, RuntimeControlAbortPredicateAgainstSnapshotAbortsWhenMas
 TEST(CouplingCoreState, RuntimeControlAbortPredicateAgainstReferenceMatchesDecisionWhenConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1194,7 +1390,7 @@ TEST(CouplingCoreState, RuntimeControlAbortPredicateAgainstReferenceMatchesDecis
 TEST(CouplingCoreState, RuntimeControlAbortPredicateAgainstReferenceMatchesDecisionWhenDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1215,7 +1411,7 @@ TEST(CouplingCoreState, RuntimeControlAbortPredicateAgainstReferenceMatchesDecis
 TEST(CouplingCoreState, RuntimeControlAbortPredicateAgainstSnapshotMatchesDecisionWhenConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1234,7 +1430,7 @@ TEST(CouplingCoreState, RuntimeControlAbortPredicateAgainstSnapshotMatchesDecisi
 TEST(CouplingCoreState, RuntimeControlAbortPredicateAgainstSnapshotMatchesDecisionWhenDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1255,7 +1451,7 @@ TEST(CouplingCoreState, RuntimeControlAbortPredicateAgainstSnapshotMatchesDecisi
 TEST(CouplingCoreState, RuntimeGateAgainstSnapshotMatchesGateActionWhenConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1277,7 +1473,7 @@ TEST(CouplingCoreState, RuntimeGateAgainstSnapshotMatchesGateActionWhenConserved
 TEST(CouplingCoreState, RuntimeGateAgainstSnapshotMatchesGateActionWhenDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1301,7 +1497,7 @@ TEST(CouplingCoreState, RuntimeGateAgainstSnapshotMatchesGateActionWhenDrifted) 
 TEST(CouplingCoreState, RuntimeGateAgainstReferenceMatchesGateActionWhenConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1323,7 +1519,7 @@ TEST(CouplingCoreState, RuntimeGateAgainstReferenceMatchesGateActionWhenConserve
 TEST(CouplingCoreState, RuntimeGateAgainstReferenceMatchesGateActionWhenDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1347,7 +1543,7 @@ TEST(CouplingCoreState, RuntimeGateAgainstReferenceMatchesGateActionWhenDrifted)
 TEST(CouplingCoreState, RuntimeControlGateOutcomeAgainstReferenceMatchesGateWhenConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1370,7 +1566,7 @@ TEST(CouplingCoreState, RuntimeControlGateOutcomeAgainstReferenceMatchesGateWhen
 TEST(CouplingCoreState, RuntimeControlGateOutcomeAgainstReferenceMatchesGateWhenDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1395,7 +1591,7 @@ TEST(CouplingCoreState, RuntimeControlGateOutcomeAgainstReferenceMatchesGateWhen
 TEST(CouplingCoreState, RuntimeControlGateOutcomeAgainstSnapshotMatchesGateWhenConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1418,7 +1614,7 @@ TEST(CouplingCoreState, RuntimeControlGateOutcomeAgainstSnapshotMatchesGateWhenC
 TEST(CouplingCoreState, RuntimeControlGateOutcomeAgainstSnapshotMatchesGateWhenDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1443,7 +1639,7 @@ TEST(CouplingCoreState, RuntimeControlGateOutcomeAgainstSnapshotMatchesGateWhenD
 TEST(CouplingCoreState, RuntimeAbortHandlingStateAgainstReferenceMatchesControlWhenConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1466,7 +1662,7 @@ TEST(CouplingCoreState, RuntimeAbortHandlingStateAgainstReferenceMatchesControlW
 TEST(CouplingCoreState, RuntimeAbortHandlingStateAgainstReferenceMatchesControlWhenDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1491,7 +1687,7 @@ TEST(CouplingCoreState, RuntimeAbortHandlingStateAgainstReferenceMatchesControlW
 TEST(CouplingCoreState, RuntimeAbortHandlingStateAgainstSnapshotMatchesControlWhenConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1514,7 +1710,7 @@ TEST(CouplingCoreState, RuntimeAbortHandlingStateAgainstSnapshotMatchesControlWh
 TEST(CouplingCoreState, RuntimeAbortHandlingStateAgainstSnapshotMatchesControlWhenDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1539,7 +1735,7 @@ TEST(CouplingCoreState, RuntimeAbortHandlingStateAgainstSnapshotMatchesControlWh
 TEST(CouplingCoreState, DiagnoseAgainstReferenceMatchesAuditWhenConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1563,7 +1759,7 @@ TEST(CouplingCoreState, DiagnoseAgainstReferenceMatchesAuditWhenConserved) {
 TEST(CouplingCoreState, DiagnoseAgainstReferenceMatchesAuditWhenDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1589,7 +1785,7 @@ TEST(CouplingCoreState, DiagnoseAgainstReferenceMatchesAuditWhenDrifted) {
 TEST(CouplingCoreState, DiagnoseAgainstSnapshotMatchesAuditWhenConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1613,7 +1809,7 @@ TEST(CouplingCoreState, DiagnoseAgainstSnapshotMatchesAuditWhenConserved) {
 TEST(CouplingCoreState, DiagnoseAgainstSnapshotMatchesAuditWhenDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1639,7 +1835,7 @@ TEST(CouplingCoreState, DiagnoseAgainstSnapshotMatchesAuditWhenDrifted) {
 TEST(CouplingCoreState, GateActionAgainstReferenceMatchesDiagnoseWhenConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1663,7 +1859,7 @@ TEST(CouplingCoreState, GateActionAgainstReferenceMatchesDiagnoseWhenConserved) 
 TEST(CouplingCoreState, GateActionAgainstReferenceMatchesDiagnoseWhenDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1689,7 +1885,7 @@ TEST(CouplingCoreState, GateActionAgainstReferenceMatchesDiagnoseWhenDrifted) {
 TEST(CouplingCoreState, GateActionAgainstSnapshotMatchesDiagnoseWhenConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1713,7 +1909,7 @@ TEST(CouplingCoreState, GateActionAgainstSnapshotMatchesDiagnoseWhenConserved) {
 TEST(CouplingCoreState, GateActionAgainstSnapshotMatchesDiagnoseWhenDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1739,7 +1935,7 @@ TEST(CouplingCoreState, GateActionAgainstSnapshotMatchesDiagnoseWhenDrifted) {
 TEST(CouplingCoreState, AuditAgainstReferencePreservesBaselineAndCurrentWhenConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1766,7 +1962,7 @@ TEST(CouplingCoreState, AuditAgainstReferencePreservesBaselineAndCurrentWhenCons
 TEST(CouplingCoreState, AuditAgainstReferencePreservesBaselineAndCurrentWhenDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1790,7 +1986,7 @@ TEST(CouplingCoreState, AuditAgainstReferencePreservesBaselineAndCurrentWhenDrif
 TEST(CouplingCoreState, AuditAgainstSnapshotPreservesBaselineAndCurrentWhenConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1818,7 +2014,7 @@ TEST(CouplingCoreState, AuditAgainstSnapshotPreservesBaselineAndCurrentWhenConse
 TEST(CouplingCoreState, AuditAgainstSnapshotPreservesBaselineAndCurrentWhenDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1843,7 +2039,7 @@ TEST(CouplingCoreState, AuditAgainstSnapshotPreservesBaselineAndCurrentWhenDrift
 TEST(CouplingCoreState, GateActionAgainstReferenceMatchesAuditChainWhenConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1868,7 +2064,7 @@ TEST(CouplingCoreState, GateActionAgainstReferenceMatchesAuditChainWhenConserved
 TEST(CouplingCoreState, GateActionAgainstReferenceMatchesAuditChainWhenDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1895,7 +2091,7 @@ TEST(CouplingCoreState, GateActionAgainstReferenceMatchesAuditChainWhenDrifted) 
 TEST(CouplingCoreState, GateActionAgainstSnapshotMatchesAuditChainWhenConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1920,7 +2116,7 @@ TEST(CouplingCoreState, GateActionAgainstSnapshotMatchesAuditChainWhenConserved)
 TEST(CouplingCoreState, GateActionAgainstSnapshotMatchesAuditChainWhenDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1947,7 +2143,7 @@ TEST(CouplingCoreState, GateActionAgainstSnapshotMatchesAuditChainWhenDrifted) {
 TEST(CouplingCoreState, RuntimeGateAgainstReferenceMatchesAuditChainWhenConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -1974,7 +2170,7 @@ TEST(CouplingCoreState, RuntimeGateAgainstReferenceMatchesAuditChainWhenConserve
 TEST(CouplingCoreState, RuntimeGateAgainstReferenceMatchesAuditChainWhenDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -2003,7 +2199,7 @@ TEST(CouplingCoreState, RuntimeGateAgainstReferenceMatchesAuditChainWhenDrifted)
 TEST(CouplingCoreState, RuntimeGateAgainstSnapshotMatchesAuditChainWhenConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -2030,7 +2226,7 @@ TEST(CouplingCoreState, RuntimeGateAgainstSnapshotMatchesAuditChainWhenConserved
 TEST(CouplingCoreState, RuntimeGateAgainstSnapshotMatchesAuditChainWhenDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -2059,7 +2255,7 @@ TEST(CouplingCoreState, RuntimeGateAgainstSnapshotMatchesAuditChainWhenDrifted) 
 TEST(CouplingCoreState, RuntimeControlAgainstReferenceMatchesAuditChainWhenConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -2091,7 +2287,7 @@ TEST(CouplingCoreState, RuntimeControlAgainstReferenceMatchesAuditChainWhenConse
 TEST(CouplingCoreState, RuntimeControlAgainstReferenceMatchesAuditChainWhenDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -2125,7 +2321,7 @@ TEST(CouplingCoreState, RuntimeControlAgainstReferenceMatchesAuditChainWhenDrift
 TEST(CouplingCoreState, RuntimeControlAgainstSnapshotMatchesAuditChainWhenConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -2157,7 +2353,7 @@ TEST(CouplingCoreState, RuntimeControlAgainstSnapshotMatchesAuditChainWhenConser
 TEST(CouplingCoreState, RuntimeControlAgainstSnapshotMatchesAuditChainWhenDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -2191,7 +2387,7 @@ TEST(CouplingCoreState, RuntimeControlAgainstSnapshotMatchesAuditChainWhenDrifte
 TEST(CouplingCoreState, RuntimeControlConsumerAgainstReferenceContinuesWhenMassIsConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -2217,7 +2413,7 @@ TEST(CouplingCoreState, RuntimeControlConsumerAgainstReferenceContinuesWhenMassI
 TEST(CouplingCoreState, RuntimeControlConsumerAgainstReferenceAbortsWhenMassDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -2245,7 +2441,7 @@ TEST(CouplingCoreState, RuntimeControlConsumerAgainstReferenceAbortsWhenMassDrif
 TEST(CouplingCoreState, RuntimeControlConsumerAgainstSnapshotContinuesWhenMassIsConserved) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -2271,7 +2467,7 @@ TEST(CouplingCoreState, RuntimeControlConsumerAgainstSnapshotContinuesWhenMassIs
 TEST(CouplingCoreState, RuntimeControlConsumerAgainstSnapshotAbortsWhenMassDrifted) {
     constexpr double kHWet = 1.0e-4;
     scau::coupling::core::CouplingState state{{{
-        .volume = 10.0,
+        .volume = 40.0,
         .mass_deficit_account = {.volume = 1.0},
         .phi_t = 0.4,
         .h = 2.0,
@@ -2294,4 +2490,268 @@ TEST(CouplingCoreState, RuntimeControlConsumerAgainstSnapshotAbortsWhenMassDrift
     EXPECT_DOUBLE_EQ(result.decision.gate_outcome.decision.diagnostic.baseline_total_mass, 41.0);
     EXPECT_DOUBLE_EQ(result.decision.gate_outcome.decision.diagnostic.current_total_mass, 45.0);
     EXPECT_EQ(result.decision.handling_state, scau::coupling::core::SystemMassRuntimeAbortHandlingState::abort);
+}
+
+TEST(CouplingCoreState, RuntimeOperatorActionAgainstReferenceContinuesWhenMassIsConserved) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 40.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.compute_system_mass(kHWet);
+    const auto decision = state.decide_system_mass_runtime_control_against_reference(baseline, kHWet);
+    const auto result = scau::coupling::core::consume_system_mass_runtime_control_decision(decision);
+
+    const auto action = scau::coupling::core::make_system_mass_runtime_operator_action(result);
+
+    EXPECT_EQ(action.state, scau::coupling::core::SystemMassRuntimeOperatorActionState::continue_run);
+    EXPECT_EQ(action.control_result.state, scau::coupling::core::SystemMassRuntimeControlState::continue_run);
+    EXPECT_FALSE(action.control_result.decision.should_abort);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.status, scau::coupling::core::SystemMassRuntimeGateStatus::running);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.action, scau::coupling::core::SystemMassGateAction::continue_run);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.status, scau::coupling::core::SystemMassConservationStatus::conserved);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.residual, 0.0);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass, 41.0);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass, 41.0);
+    EXPECT_EQ(action.control_result.decision.handling_state, scau::coupling::core::SystemMassRuntimeAbortHandlingState::continue_run);
+}
+
+TEST(CouplingCoreState, RuntimeOperatorActionAgainstReferenceRequestsAbortWhenMassDrifted) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 40.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.compute_system_mass(kHWet);
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 0.0, .unmet_volume = 4.0});
+    state.replay_pending();
+    const auto decision = state.decide_system_mass_runtime_control_against_reference(baseline, kHWet);
+    const auto result = scau::coupling::core::consume_system_mass_runtime_control_decision(decision);
+
+    const auto action = scau::coupling::core::make_system_mass_runtime_operator_action(result);
+
+    EXPECT_EQ(action.state, scau::coupling::core::SystemMassRuntimeOperatorActionState::abort_requested);
+    EXPECT_EQ(action.control_result.state, scau::coupling::core::SystemMassRuntimeControlState::abort);
+    EXPECT_TRUE(action.control_result.decision.should_abort);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.status, scau::coupling::core::SystemMassRuntimeGateStatus::abort);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.action, scau::coupling::core::SystemMassGateAction::abort_run);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.status, scau::coupling::core::SystemMassConservationStatus::drifted);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.residual, 4.0);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass, 41.0);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass, 45.0);
+    EXPECT_EQ(action.control_result.decision.handling_state, scau::coupling::core::SystemMassRuntimeAbortHandlingState::abort);
+}
+
+TEST(CouplingCoreState, RuntimeOperatorActionAgainstSnapshotContinuesWhenMassIsConserved) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 40.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.snapshot();
+    const auto decision = state.decide_system_mass_runtime_control_against_snapshot(baseline, kHWet);
+    const auto result = scau::coupling::core::consume_system_mass_runtime_control_decision(decision);
+
+    const auto action = scau::coupling::core::make_system_mass_runtime_operator_action(result);
+
+    EXPECT_EQ(action.state, scau::coupling::core::SystemMassRuntimeOperatorActionState::continue_run);
+    EXPECT_EQ(action.control_result.state, scau::coupling::core::SystemMassRuntimeControlState::continue_run);
+    EXPECT_FALSE(action.control_result.decision.should_abort);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.status, scau::coupling::core::SystemMassRuntimeGateStatus::running);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.action, scau::coupling::core::SystemMassGateAction::continue_run);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.status, scau::coupling::core::SystemMassConservationStatus::conserved);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.residual, 0.0);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass, 41.0);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass, 41.0);
+    EXPECT_EQ(action.control_result.decision.handling_state, scau::coupling::core::SystemMassRuntimeAbortHandlingState::continue_run);
+}
+
+TEST(CouplingCoreState, RuntimeOperatorActionAgainstSnapshotRequestsAbortWhenMassDrifted) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 40.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.snapshot();
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 0.0, .unmet_volume = 4.0});
+    state.replay_pending();
+    const auto decision = state.decide_system_mass_runtime_control_against_snapshot(baseline, kHWet);
+    const auto result = scau::coupling::core::consume_system_mass_runtime_control_decision(decision);
+
+    const auto action = scau::coupling::core::make_system_mass_runtime_operator_action(result);
+
+    EXPECT_EQ(action.state, scau::coupling::core::SystemMassRuntimeOperatorActionState::abort_requested);
+    EXPECT_EQ(action.control_result.state, scau::coupling::core::SystemMassRuntimeControlState::abort);
+    EXPECT_TRUE(action.control_result.decision.should_abort);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.status, scau::coupling::core::SystemMassRuntimeGateStatus::abort);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.action, scau::coupling::core::SystemMassGateAction::abort_run);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.status, scau::coupling::core::SystemMassConservationStatus::drifted);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.residual, 4.0);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass, 41.0);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass, 45.0);
+    EXPECT_EQ(action.control_result.decision.handling_state, scau::coupling::core::SystemMassRuntimeAbortHandlingState::abort);
+}
+
+TEST(CouplingCoreState, RuntimeOperatorActionAgainstReferenceMatchesAuditChainWhenConserved) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 40.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.compute_system_mass(kHWet);
+
+    const auto audit = state.audit_system_mass_against_reference(baseline, kHWet);
+    const auto decision = state.decide_system_mass_runtime_control_against_reference(baseline, kHWet);
+    const auto result = scau::coupling::core::consume_system_mass_runtime_control_decision(decision);
+    const auto action = scau::coupling::core::make_system_mass_runtime_operator_action(result);
+    const auto via_audit = scau::coupling::core::make_system_mass_runtime_operator_action(
+        scau::coupling::core::consume_system_mass_runtime_control_decision(
+            scau::coupling::core::make_system_mass_runtime_control_decision(
+                scau::coupling::core::make_system_mass_runtime_gate_outcome(
+                    scau::coupling::core::decide_system_mass_gate_action(
+                        scau::coupling::core::make_system_mass_conservation_diagnostic(audit))))));
+
+    EXPECT_EQ(action.state, via_audit.state);
+    EXPECT_EQ(action.control_result.state, via_audit.control_result.state);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.status, via_audit.control_result.decision.gate_outcome.status);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.action, via_audit.control_result.decision.gate_outcome.decision.action);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.status, via_audit.control_result.decision.gate_outcome.decision.diagnostic.status);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.residual, via_audit.control_result.decision.gate_outcome.decision.diagnostic.residual);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass, via_audit.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass, via_audit.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass);
+    EXPECT_EQ(action.control_result.decision.handling_state, via_audit.control_result.decision.handling_state);
+    EXPECT_EQ(action.control_result.decision.should_abort, via_audit.control_result.decision.should_abort);
+    EXPECT_EQ(action.state, scau::coupling::core::SystemMassRuntimeOperatorActionState::continue_run);
+}
+
+TEST(CouplingCoreState, RuntimeOperatorActionAgainstReferenceMatchesAuditChainWhenDrifted) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 40.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto baseline = state.compute_system_mass(kHWet);
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 0.0, .unmet_volume = 4.0});
+    state.replay_pending();
+
+    const auto audit = state.audit_system_mass_against_reference(baseline, kHWet);
+    const auto decision = state.decide_system_mass_runtime_control_against_reference(baseline, kHWet);
+    const auto result = scau::coupling::core::consume_system_mass_runtime_control_decision(decision);
+    const auto action = scau::coupling::core::make_system_mass_runtime_operator_action(result);
+    const auto via_audit = scau::coupling::core::make_system_mass_runtime_operator_action(
+        scau::coupling::core::consume_system_mass_runtime_control_decision(
+            scau::coupling::core::make_system_mass_runtime_control_decision(
+                scau::coupling::core::make_system_mass_runtime_gate_outcome(
+                    scau::coupling::core::decide_system_mass_gate_action(
+                        scau::coupling::core::make_system_mass_conservation_diagnostic(audit))))));
+
+    EXPECT_EQ(action.state, via_audit.state);
+    EXPECT_EQ(action.control_result.state, via_audit.control_result.state);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.status, via_audit.control_result.decision.gate_outcome.status);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.action, via_audit.control_result.decision.gate_outcome.decision.action);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.status, via_audit.control_result.decision.gate_outcome.decision.diagnostic.status);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.residual, via_audit.control_result.decision.gate_outcome.decision.diagnostic.residual);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass, via_audit.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass, via_audit.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass);
+    EXPECT_EQ(action.control_result.decision.handling_state, via_audit.control_result.decision.handling_state);
+    EXPECT_EQ(action.control_result.decision.should_abort, via_audit.control_result.decision.should_abort);
+    EXPECT_EQ(action.state, scau::coupling::core::SystemMassRuntimeOperatorActionState::abort_requested);
+}
+
+TEST(CouplingCoreState, RuntimeOperatorActionAgainstSnapshotMatchesAuditChainWhenConserved) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 40.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto snap = state.snapshot();
+
+    const auto audit = state.audit_system_mass_against_snapshot(snap, kHWet);
+    const auto decision = state.decide_system_mass_runtime_control_against_snapshot(snap, kHWet);
+    const auto result = scau::coupling::core::consume_system_mass_runtime_control_decision(decision);
+    const auto action = scau::coupling::core::make_system_mass_runtime_operator_action(result);
+    const auto via_audit = scau::coupling::core::make_system_mass_runtime_operator_action(
+        scau::coupling::core::consume_system_mass_runtime_control_decision(
+            scau::coupling::core::make_system_mass_runtime_control_decision(
+                scau::coupling::core::make_system_mass_runtime_gate_outcome(
+                    scau::coupling::core::decide_system_mass_gate_action(
+                        scau::coupling::core::make_system_mass_conservation_diagnostic(audit))))));
+
+    EXPECT_EQ(action.state, via_audit.state);
+    EXPECT_EQ(action.control_result.state, via_audit.control_result.state);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.status, via_audit.control_result.decision.gate_outcome.status);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.action, via_audit.control_result.decision.gate_outcome.decision.action);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.status, via_audit.control_result.decision.gate_outcome.decision.diagnostic.status);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.residual, via_audit.control_result.decision.gate_outcome.decision.diagnostic.residual);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass, via_audit.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass, via_audit.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass);
+    EXPECT_EQ(action.control_result.decision.handling_state, via_audit.control_result.decision.handling_state);
+    EXPECT_EQ(action.control_result.decision.should_abort, via_audit.control_result.decision.should_abort);
+    EXPECT_EQ(action.state, scau::coupling::core::SystemMassRuntimeOperatorActionState::continue_run);
+}
+
+TEST(CouplingCoreState, RuntimeOperatorActionAgainstSnapshotMatchesAuditChainWhenDrifted) {
+    constexpr double kHWet = 1.0e-4;
+    scau::coupling::core::CouplingState state{{{
+        .volume = 40.0,
+        .mass_deficit_account = {.volume = 1.0},
+        .phi_t = 0.4,
+        .h = 2.0,
+        .area = 50.0,
+    }}};
+
+    const auto snap = state.snapshot();
+    state.enqueue_event({.exchange_cell_index = 0U, .volume_delta = 0.0, .unmet_volume = 4.0});
+    state.replay_pending();
+
+    const auto audit = state.audit_system_mass_against_snapshot(snap, kHWet);
+    const auto decision = state.decide_system_mass_runtime_control_against_snapshot(snap, kHWet);
+    const auto result = scau::coupling::core::consume_system_mass_runtime_control_decision(decision);
+    const auto action = scau::coupling::core::make_system_mass_runtime_operator_action(result);
+    const auto via_audit = scau::coupling::core::make_system_mass_runtime_operator_action(
+        scau::coupling::core::consume_system_mass_runtime_control_decision(
+            scau::coupling::core::make_system_mass_runtime_control_decision(
+                scau::coupling::core::make_system_mass_runtime_gate_outcome(
+                    scau::coupling::core::decide_system_mass_gate_action(
+                        scau::coupling::core::make_system_mass_conservation_diagnostic(audit))))));
+
+    EXPECT_EQ(action.state, via_audit.state);
+    EXPECT_EQ(action.control_result.state, via_audit.control_result.state);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.status, via_audit.control_result.decision.gate_outcome.status);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.action, via_audit.control_result.decision.gate_outcome.decision.action);
+    EXPECT_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.status, via_audit.control_result.decision.gate_outcome.decision.diagnostic.status);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.residual, via_audit.control_result.decision.gate_outcome.decision.diagnostic.residual);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass, via_audit.control_result.decision.gate_outcome.decision.diagnostic.baseline_total_mass);
+    EXPECT_DOUBLE_EQ(action.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass, via_audit.control_result.decision.gate_outcome.decision.diagnostic.current_total_mass);
+    EXPECT_EQ(action.control_result.decision.handling_state, via_audit.control_result.decision.handling_state);
+    EXPECT_EQ(action.control_result.decision.should_abort, via_audit.control_result.decision.should_abort);
+    EXPECT_EQ(action.state, scau::coupling::core::SystemMassRuntimeOperatorActionState::abort_requested);
 }
