@@ -10,6 +10,7 @@ add_subdirectory(swmm_single_pipe_surcharge)
 add_subdirectory(snapshot_replay_mass_deficit)
 add_subdirectory(runoff_urban_block)
 add_subdirectory(roof_swmm_transfer)
+add_subdirectory(dual_engine_shared_cell)
 
 add_test(
     NAME test_goldensuite_manifest
