@@ -124,5 +124,14 @@
     "reference_path": "tests/golden/reference/tolerances.md",
     "ci_gate": true,
     "status": "implemented"
+  },
+  {
+    "test_id": "G15",
+    "name": "dual_engine_shared_cell_real_swmm",
+    "test_path": "tests/golden/dual_engine_shared_cell_real_swmm/",
+    "applicable_phase": "Phase 2+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": false,
+    "status": "implemented"
   }
 ]
