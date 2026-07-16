@@ -78,9 +78,15 @@ TEST(SwmmRoofDrainageAcceptanceAdapter, SurchargedNodeRejectsWithoutWriting) {
     EXPECT_NEAR(engine.get_node_lateral_inflow(0), 0.0, 1.0e-12);
 }
 
-TEST(SwmmRoofDrainageAcceptanceAdapter, OutOfRangeNodeRejectsFailClosed) {
+// ASSERTION MIGRATION (confluence 2026-07-16): the unified map-based
+// MockSwmmEngine has no node-count bound, so "out-of-range node id" cannot
+// be expressed on the mock anymore. The real-engine out-of-range coverage
+// lives in test_coupling_roof_swmm_real (target node 99 -> fail-closed
+// reject). This test keeps the same adapter contract - an engine that
+// throws SwmmEngineError while vouching for the node yields a fail-closed
+// InvalidTargetNode rejection with no write - via an uninitialized engine.
+TEST(SwmmRoofDrainageAcceptanceAdapter, EngineErrorOnNodeQueryRejectsFailClosed) {
     MockSwmmEngine engine;
-    engine.initialize("mock.inp");
     SwmmRoofDrainageAcceptanceAdapter adapter(engine, 1.0);
 
     const auto accepted = adapter(RoofDrainageIntent{.source_cell_index = 0, .target_swmm_node_index = 3, .requested_volume = 0.5, .source_roof_area = 1.0});
@@ -88,7 +94,9 @@ TEST(SwmmRoofDrainageAcceptanceAdapter, OutOfRangeNodeRejectsFailClosed) {
     EXPECT_NEAR(accepted.accepted_volume, 0.0, 1.0e-12);
     EXPECT_NEAR(accepted.rejected_volume, 0.5, 1.0e-12);
     EXPECT_EQ(accepted.rejection_reason, RoofDrainageRejectionReason::InvalidTargetNode);
-    EXPECT_NEAR(engine.get_node_lateral_inflow(0), 0.0, 1.0e-12);
+
+    engine.initialize("mock.inp");
+    EXPECT_NEAR(engine.get_node_lateral_inflow(3), 0.0, 1.0e-12);
 }
 
 TEST(SwmmRoofDrainageAcceptanceAdapter, InvalidRequestedVolumeRejectsFailClosed) {
