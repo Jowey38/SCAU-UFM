@@ -7,14 +7,14 @@ Severity: `MATCH` | `MATCH_WITH_NOTE` | `GAP_MITIGABLE` | `GAP_BLOCKING` | `TBD`
 | §7.3-§7.4 assumption | Real API | Severity | Notes |
 |---|---|---|---|
 | Open with config file | `int initialize(const char *config_file)` | MATCH | |
-| Step with caller-supplied dt | `int update(double dt)` | MATCH_WITH_NOTE | spike-spec §6.3 risk: verify engine actually respects caller dt (no silent internal multi-step) |
+| Step with caller-supplied dt | `int update(double dt)` | MATCH | 2026-07-19 release run: 100 x `update(60)` produced exact 60 s increments; max absolute error 0 |
 | Read state by name | `void get_var(const char *name, void **ptr)` | MATCH_WITH_NOTE | main-graph adapter treats the returned pointer as engine-owned double storage; spike must still lock down lifetime rules across `set_var` / `update` |
 | Write state by name | `void set_var(const char *name, const void *ptr)` | MATCH_WITH_NOTE | main-graph adapter supports scalar/location-0 writes only until real shape inventory and `set_var_slice` evidence exist |
 | Save state mid-run | NOT IN BMI 1.0 | GAP_BLOCKING | investigate D-Flow FM non-BMI hot-start path before claiming replay/rollback parity |
 | Multi-instance in process | NOT POSSIBLE | GAP_BLOCKING | free-function API implies single global state; main-graph adapter enforces one initialized `DFlowFMEngine` per process |
 | RTC / weir / gate state read | NOT IN BMI 1.0 base | GAP_MITIGABLE | likely available via extra D-Flow FM-specific headers outside BMI; spike must locate (search under `src/engines_gpl/dflowfm/packages/dflowfm_kernel/`) |
-| Variable enumeration | `get_var_count`, `get_var_name(i, char*)` | MATCH | useful for §7.5 `RiverExchangePoint` field discovery |
-| Variable shape / rank / type | `get_var_shape`, `get_var_rank`, `get_var_type` | MATCH | dims up to 6 (`MAXDIMS`); type returned as type-name string |
+| Variable enumeration | `get_var_count`, `get_var_name(i, char*)` | MATCH | 195 variables captured; `s1` water level and `q1` discharge confirmed |
+| Variable shape / rank / type | `get_var_shape`, `get_var_rank`, `get_var_type` | GAP_MITIGABLE | rank/type work for 195 variables; release DLL access-violates in `get_var_shape` for some rank>1 variables (`bodsed` first observed). Host queries shape only for rank<=1 |
 | Logging | `set_logger(BMILogger)` | MATCH | function-pointer callback; install before `initialize` |
 | Time accessors | `get_start_time` / `get_end_time` / `get_current_time` / `get_time_step` | MATCH | all out-parameter doubles |
 | Finalize | `int finalize()` | MATCH | |

@@ -1,9 +1,11 @@
 # D-Flow FM BMI 1.0 spike report
 
-**Status:** Runtime-readiness boundary exists in the main graph, but the real
-external D-Flow FM kernel/case run is still blocked. G11
-`dflowfm_river_steady` must remain `pending` and `ci_gate:false` until a
-replayable 100-step run from `spikes/dflowfm/cases/` is recorded here.
+**Status:** Real D-Flow FM release runtime and a local 1D companion case were
+executed successfully on 2026-07-19. The read-only 100-step trace completed
+with `last_time=6000`, `expected_last_time=6000`, `max_dt_abs_error=0`, and
+`time_trace_valid=true`. G11 remains `pending` / `ci_gate:false` only because a
+validated boundary/lateral write mapping is not yet established and the local
+Deltares Flow1D companion files are not redistributable project fixtures.
 
 ## §3.1 Lifecycle
 
@@ -12,8 +14,10 @@ fails closed when the library is missing, when initialization receives an empty
 `.mdu` path, or when a second initialized instance would own the process-global
 BMI state.
 
-Real-kernel evidence: TBD. The spike host has not yet been executed against a
-provided Delft3D/D-Flow FM build and model case.
+Real-kernel evidence: release `dflowfm.dll` loaded with its installed runtime
+dependencies; `initialize("Flow1D.mdu")` returned 0, constructed 186 1D flow
+nodes / 190 links, wrote initial output, and `finalize()` returned 0. The local
+case includes `Flow1D_net.nc`, `IniCondition.ini`, and `initialfields.ini`.
 
 ## §3.2 Time advance
 
@@ -21,14 +25,11 @@ Main-graph readiness: `DFlowFMEngine::update(dt_dfm)` validates finite positive
 `dt_dfm`, calls BMI `update(double)`, and refreshes `get_current_time` after a
 successful step.
 
-Real-kernel evidence: TBD. A G11 spike must verify that `update(dt)` honors the
-caller-supplied step and must record `get_current_time` over 100 steps. The
-spike host now supports `--steps`, `--dt`, and `--trace-out <file>` so that the
-step trace can be archived directly instead of copied from terminal output. The
-trace summary records completed steps, requested steps, last time, expected last
-time, and maximum observed `dt` absolute error. A non-zero `update()` or
-`finalize()` return now makes the host exit non-zero, so a scripted spike run can
-reject partial traces.
+Real-kernel evidence: `single_reach.trace.txt` records 100 calls to
+`update(60)` and `get_current_time`; every observed increment is exactly 60 s.
+Summary: `completed_steps=100`, `requested_steps=100`, `last_time=6000`,
+`expected_last_time=6000`, `max_dt_abs_error=0`, `time_trace_valid=true`.
+Stage `s1[0]` remained finite through the run and ended at 9.938400.
 
 ## §3.3 State read / write
 
@@ -36,13 +37,14 @@ Main-graph readiness: `DFlowFMEngine` resolves BMI `get_var`/`set_var` at
 runtime. Reads treat `get_var` as an engine-owned double buffer and index by
 `location_id`; writes currently support scalar/location-0 `set_var` only.
 
-Real-kernel evidence: TBD. Before G11 can become an executable runtime Golden,
-the spike must enumerate real variable names, shapes, units, and the correct
-lateral-discharge/stage variables, and record them in
-`evidence/var_inventory.md`. The spike host now emits a markdown inventory table
-for this purpose; a future real-runtime pass should paste that output into the
-inventory file and then annotate roles/notes. Non-scalar writes require
-`set_var_slice` evidence before use.
+Real-kernel evidence: 195 variables captured in
+`var_inventory.captured.md`. Confirmed rank-1 state names include `s1`
+(water level, shape 186), `hs` (depth, shape 186), and `q1` / `q1_main`
+(discharge, shape 190). The likely lateral candidate `laterals` is rank 2;
+write use remains blocked until its shape/index contract and `set_var_slice`
+semantics are verified. The runtime also exposes two ABI limitations: no
+`get_var_units` symbol, and `get_var_shape` access-violates for some rank>1
+variables (first reproduced on `bodsed`).
 
 ## §3.4 Hot-start / state save
 
@@ -84,5 +86,5 @@ runtime library and `.mdu` case are available.
 - [ ] §4 six must-document items answered
 - [ ] `interface_gap_matrix.md` statuses finalised (no `TBD` left)
 - [ ] each `GAP_BLOCKING` has concrete §7 redesign proposal
-- [ ] host binary runs 100 steps clean from `cases/`
+- [x] host binary runs 100 read-only steps clean from the local `cases/single_reach/` companion set
 - [ ] `abi_gotchas.md` covers all 6 categories

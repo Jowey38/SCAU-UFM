@@ -30,3 +30,11 @@ Thumbs.db
 # See superpowers/specs/2026-05-25-m28-vendor-source-layout-isolation-design.md.
 /Delft3D-main/
 /Stormwater-Management-Model-develop/
+
+# Local D-Flow FM runtime case assets (Deltares AGPL test data; never commit).
+# Copied locally from Delft3D-main test_data for G11 spike runs only.
+spikes/dflowfm/cases/single_reach/
+
+# Local D-Flow FM runtime assets (large binaries / Deltares test companions).
+# Paths are documented in configs/third_party/dflowfm/local-runtime.env.example.
+configs/third_party/dflowfm/local_runtime/
