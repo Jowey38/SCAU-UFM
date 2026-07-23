@@ -6,9 +6,21 @@
 namespace scau::coupling::river {
 namespace {
 
+bool is_compound_lateral_discharge(const std::string& var_name) {
+    constexpr const char* kPrefix = "laterals/";
+    constexpr const char* kSuffix = "/water_discharge";
+    if (!var_name.starts_with(kPrefix) || !var_name.ends_with(kSuffix)) {
+        return false;
+    }
+    const std::size_t id_begin = std::char_traits<char>::length(kPrefix);
+    const std::size_t id_length = var_name.size() - id_begin - std::char_traits<char>::length(kSuffix);
+    return id_length > 0U && var_name.find('/', id_begin) == id_begin + id_length;
+}
+
 bool is_supported_dflowfm_variable(const std::string& var_name) {
     return var_name == "water_level" || var_name == "discharge" ||
-        var_name == "lateral_discharge" || var_name == "gate_opening";
+        var_name == "lateral_discharge" || var_name == "gate_opening" ||
+        is_compound_lateral_discharge(var_name);
 }
 
 bool is_supported_exchange_type(const std::string& exchange_type) {
@@ -73,6 +85,9 @@ double MockDFlowFMEngine::get_value(const std::string& var_name, int location_id
     if (!is_supported_dflowfm_variable(var_name)) {
         throw DFlowFMEngineError("unsupported D-Flow FM variable");
     }
+    if (is_compound_lateral_discharge(var_name) && location_id != 0) {
+        throw DFlowFMEngineError("compound D-Flow FM lateral variable requires location 0");
+    }
     const auto iter = values_.find(ValueKey{.var_name = var_name, .location_id = location_id});
     if (iter == values_.end()) {
         return 0.0;
@@ -89,6 +104,9 @@ void MockDFlowFMEngine::set_value(const std::string& var_name, int location_id, 
     }
     if (!is_supported_dflowfm_variable(var_name)) {
         throw DFlowFMEngineError("unsupported D-Flow FM variable");
+    }
+    if (is_compound_lateral_discharge(var_name) && location_id != 0) {
+        throw DFlowFMEngineError("compound D-Flow FM lateral variable requires location 0");
     }
     if (!std::isfinite(value)) {
         throw DFlowFMEngineError("D-Flow FM value must be finite");

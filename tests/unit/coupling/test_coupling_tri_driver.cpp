@@ -14,6 +14,7 @@ namespace {
 
 using scau::coupling::core::CouplingState;
 using scau::coupling::core::SharedExchangeEngine;
+using scau::coupling::driver::DFlowFMLateralIdMapping;
 using scau::coupling::driver::DrainageRiverLink;
 using scau::coupling::driver::SurfaceDrainageLink;
 using scau::coupling::driver::SurfaceRiverLink;
@@ -36,6 +37,56 @@ CouplingState make_state() {
 }
 
 }  // namespace
+
+TEST(CouplingTriDriver, MapsCanonicalRiverEndpointToNativeCompoundLateral) {
+    auto state = make_state();
+    MockSwmmEngine swmm;
+    MockDFlowFMEngine dflowfm;
+    swmm.initialize("mock.inp");
+    dflowfm.initialize("mock.mdu");
+
+    TriCouplingStepConfig config{
+        .surface_river = {{.cell_index = 0U, .location_id = 5, .q_request = 2.0}},
+        .river_lateral_ids = {{.location_id = 5, .native_lateral_id = "lat1"}},
+        .step_engines = false,
+    };
+
+    const auto report = advance_tri_coupling_step(state, swmm, dflowfm, config, kDtSub);
+
+    ASSERT_EQ(report.surface_decisions.size(), 1U);
+    EXPECT_EQ(report.surface_decisions[0].endpoint.node_id, 5U);
+    EXPECT_DOUBLE_EQ(dflowfm.get_value("laterals/lat1/water_discharge", 0), 2.0);
+    EXPECT_DOUBLE_EQ(dflowfm.get_value("lateral_discharge", 5), 0.0);
+}
+
+TEST(CouplingTriDriver, RejectsMalformedOrDuplicateNativeLateralMappings) {
+    auto state = make_state();
+    MockSwmmEngine swmm;
+    MockDFlowFMEngine dflowfm;
+    swmm.initialize("mock.inp");
+    dflowfm.initialize("mock.mdu");
+
+    for (const std::string& invalid : {std::string{}, std::string{"lat/1"}}) {
+        TriCouplingStepConfig config{
+            .river_lateral_ids = {{.location_id = 5, .native_lateral_id = invalid}},
+            .step_engines = false,
+        };
+        EXPECT_THROW(
+            static_cast<void>(advance_tri_coupling_step(state, swmm, dflowfm, config, kDtSub)),
+            std::invalid_argument);
+    }
+
+    TriCouplingStepConfig duplicate{
+        .river_lateral_ids = {
+            DFlowFMLateralIdMapping{.location_id = 5, .native_lateral_id = "lat1"},
+            DFlowFMLateralIdMapping{.location_id = 5, .native_lateral_id = "lat2"},
+        },
+        .step_engines = false,
+    };
+    EXPECT_THROW(
+        static_cast<void>(advance_tri_coupling_step(state, swmm, dflowfm, duplicate, kDtSub)),
+        std::invalid_argument);
+}
 
 TEST(CouplingTriDriver, SharedCellArbitrationFeedsBothEngines) {
     auto state = make_state();
