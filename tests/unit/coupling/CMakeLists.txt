@@ -494,3 +494,8 @@ target_link_libraries(test_coupling_tri_driver
         GTest::gtest_main
 )
 add_test(NAME test_coupling_tri_driver COMMAND test_coupling_tri_driver)
+
+add_executable(test_coupling_dflowfm_checkpoint test_coupling_dflowfm_checkpoint.cpp)
+target_link_libraries(test_coupling_dflowfm_checkpoint
+    PRIVATE scau::coupling_driver scau::warnings GTest::gtest_main)
+add_test(NAME test_coupling_dflowfm_checkpoint COMMAND test_coupling_dflowfm_checkpoint)
