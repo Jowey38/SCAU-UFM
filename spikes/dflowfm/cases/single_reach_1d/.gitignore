@@ -1,0 +1,4 @@
+DFM_OUTPUT_*/
+*.cache
+*.dia
+*.log

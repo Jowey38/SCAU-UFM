@@ -1,0 +1,48 @@
+[model]
+Program = D-Flow FM
+MDUFormatVersion = 1.09
+AutoStart = 0
+
+[geometry]
+NetFile = single_reach_net.nc
+Uniformwidth1D = 5.0
+Uniformheight1D = 3.0
+WaterLevIni = 1.0
+BedlevUni = 0.0
+BedlevType = 3
+
+[numerics]
+CFLMax = 0.7
+TimeStepType = 2
+AdvecType = 0
+Icgsolver = 4
+
+[physics]
+UnifFrictType = 1
+UnifFrictCoef1D = 0.03
+Ag = 9.81
+Salinity = 0
+Temperature = 0
+
+[time]
+RefDate = 20260723
+Tunit = S
+TStart = 0.0
+TStop = 6000.0
+DtUser = 60.0
+DtMax = 60.0
+DtInit = 60.0
+
+[restart]
+RestartFile =
+RestartDateTime =
+
+[external forcing]
+ExtForceFileNew = single_reach.ext
+
+[output]
+OutputDir = DFM_OUTPUT_single_reach
+MapFormat = 4
+MapInterval = 600. 0. 6000.
+HisInterval = 600. 0. 6000.
+RstInterval = 600. 0. 6000.
