@@ -38,3 +38,10 @@ spikes/dflowfm/cases/single_reach/
 # Local D-Flow FM runtime assets (large binaries / Deltares test companions).
 # Paths are documented in configs/third_party/dflowfm/local-runtime.env.example.
 configs/third_party/dflowfm/local_runtime/
+
+# D-Flow FM runtime-generated case outputs.
+spikes/dflowfm/cases/**/DFM_OUTPUT_*/
+spikes/dflowfm/cases/**/*.cache
+
+# Local Deltares-derived lateral case companions; tracked recipe only.
+spikes/dflowfm/cases/single_reach_lateral/
