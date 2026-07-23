@@ -1,52 +1,52 @@
 # D-Flow FM BMI 1.0 variable inventory
 
-Status: template only. Fill this file from a real `get_var_count` /
-`get_var_name` / `get_var_type` / `get_var_rank` / `get_var_shape` spike run.
+Status: real runtime captured on 2026-07-19 from the release build at
+`Delft3D-main/install_fm-suite_release/bin/dflowfm.dll` using the local
+`Flow1D.mdu` companion set. Full 195-variable machine capture:
+`var_inventory.captured.md`.
 
-## Purpose
+## Runtime identity and capture
 
-This inventory is the authoritative place to record the real BMI variable names
-exposed by the target D-Flow FM build used for G11 `dflowfm_river_steady`.
+- `DFLOWFM_SOURCE_DIR`: `H:/githubcode/SCAU-UFM/Delft3D-main`
+- release DLL: `install_fm-suite_release/bin/dflowfm.dll`
+- debug DLL: `install_fm-suite/bin/dflowfm.dll`
+- case: `spikes/dflowfm/cases/single_reach/Flow1D.mdu` with
+  `Flow1D_net.nc`, `IniCondition.ini`, and `initialfields.ini`
+- variable count: **195**
+- BMI header/version: 1.0
+- units: unavailable through BMI 1.0 (there is no `get_var_units` symbol)
 
-It should answer the G11 questions that fake/mock coverage cannot answer:
+## G11 required highlights
 
-- which variable names map to water level, discharge, and lateral discharge;
-- whether the variables are scalar or array-valued;
-- their type strings, ranks, shapes, and units;
-- whether write paths need `set_var` or `set_var_slice`.
+| index | runtime name | type | rank | shape | role | conclusion |
+|---|---|---|---|---|---|---|
+| 90 | `s1` | double | 1 | 186 | water level / stage read | confirmed; used for the successful 100-step trace |
+| 91 | `s1max` | double | 1 | 186 | maximum water level read | confirmed metadata |
+| 97 | `hs` | double | 1 | 186 | water depth read | confirmed metadata |
+| 112 | `q1` | double | 1 | 190 | link discharge read | confirmed metadata |
+| 113 | `q1_main` | double | 1 | 190 | main discharge read | confirmed metadata |
+| 182 | `laterals` | type string empty | 2 | unavailable | lateral exchange candidate | `get_var_shape` crashes in this runtime for some rank>1 variables; do not write until `set_var_slice` evidence exists |
 
-## Capture instructions
+## ABI findings
 
-The spike host now prints a markdown inventory table directly from
-`get_var_count` / `get_var_name` / `get_var_type` / `get_var_rank` /
-`get_var_shape` / `get_var_units`. During a real runtime pass, either copy that
-stdout table or use `--inventory-out <file>` and paste the generated file into
-this document, then fill the `read/write role` and `notes` columns. Treat a
-non-zero host exit as an incomplete inventory capture; pair the inventory with a
-trace summary from the same run when promoting G11 evidence.
+1. `get_var_count`, `get_var_name`, `get_var_type`, and `get_var_rank` work for
+   the complete 195-variable inventory.
+2. `get_var_shape` works for rank 0/1 variables but the release DLL raises an
+   access violation for some rank>1 variables (first reproduced on `bodsed`,
+   index 5, rank 2). The spike host now records high-rank shapes as unavailable
+   rather than invoking the crashing ABI path.
+3. BMI 1.0 does not export `get_var_units`; the inventory records
+   `N/A (BMI 1.0)` instead of assuming units.
+4. Project placeholder variable names `water_level`, `stage_at_section`, and
+   `boundary_discharge` are not the real names for this build/case. Configure
+   stage reads as `s1`; discharge reads as `q1`/`q1_main` as appropriate.
+5. A safe lateral write variable has not yet been established. `laterals` is
+   rank 2 and requires shape/index semantics plus `set_var_slice` evidence.
 
-For each exported variable observed during the real spike run, record:
+## G11 consequence
 
-| index | name | type | rank | shape | units | read/write role | notes |
-|---|---|---|---|---|---|---|---|
-| 0 | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-
-## Required highlights for G11
-
-At minimum, identify and document the actual runtime names for:
-
-- water level / stage;
-- discharge / flow;
-- lateral discharge;
-- any weir / gate / structure variables needed by the `reach_with_weir` case.
-
-See also `evidence/runbook.md` for the recommended host command line and output
-artifact set.
-
-## Follow-on usage
-
-- `spike_report.md` should summarize the conclusions from this inventory.
-- `interface_gap_matrix.md` should downgrade `TBD` / `MATCH_WITH_NOTE` entries
-  only after this file has real data.
-- `DFlowFMEngine` should not widen its public assumptions until the relevant
-  runtime names and shapes have been captured here.
+The real runtime now satisfies lifecycle, enumeration, rank-1 stage read, and
+100-step time-advance evidence. Full bidirectional G11 promotion remains
+blocked only on a validated lateral/boundary write mapping and a repository-
+authored redistributable single-reach case (the current Flow1D companions are
+local Deltares test assets and remain gitignored).

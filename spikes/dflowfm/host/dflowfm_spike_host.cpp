@@ -1,6 +1,6 @@
 // D-Flow FM BMI 1.0 spike host.
 //
-// Purpose: exercise the real BMI C API against the spike-spec §3 / §6
+// Purpose: exercise the real BMI C API against spike-spec sections 3 and 6.
 //   assumptions. NOT a coupling implementation. Aligned to the actual BMI
 //   signatures verified in
 //   Delft3D-main/src/engines_gpl/dimr/packages/dimr_lib/include/bmi.h.
@@ -8,7 +8,7 @@
 // Gaps already visible from header inspection (see
 //   spikes/dflowfm/evidence/interface_gap_matrix.md):
 //   D1: no instance handle; API is process-global free C functions.
-//   D2: update(double dt) takes external dt — must verify engine respects it.
+//   D2: update(double dt) takes external dt; verify the engine respects it.
 //   D3: set_var/get_var use string-named variables; caller buffer for set,
 //       engine-owned pointer for get (caller does NOT free).
 //   D4: no save_state in BMI 1.0; investigate engine-specific extension.
@@ -39,6 +39,8 @@ struct SpikeOptions {
     const char *stage_var{kStageVar};
     const char *inventory_out_path{nullptr};
     const char *trace_out_path{nullptr};
+    bool inventory_only{false};
+    bool skip_boundary_write{false};
 };
 
 void BMI_CALLCONV spike_logger(Level level, const char *msg) {
@@ -111,6 +113,14 @@ bool parse_options(int argc, char **argv, SpikeOptions *options) {
             options->trace_out_path = argv[++i];
             continue;
         }
+        if (arg == "--inventory-only") {
+            options->inventory_only = true;
+            continue;
+        }
+        if (arg == "--skip-boundary-write") {
+            options->skip_boundary_write = true;
+            continue;
+        }
         return false;
     }
     return true;
@@ -124,7 +134,8 @@ int main(int argc, char **argv) {
         std::fprintf(stderr,
                      "usage: %s <config.mdu> [--steps N] [--dt seconds] "
                      "[--boundary-var name] [--stage-var name] "
-                     "[--inventory-out file] [--trace-out file]\n",
+                     "[--inventory-out file] [--trace-out file] [--inventory-only] "
+                     "[--skip-boundary-write]\n",
                      argv[0]);
         return 2;
     }
@@ -174,24 +185,35 @@ int main(int argc, char **argv) {
     for (int i = 0; i < var_count; ++i) {
         std::array<char, MAXSTRINGLEN> name{};
         std::array<char, MAXSTRINGLEN> type{};
-        std::array<char, MAXSTRINGLEN> units{};
         std::array<int, MAXDIMS> shape{};
         int rank = 0;
         get_var_name(i, name.data());
         get_var_type(name.data(), type.data());
         get_var_rank(name.data(), &rank);
-        get_var_shape(name.data(), shape.data());
-        get_var_units(name.data(), units.data());
+        // The 2026-07-19 D-Flow FM release DLL crashes in get_var_shape for
+        // some rank>1 variables (first observed: bodsed, rank 2). Query shape
+        // only for scalar/vector variables so inventory capture stays robust;
+        // record high-rank shape as unavailable pending an upstream ABI fix.
+        if (rank <= 1) {
+            get_var_shape(name.data(), shape.data());
+        }
+        // BMI 1.0 exposes no get_var_units symbol. Preserve the inventory
+        // column explicitly as unavailable rather than calling a non-ABI API.
+        constexpr const char *units = "N/A (BMI 1.0)";
 
         std::string shape_text;
-        for (int dim = 0; dim < rank; ++dim) {
-            if (!shape_text.empty()) {
-                shape_text += " x ";
+        if (rank > 1) {
+            shape_text = "unavailable (runtime get_var_shape crash)";
+        } else {
+            for (int dim = 0; dim < rank; ++dim) {
+                if (!shape_text.empty()) {
+                    shape_text += " x ";
+                }
+                shape_text += std::to_string(shape[dim]);
             }
-            shape_text += std::to_string(shape[dim]);
-        }
-        if (shape_text.empty()) {
-            shape_text = "scalar";
+            if (shape_text.empty()) {
+                shape_text = "scalar";
+            }
         }
 
         std::printf("| %d | %s | %s | %d | %s | %s | TBD | captured by spike host |\n",
@@ -200,7 +222,7 @@ int main(int argc, char **argv) {
                     type.data(),
                     rank,
                     shape_text.c_str(),
-                    units.data());
+                    units);
         if (inventory_out != nullptr) {
             std::fprintf(inventory_out,
                          "| %d | %s | %s | %d | %s | %s | TBD | captured by spike host |\n",
@@ -209,8 +231,19 @@ int main(int argc, char **argv) {
                          type.data(),
                          rank,
                          shape_text.c_str(),
-                         units.data());
+                         units);
         }
+    }
+
+    if (options.inventory_only) {
+        const int finalize_rc = finalize();
+        if (inventory_out != nullptr) {
+            std::fclose(inventory_out);
+        }
+        if (trace_out != nullptr) {
+            std::fclose(trace_out);
+        }
+        return finalize_rc == 0 ? 0 : 1;
     }
 
     double t0 = 0.0;
@@ -242,8 +275,10 @@ int main(int argc, char **argv) {
     bool time_trace_valid = true;
     for (int step = 0; step < options.steps; ++step) {
         const double q_inject = 1.5;  // SI m^3/s
-        // GAP D3: caller provides pointer to caller-owned buffer.
-        set_var(options.boundary_discharge_var, static_cast<const void *>(&q_inject));
+        if (!options.skip_boundary_write) {
+            // GAP D3: caller provides pointer to caller-owned buffer.
+            set_var(options.boundary_discharge_var, static_cast<const void *>(&q_inject));
+        }
 
         rc = update(options.dt_seconds);
         if (rc != 0) {
