@@ -22,6 +22,7 @@ REQUIRED = {
     "G12": ("dual_engine_shared_cell", "implemented", False),
     "G13": ("runoff_urban_block", "implemented", True),
     "G14": ("roof_swmm_transfer", "implemented", True),
+    "G15": ("dual_engine_shared_cell_real_swmm", "implemented", False),
 }
 
 
