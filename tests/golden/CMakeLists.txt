@@ -18,3 +18,5 @@ add_test(
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/suite_manifest/check_manifest.py
 )
 set_tests_properties(test_goldensuite_manifest PROPERTIES LABELS "golden;manifest")
+
+add_subdirectory(dflowfm_river_steady)
