@@ -1,5 +1,6 @@
 add_library(scau_coupling_driver
     src/coupling_state_endpoint_provider.cpp
+    src/dflowfm_checkpoint.cpp
     src/roof_exchange_gate.cpp
     src/roof_swmm_step_driver.cpp
     src/tri_coupling.cpp
