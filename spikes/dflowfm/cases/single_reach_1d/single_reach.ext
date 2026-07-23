@@ -1,0 +1,10 @@
+[General]
+fileVersion = 2.02
+fileType = extForce
+
+[Lateral]
+id = lat1
+locationType = 1d
+branchId = branch_main
+chainage = 500.0
+discharge = 0.0
