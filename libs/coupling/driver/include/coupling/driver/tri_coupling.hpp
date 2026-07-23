@@ -63,10 +63,18 @@ struct DrainageRiverLink {
     bool drive_outfall_stage{true};  // write river water level back to outfall
 };
 
+struct DFlowFMLateralIdMapping {
+    int location_id{0};
+    std::string native_lateral_id{};
+};
+
 struct TriCouplingStepConfig {
     std::vector<SurfaceDrainageLink> surface_drainage{};
     std::vector<SurfaceRiverLink> surface_river{};
     std::vector<DrainageRiverLink> drainage_river{};
+    // Case-owned mapping from CouplingLib's integer river endpoint to the
+    // D-Flow FM native compound lateral ID. Native IDs remain outside core DTOs.
+    std::vector<DFlowFMLateralIdMapping> river_lateral_ids{};
     // Project-standard D-Flow FM variable names (symbols reference). When the
     // real BMI kernel exposes different native names (e.g. "s1" for water
     // level), override these per configuration.

@@ -116,6 +116,23 @@ TEST(CouplingAdapterBoundaries, DFlowFMMockTypedFixturesProvideDeterministicStat
     EXPECT_DOUBLE_EQ(engine.get_value("gate_opening", 4), 0.75);
 }
 
+TEST(CouplingAdapterBoundaries, DFlowFMMockSupportsCompoundLateralPathsAtLocationZero) {
+    scau::coupling::river::MockDFlowFMEngine engine;
+    engine.initialize("mock.mdu");
+
+    engine.set_value("laterals/lat1/water_discharge", 0, 0.125);
+    EXPECT_DOUBLE_EQ(engine.get_value("laterals/lat1/water_discharge", 0), 0.125);
+    EXPECT_THROW(
+        engine.set_value("laterals/lat1/water_discharge", 1, 0.125),
+        scau::coupling::river::DFlowFMEngineError);
+    EXPECT_THROW(
+        engine.set_value("laterals//water_discharge", 0, 0.125),
+        scau::coupling::river::DFlowFMEngineError);
+    EXPECT_THROW(
+        engine.set_value("laterals/lat1/discharge", 0, 0.125),
+        scau::coupling::river::DFlowFMEngineError);
+}
+
 TEST(CouplingAdapterBoundaries, DFlowFMMockTypedFixturesReuseBoundaryValidation) {
     scau::coupling::river::MockDFlowFMEngine engine;
     engine.initialize("mock.mdu");

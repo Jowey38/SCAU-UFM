@@ -11,6 +11,26 @@ namespace {
 
 constexpr std::size_t kMaxNodeId = static_cast<std::size_t>(std::numeric_limits<int>::max());
 
+bool is_valid_native_lateral_id(const std::string& id) {
+    return !id.empty() && id.find('/') == std::string::npos;
+}
+
+std::map<int, std::string> make_lateral_id_map(const TriCouplingStepConfig& config) {
+    std::map<int, std::string> result;
+    for (const auto& mapping : config.river_lateral_ids) {
+        if (mapping.location_id < 0) {
+            throw std::invalid_argument("D-Flow FM lateral mapping location_id must be non-negative");
+        }
+        if (!is_valid_native_lateral_id(mapping.native_lateral_id)) {
+            throw std::invalid_argument("D-Flow FM native lateral ID must be non-empty and contain no slash");
+        }
+        if (!result.emplace(mapping.location_id, mapping.native_lateral_id).second) {
+            throw std::invalid_argument("D-Flow FM lateral mapping location_id must be unique");
+        }
+    }
+    return result;
+}
+
 void validate_config(
     const TriCouplingStepConfig& config,
     double dt_sub,
@@ -24,6 +44,7 @@ void validate_config(
     if (config.river_water_level_variable.empty()) {
         throw std::invalid_argument("river_water_level_variable must not be empty");
     }
+    static_cast<void>(make_lateral_id_map(config));
 
     std::map<int, int> drainage_node_use;
     for (const auto& link : config.surface_drainage) {
@@ -119,6 +140,8 @@ TriCouplingStepReport advance_tri_coupling_step(
     double dt_sub,
     double h_wet) {
     validate_config(config, dt_sub, state.cells().size());
+
+    const auto native_lateral_ids = make_lateral_id_map(config);
 
     TriCouplingStepReport report{};
     report.surface_mass_before = state.compute_system_mass(h_wet);
@@ -225,7 +248,14 @@ TriCouplingStepReport advance_tri_coupling_step(
         swmm.set_node_lateral_inflow(node_id, q_total);
     }
     for (const auto& [location_id, q_total] : river_lateral_discharge) {
-        dflowfm.set_value(config.river_lateral_discharge_variable, location_id, q_total);
+        const auto native = native_lateral_ids.find(location_id);
+        if (native == native_lateral_ids.end()) {
+            dflowfm.set_value(config.river_lateral_discharge_variable, location_id, q_total);
+        } else {
+            const std::string variable =
+                "laterals/" + native->second + "/water_discharge";
+            dflowfm.set_value(variable, 0, q_total);
+        }
     }
     for (const auto& link : config.drainage_river) {
         if (link.drive_outfall_stage) {
