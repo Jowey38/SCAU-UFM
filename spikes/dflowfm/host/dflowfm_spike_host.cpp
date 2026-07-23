@@ -41,6 +41,7 @@ struct SpikeOptions {
     const char *trace_out_path{nullptr};
     bool inventory_only{false};
     bool skip_boundary_write{false};
+    const char *verify_lateral_id{nullptr};
 };
 
 void BMI_CALLCONV spike_logger(Level level, const char *msg) {
@@ -121,6 +122,10 @@ bool parse_options(int argc, char **argv, SpikeOptions *options) {
             options->skip_boundary_write = true;
             continue;
         }
+        if (arg == "--verify-lateral-id" && i + 1 < argc) {
+            options->verify_lateral_id = argv[++i];
+            continue;
+        }
         return false;
     }
     return true;
@@ -135,7 +140,7 @@ int main(int argc, char **argv) {
                      "usage: %s <config.mdu> [--steps N] [--dt seconds] "
                      "[--boundary-var name] [--stage-var name] "
                      "[--inventory-out file] [--trace-out file] [--inventory-only] "
-                     "[--skip-boundary-write]\n",
+                     "[--skip-boundary-write] [--verify-lateral-id id]\n",
                      argv[0]);
         return 2;
     }
@@ -233,6 +238,40 @@ int main(int argc, char **argv) {
                          shape_text.c_str(),
                          units);
         }
+    }
+
+    if (options.verify_lateral_id != nullptr) {
+        const std::string lateral_var =
+            std::string("laterals/") + options.verify_lateral_id + "/water_discharge";
+        void *before_ptr = nullptr;
+        get_var(lateral_var.c_str(), &before_ptr);
+        if (before_ptr == nullptr) {
+            std::fprintf(stderr, "[spike] lateral verification read failed: %s\n", lateral_var.c_str());
+            finalize();
+            return 1;
+        }
+        const double before = *static_cast<const double *>(before_ptr);
+        constexpr double probe = 0.125;
+        set_var(lateral_var.c_str(), static_cast<const void *>(&probe));
+        void *probe_ptr = nullptr;
+        get_var(lateral_var.c_str(), &probe_ptr);
+        const bool probe_valid = probe_ptr != nullptr &&
+            std::isfinite(*static_cast<const double *>(probe_ptr)) &&
+            *static_cast<const double *>(probe_ptr) == probe;
+        set_var(lateral_var.c_str(), static_cast<const void *>(&before));
+        void *restored_ptr = nullptr;
+        get_var(lateral_var.c_str(), &restored_ptr);
+        const bool restore_valid = restored_ptr != nullptr &&
+            std::isfinite(*static_cast<const double *>(restored_ptr)) &&
+            *static_cast<const double *>(restored_ptr) == before;
+        if (!probe_valid || !restore_valid) {
+            std::fprintf(stderr, "[spike] lateral write/restore verification failed: %s\n", lateral_var.c_str());
+            finalize();
+            return 1;
+        }
+        std::printf(
+            "[spike] lateral_write_restore_valid=true variable=%s before=%.12g probe=%.12g restored=%.12g\n",
+            lateral_var.c_str(), before, probe, *static_cast<const double *>(restored_ptr));
     }
 
     if (options.inventory_only) {

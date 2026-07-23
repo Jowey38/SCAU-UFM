@@ -3,9 +3,11 @@
 **Status:** Real D-Flow FM release runtime and a local 1D companion case were
 executed successfully on 2026-07-19. The read-only 100-step trace completed
 with `last_time=6000`, `expected_last_time=6000`, `max_dt_abs_error=0`, and
-`time_trace_valid=true`. G11 remains `pending` / `ci_gate:false` only because a
-validated boundary/lateral write mapping is not yet established and the local
-Deltares Flow1D companion files are not redistributable project fixtures.
+`time_trace_valid=true`. A follow-up real-runtime pass also validated compound
+lateral write/read/restore through `laterals/lat1/water_discharge` and another
+100 exact steps. G11 remains `pending` / `ci_gate:false` because the local
+Deltares Flow1D companion files are not redistributable project fixtures and
+BMI 1.0 has no hot-start/save-state path for replay evidence.
 
 ## §3.1 Lifecycle
 
@@ -40,9 +42,11 @@ runtime. Reads treat `get_var` as an engine-owned double buffer and index by
 Real-kernel evidence: 195 variables captured in
 `var_inventory.captured.md`. Confirmed rank-1 state names include `s1`
 (water level, shape 186), `hs` (depth, shape 186), and `q1` / `q1_main`
-(discharge, shape 190). The likely lateral candidate `laterals` is rank 2;
-write use remains blocked until its shape/index contract and `set_var_slice`
-semantics are verified. The runtime also exposes two ABI limitations: no
+(discharge, shape 190). `laterals` is confirmed as a compound object:
+`get_var_shape("laterals")` returns `[1,1]` for the derived one-lateral case,
+and `laterals/lat1/water_discharge` supports double write/read/restore through
+`set_var` (0 -> 0.125 -> 0). Top-level `set_var_slice("laterals", ...)` is not
+the applicable API. The runtime also exposes two ABI limitations: no
 `get_var_units` symbol, and `get_var_shape` access-violates for some rank>1
 variables (first reproduced on `bodsed`).
 

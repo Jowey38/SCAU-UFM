@@ -45,7 +45,31 @@ Once the runtime and companion files are stable, the same command shape can be
 reused for `reach_with_weir.mdu`.
 
 If the real BMI variable names differ, override `--boundary-var` and
-`--stage-var` instead of recompiling the host.
+`--stage-var` instead of recompiling the host. The verified release build uses
+`s1` for stage and `q1` / `q1_main` for discharge.
+
+For safe inventory capture when no writable boundary mapping is established:
+
+```bash
+dflowfm_spike_host.exe Flow1D.mdu --inventory-only \
+  --inventory-out spikes/dflowfm/evidence/var_inventory.captured.md
+```
+
+For the compound lateral ABI check, create the local case using
+`cases/README_single_reach_lateral.md`, then run:
+
+```bash
+dflowfm_spike_host.exe Flow1D.mdu \
+  --steps 100 --dt 60 \
+  --skip-boundary-write \
+  --stage-var s1 \
+  --verify-lateral-id lat1 \
+  --trace-out spikes/dflowfm/evidence/single_reach_lateral.trace.txt
+```
+
+`--verify-lateral-id` performs a write/read/restore check through
+`laterals/<id>/water_discharge` before stepping. It restores the original value
+and exits non-zero if either the probe write or restoration fails.
 
 ## Expected outputs
 

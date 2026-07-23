@@ -25,7 +25,7 @@ Status: real runtime captured on 2026-07-19 from the release build at
 | 97 | `hs` | double | 1 | 186 | water depth read | confirmed metadata |
 | 112 | `q1` | double | 1 | 190 | link discharge read | confirmed metadata |
 | 113 | `q1_main` | double | 1 | 190 | main discharge read | confirmed metadata |
-| 182 | `laterals` | type string empty | 2 | unavailable | lateral exchange candidate | `get_var_shape` crashes in this runtime for some rank>1 variables; do not write until `set_var_slice` evidence exists |
+| 182 | `laterals` | compound (field `water_discharge` is double) | 2 | `[1,1]` in the one-lateral case | lateral exchange write/read | confirmed through `laterals/lat1/water_discharge`; write 0.125, read back, restore 0, read back |
 
 ## ABI findings
 
@@ -40,13 +40,19 @@ Status: real runtime captured on 2026-07-19 from the release build at
 4. Project placeholder variable names `water_level`, `stage_at_section`, and
    `boundary_discharge` are not the real names for this build/case. Configure
    stage reads as `s1`; discharge reads as `q1`/`q1_main` as appropriate.
-5. A safe lateral write variable has not yet been established. `laterals` is
-   rank 2 and requires shape/index semantics plus `set_var_slice` evidence.
+5. `laterals` is a compound BMI object, not a normal rank-2 numeric array.
+   The safe write path is `set_var("laterals/<id>/water_discharge", ptr)`, not
+   `set_var_slice("laterals", ...)`. In a derived one-lateral case,
+   `get_var_shape("laterals")` returned `[1,1,0,0,0,0]`; writing 0.125 to
+   `laterals/lat1/water_discharge`, reading it back, restoring 0, and reading
+   the restored value all succeeded. The field is `double`, and 2D models use
+   one value per lateral (m3/s).
 
 ## G11 consequence
 
-The real runtime now satisfies lifecycle, enumeration, rank-1 stage read, and
-100-step time-advance evidence. Full bidirectional G11 promotion remains
-blocked only on a validated lateral/boundary write mapping and a repository-
-authored redistributable single-reach case (the current Flow1D companions are
-local Deltares test assets and remain gitignored).
+The real runtime now satisfies lifecycle, enumeration, rank-1 stage read,
+compound lateral write/read/restore, and 100-step time-advance evidence. Full
+G11 promotion remains blocked on a repository-authored redistributable
+single-reach case and the separately documented BMI 1.0 hot-start/replay gap;
+the current Flow1D companions are local Deltares test assets and remain
+untracked.
