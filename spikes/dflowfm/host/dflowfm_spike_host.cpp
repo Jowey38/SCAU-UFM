@@ -340,6 +340,10 @@ int main(int argc, char **argv) {
         if (dt_abs_error > max_dt_abs_error) {
             max_dt_abs_error = dt_abs_error;
         }
+        constexpr double kTimeStepTolerance = 1.0e-9;
+        if (dt_abs_error > kTimeStepTolerance) {
+            time_trace_valid = false;
+        }
         previous_time = t_now;
         last_time = t_now;
         ++completed_steps;
@@ -388,6 +392,9 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "[spike] finalize returned %d\n", finalize_rc);
     }
     rc = run_rc != 0 ? run_rc : finalize_rc;
+    if (!time_trace_valid && rc == 0) {
+        rc = 1;
+    }
     if (inventory_out != nullptr) {
         std::fclose(inventory_out);
     }
