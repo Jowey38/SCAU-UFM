@@ -133,5 +133,23 @@
     "reference_path": "tests/golden/reference/tolerances.md",
     "ci_gate": false,
     "status": "implemented"
+  },
+  {
+    "test_id": "G16",
+    "name": "dual_engine_shared_cell_real_both",
+    "test_path": "tests/golden/dual_engine_shared_cell_real_both/",
+    "applicable_phase": "Phase 2+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": false,
+    "status": "implemented"
+  },
+  {
+    "test_id": "G17",
+    "name": "tri_coupling_real_minimal",
+    "test_path": "tests/golden/tri_coupling_real_minimal/",
+    "applicable_phase": "Phase 2+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": false,
+    "status": "implemented"
   }
 ]
