@@ -3,6 +3,8 @@
 #include <filesystem>
 #include <string>
 
+#include "coupling/river/dflowfm_engine.hpp"
+
 namespace scau::coupling::driver {
 
 enum class DFlowFMCheckpointSource {
@@ -42,5 +44,13 @@ void validate_dflowfm_checkpoint(const DFlowFMCheckpoint& checkpoint);
 void write_dflowfm_restart_mdu(
     const DFlowFMCheckpoint& checkpoint,
     const std::filesystem::path& output_mdu);
+
+// Executes the native file-checkpoint recovery boundary on the concrete BMI
+// engine. Rollback remains orchestration-owned and is not added to the abstract
+// IDFlowFMEngine interface.
+void reload_dflowfm_from_checkpoint(
+    river::DFlowFMEngine& engine,
+    const DFlowFMCheckpoint& checkpoint,
+    const std::filesystem::path& generated_mdu);
 
 }  // namespace scau::coupling::driver
