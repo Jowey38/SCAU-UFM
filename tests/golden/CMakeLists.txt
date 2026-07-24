@@ -24,3 +24,5 @@ add_subdirectory(dflowfm_river_steady)
 add_subdirectory(dual_engine_shared_cell_real_both)
 
 add_subdirectory(tri_coupling_real_minimal)
+
+add_subdirectory(dflowfm_checkpoint_reload)

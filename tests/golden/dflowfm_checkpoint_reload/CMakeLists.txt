@@ -1,0 +1,5 @@
+add_executable(test_dflowfm_checkpoint_reload test_dflowfm_checkpoint_reload.cpp)
+target_link_libraries(test_dflowfm_checkpoint_reload
+    PRIVATE scau::coupling_driver scau::coupling_river scau::warnings GTest::gtest_main)
+add_test(NAME test_dflowfm_checkpoint_reload COMMAND test_dflowfm_checkpoint_reload)
+set_tests_properties(test_dflowfm_checkpoint_reload PROPERTIES LABELS "candidate_non_gating")

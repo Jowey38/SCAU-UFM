@@ -152,4 +152,19 @@ void write_dflowfm_restart_mdu(
     }
 }
 
+void reload_dflowfm_from_checkpoint(
+    river::DFlowFMEngine& engine,
+    const DFlowFMCheckpoint& checkpoint,
+    const std::filesystem::path& generated_mdu) {
+    validate_dflowfm_checkpoint(checkpoint);
+    engine.finalize();
+    write_dflowfm_restart_mdu(checkpoint, generated_mdu);
+    engine.initialize(generated_mdu.string());
+    constexpr double kTimeTolerance = 1.0e-9;
+    if (std::abs(engine.current_time() - checkpoint.logical_time) > kTimeTolerance) {
+        engine.finalize();
+        throw std::runtime_error("D-Flow FM checkpoint reload time does not match logical checkpoint time");
+    }
+}
+
 }  // namespace scau::coupling::driver
