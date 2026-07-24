@@ -53,6 +53,10 @@ SCAU_BMI_EXPORT void get_current_time(double* time) {
     *time = g_current_time;
 }
 
+SCAU_BMI_EXPORT void get_time_step(double* dt) {
+    *dt = 30.0;
+}
+
 SCAU_BMI_EXPORT void get_var(const char* name, void** ptr) {
     if (std::strcmp(name, "water_level") == 0) {
         *ptr = g_water_level;

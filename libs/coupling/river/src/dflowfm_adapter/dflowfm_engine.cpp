@@ -141,6 +141,7 @@ struct DFlowFMEngine::BmiApi {
     using FinalizeFn = int (*)();
     using GetStartTimeFn = void (*)(double*);
     using GetCurrentTimeFn = void (*)(double*);
+    using GetTimeStepFn = void (*)(double*);
     using GetVarFn = void (*)(const char*, void**);
     using SetVarFn = void (*)(const char*, const void*);
     using GetVarCountFn = void (*)(int*);
@@ -151,6 +152,7 @@ struct DFlowFMEngine::BmiApi {
     FinalizeFn finalize{nullptr};
     GetStartTimeFn get_start_time{nullptr};
     GetCurrentTimeFn get_current_time{nullptr};
+    GetTimeStepFn get_time_step{nullptr};
     GetVarFn get_var{nullptr};
     SetVarFn set_var{nullptr};
     GetVarCountFn get_var_count{nullptr};
@@ -208,6 +210,21 @@ void DFlowFMEngine::update(double dt_dfm) {
     require_initialized();
     if (!std::isfinite(dt_dfm) || dt_dfm <= 0.0) {
         throw DFlowFMEngineError("dt_dfm must be finite and positive");
+    }
+    double engine_dt = 0.0;
+    api_->get_time_step(&engine_dt);
+    if (!std::isfinite(engine_dt) || engine_dt <= 0.0) {
+        throw DFlowFMEngineError(
+            "D-Flow FM reported an invalid internal time step",
+            "DFlowFM",
+            "dflowfm_invalid_time_step");
+    }
+    constexpr double kTimeStepTolerance = 1.0e-9;
+    if (std::abs(dt_dfm - engine_dt) > kTimeStepTolerance) {
+        throw DFlowFMEngineError(
+            "requested D-Flow FM dt does not match the engine time step",
+            "DFlowFM",
+            "dflowfm_time_step_mismatch");
     }
     const int rc = api_->update(dt_dfm);
     if (rc != 0) {
@@ -329,6 +346,7 @@ void DFlowFMEngine::load_library() {
         api->finalize = load_symbol<BmiApi::FinalizeFn>(library_handle_, "finalize");
         api->get_start_time = load_symbol<BmiApi::GetStartTimeFn>(library_handle_, "get_start_time");
         api->get_current_time = load_symbol<BmiApi::GetCurrentTimeFn>(library_handle_, "get_current_time");
+        api->get_time_step = load_symbol<BmiApi::GetTimeStepFn>(library_handle_, "get_time_step");
         api->get_var = load_symbol<BmiApi::GetVarFn>(library_handle_, "get_var");
         api->set_var = load_symbol<BmiApi::SetVarFn>(library_handle_, "set_var");
         api->get_var_count = load_symbol<BmiApi::GetVarCountFn>(library_handle_, "get_var_count");

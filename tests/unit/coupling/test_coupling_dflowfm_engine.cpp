@@ -104,6 +104,17 @@ TEST(CouplingDFlowFMEngine, FakeBmiRuntimeLoadsAndAdvancesLifecycle) {
     EXPECT_DOUBLE_EQ(engine.elapsed_time(), 0.0);
 }
 
+TEST(CouplingDFlowFMEngine, RejectsCallerDtMismatchBeforeMutatingEngine) {
+    scau::coupling::river::DFlowFMEngine engine{fake_library_path()};
+    engine.initialize("fake_case.mdu");
+
+    EXPECT_THROW(engine.update(6.0), scau::coupling::river::DFlowFMEngineError);
+    EXPECT_DOUBLE_EQ(engine.current_time(), 100.0);
+    EXPECT_DOUBLE_EQ(engine.elapsed_time(), 0.0);
+
+    engine.finalize();
+}
+
 TEST(CouplingDFlowFMEngine, FakeBmiRuntimeRejectsInvalidStateAccess) {
     scau::coupling::river::DFlowFMEngine engine{fake_library_path()};
     engine.initialize("fake_case.mdu");

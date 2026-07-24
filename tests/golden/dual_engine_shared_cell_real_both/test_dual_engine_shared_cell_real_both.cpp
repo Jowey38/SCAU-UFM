@@ -54,15 +54,15 @@ TEST(GoldenDualEngineSharedCellRealBoth, BothRealEnginesReceiveCoreArbitratedGra
     auto state = make_state();
     scau::coupling::driver::TriCouplingStepConfig config{
         .surface_drainage = {{.cell_index = 0U, .node_id = j1,
-                              .q_request = 4.0, .priority_weight = 1.0}},
+                              .q_request = 0.3, .priority_weight = 1.0}},
         .surface_river = {{.cell_index = 0U, .location_id = 5,
-                           .q_request = 4.0, .priority_weight = 2.0}},
+                           .q_request = 0.3, .priority_weight = 2.0}},
         .river_lateral_ids = {{.location_id = 5, .native_lateral_id = "lat1"}},
         .river_water_level_variable = "s1",
     };
 
     const auto report = scau::coupling::driver::advance_tri_coupling_step(
-        state, swmm, dflowfm, config, 4.0);
+        state, swmm, dflowfm, config, 60.0);
     ASSERT_EQ(report.surface_decisions.size(), 2U);
     const auto& drainage = decision_for(
         report.surface_decisions, scau::coupling::core::SharedExchangeEngine::drainage);
@@ -72,13 +72,13 @@ TEST(GoldenDualEngineSharedCellRealBoth, BothRealEnginesReceiveCoreArbitratedGra
     EXPECT_DOUBLE_EQ(drainage.allocated_limit.v_limit, 12.0);
     EXPECT_DOUBLE_EQ(river.allocated_limit.v_limit, 24.0);
     EXPECT_DOUBLE_EQ(drainage.exchange.v_granted, 12.0);
-    EXPECT_DOUBLE_EQ(river.exchange.v_granted, 16.0);
-    EXPECT_DOUBLE_EQ(drainage.exchange.v_unmet, 4.0);
+    EXPECT_DOUBLE_EQ(river.exchange.v_granted, 18.0);
+    EXPECT_DOUBLE_EQ(drainage.exchange.v_unmet, 6.0);
     EXPECT_DOUBLE_EQ(river.exchange.v_unmet, 0.0);
-    EXPECT_NEAR(swmm.get_node_lateral_inflow(j1), 3.0, 1.0e-6);
-    EXPECT_DOUBLE_EQ(dflowfm.get_value("laterals/lat1/water_discharge", 0), 4.0);
+    EXPECT_NEAR(swmm.get_node_lateral_inflow(j1), 0.2, 1.0e-6);
+    EXPECT_DOUBLE_EQ(dflowfm.get_value("laterals/lat1/water_discharge", 0), 0.3);
     EXPECT_TRUE(std::isfinite(dflowfm.get_value("s1", 0)));
-    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 12.0);
+    EXPECT_DOUBLE_EQ(state.cells()[0].volume, 10.0);
     EXPECT_NEAR(
         report.surface_mass_before.surface_mass - report.surface_mass_after.surface_mass,
         drainage.exchange.v_granted + river.exchange.v_granted,
