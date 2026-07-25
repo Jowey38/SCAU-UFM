@@ -128,6 +128,38 @@ jobs:
       - name: GoldenSuite gate
         run: ctest --preset ${{ matrix.preset }} -L golden --output-on-failure
 
+  # Real D-Flow FM phase gateway (G11/G16/G17/G18 + checkpoint reload).
+  # Requires a governed self-hosted runner that provides the licensed runtime:
+  #   - runner labels: [self-hosted, windows, dflowfm]
+  #   - machine env SCAU_DFLOWFM_LIBRARY -> real dflowfm.dll (deps beside it)
+  #   - VS2022 + VCPKG_ROOT available, short workspace path (MSVC MAX_PATH)
+  # The job stays skipped until the repository variable SCAU_DFLOWFM_RUNNER is
+  # set to 'enabled'; manifest ci_gate for these goldens is promoted only after
+  # this job runs green on master (stability protocol: represented-in-CI).
+  real-dflowfm-golden:
+    name: real-dflowfm-golden
+    if: ${{ vars.SCAU_DFLOWFM_RUNNER == 'enabled' }}
+    runs-on: [self-hosted, windows, dflowfm]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake --preset windows-msvc
+
+      - name: Build real golden targets
+        run: >
+          cmake --build --preset windows-msvc --target
+          test_dflowfm_river_steady
+          test_dflowfm_lateral_response
+          test_dual_engine_shared_cell_real_both
+          test_tri_coupling_real_minimal
+          test_dflowfm_checkpoint_reload
+
+      - name: Run real D-Flow FM phase gateway
+        shell: bash
+        run: tools/dflowfm/run_real_goldens.sh build/windows-msvc Debug
+
   goldensuite-manifest-check:
     name: manifest-completeness
     runs-on: ubuntu-22.04
