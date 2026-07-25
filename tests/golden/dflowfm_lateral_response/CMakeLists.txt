@@ -1,0 +1,5 @@
+add_executable(test_dflowfm_lateral_response test_dflowfm_lateral_response.cpp)
+target_link_libraries(test_dflowfm_lateral_response
+    PRIVATE scau::coupling_river scau::warnings GTest::gtest_main)
+add_test(NAME test_dflowfm_lateral_response COMMAND test_dflowfm_lateral_response)
+set_tests_properties(test_dflowfm_lateral_response PROPERTIES LABELS "candidate_non_gating")

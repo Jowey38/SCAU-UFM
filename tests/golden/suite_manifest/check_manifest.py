@@ -25,6 +25,7 @@ REQUIRED = {
     "G15": ("dual_engine_shared_cell_real_swmm", "implemented", False),
     "G16": ("dual_engine_shared_cell_real_both", "implemented", False),
     "G17": ("tri_coupling_real_minimal", "implemented", False),
+    "G18": ("dflowfm_lateral_response", "implemented", False),
 }
 
 

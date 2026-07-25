@@ -151,5 +151,14 @@
     "reference_path": "tests/golden/reference/tolerances.md",
     "ci_gate": false,
     "status": "implemented"
+  },
+  {
+    "test_id": "G18",
+    "name": "dflowfm_lateral_response",
+    "test_path": "tests/golden/dflowfm_lateral_response/",
+    "applicable_phase": "Phase 2+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": false,
+    "status": "implemented"
   }
 ]
