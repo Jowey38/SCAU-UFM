@@ -27,13 +27,25 @@ G17 `tri_coupling_real_minimal`, G18 `dflowfm_lateral_response`, and
 
 ## Runner prerequisites (mid-term)
 
-- Windows runner with VS2022, CMake, and `VCPKG_ROOT` configured.
-- Machine-level `SCAU_DFLOWFM_LIBRARY` pointing at the real `dflowfm.dll`
-  with its dependent runtime DLLs in the same directory.
+- Windows runner with VS2022 and CMake installed; labels
+  `[self-hosted, windows, dflowfm]`.
+- Repository variables (no machine env or service restart needed):
+  - `SCAU_DFLOWFM_RUNNER=enabled` activates the job;
+  - `SCAU_DFLOWFM_LIBRARY` -> real `dflowfm.dll` on the runner, with its
+    dependent runtime DLLs in the same directory;
+  - `SCAU_DFLOWFM_VCPKG_ROOT` -> a bootstrapped vcpkg checkout on the runner.
+- Job run steps use bash (Git Bash), so restrictive PowerShell execution
+  policies on the runner cannot break the gate.
 - Short workspace path (MSVC MAX_PATH; see the project short-build-root
   convention).
 - Private/internal PR execution only; do not expose the licensed runtime
   through a public runner.
+
+2026-07-25 activation note: the first live run failed before configure for
+two runner-environment reasons (PowerShell script execution disabled, and the
+workflow-level `VCPKG_ROOT` override shadowing the machine layout without a
+bootstrap step in this job). Both are fixed by the bash default shell and the
+repo-variable wiring above.
 
 ## ci_gate promotion criteria
 
