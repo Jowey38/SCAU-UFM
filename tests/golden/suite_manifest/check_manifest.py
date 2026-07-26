@@ -18,14 +18,14 @@ REQUIRED = {
     "G8": ("swmm_single_pipe_surcharge", "implemented", True),
     "G9": ("cpu_gpu_deterministic_match", "pending", False),
     "G10": ("snapshot_replay_mass_deficit", "implemented", False),
-    "G11": ("dflowfm_river_steady", "implemented", False),
+    "G11": ("dflowfm_river_steady", "implemented", True),
     "G12": ("dual_engine_shared_cell", "implemented", False),
     "G13": ("runoff_urban_block", "implemented", True),
     "G14": ("roof_swmm_transfer", "implemented", True),
     "G15": ("dual_engine_shared_cell_real_swmm", "implemented", False),
-    "G16": ("dual_engine_shared_cell_real_both", "implemented", False),
-    "G17": ("tri_coupling_real_minimal", "implemented", False),
-    "G18": ("dflowfm_lateral_response", "implemented", False),
+    "G16": ("dual_engine_shared_cell_real_both", "implemented", True),
+    "G17": ("tri_coupling_real_minimal", "implemented", True),
+    "G18": ("dflowfm_lateral_response", "implemented", True),
 }
 
 
