@@ -131,8 +131,10 @@ jobs:
   # Real D-Flow FM phase gateway (G11/G16/G17/G18 + checkpoint reload).
   # Requires a governed self-hosted runner that provides the licensed runtime:
   #   - runner labels: [self-hosted, windows, dflowfm]
-  #   - machine env SCAU_DFLOWFM_LIBRARY -> real dflowfm.dll (deps beside it)
-  #   - VS2022 + VCPKG_ROOT available, short workspace path (MSVC MAX_PATH)
+  #   - repo variable SCAU_DFLOWFM_LIBRARY -> real dflowfm.dll on the runner
+  #     (dependent runtime DLLs beside it)
+  #   - repo variable SCAU_DFLOWFM_VCPKG_ROOT -> bootstrapped vcpkg on the runner
+  #   - VS2022 + CMake installed, short workspace path (MSVC MAX_PATH)
   # The job stays skipped until the repository variable SCAU_DFLOWFM_RUNNER is
   # set to 'enabled'; manifest ci_gate for these goldens is promoted only after
   # this job runs green on master (stability protocol: represented-in-CI).
@@ -140,9 +142,21 @@ jobs:
     name: real-dflowfm-golden
     if: ${{ vars.SCAU_DFLOWFM_RUNNER == 'enabled' }}
     runs-on: [self-hosted, windows, dflowfm]
+    # Runner-provided paths come in as repository variables so the workflow
+    # never hard-codes machine layout and the runner service needs no
+    # machine-level env. bash avoids restrictive PowerShell script policies.
+    env:
+      VCPKG_ROOT: ${{ vars.SCAU_DFLOWFM_VCPKG_ROOT }}
+      SCAU_DFLOWFM_LIBRARY: ${{ vars.SCAU_DFLOWFM_LIBRARY }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Prepare vcpkg binary cache
+        run: mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
 
       - name: Configure
         run: cmake --preset windows-msvc
@@ -157,7 +171,6 @@ jobs:
           test_dflowfm_checkpoint_reload
 
       - name: Run real D-Flow FM phase gateway
-        shell: bash
         run: tools/dflowfm/run_real_goldens.sh build/windows-msvc Debug
 
   goldensuite-manifest-check:
