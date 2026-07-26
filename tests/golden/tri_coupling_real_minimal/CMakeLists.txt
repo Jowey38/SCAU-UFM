@@ -8,4 +8,4 @@ target_link_libraries(test_tri_coupling_real_minimal
 target_compile_definitions(test_tri_coupling_real_minimal
     PRIVATE SCAU_SWMM_TEST_CASE_DIR="${CMAKE_CURRENT_BINARY_DIR}/cases")
 add_test(NAME test_tri_coupling_real_minimal COMMAND test_tri_coupling_real_minimal)
-set_tests_properties(test_tri_coupling_real_minimal PROPERTIES LABELS "candidate_non_gating")
+set_tests_properties(test_tri_coupling_real_minimal PROPERTIES LABELS golden)

@@ -47,6 +47,16 @@ workflow-level `VCPKG_ROOT` override shadowing the machine layout without a
 bootstrap step in this job). Both are fixed by the bash default shell and the
 repo-variable wiring above.
 
+## Promotion executed (2026-07-26)
+
+The runner `SCAU-DFLOWFM-SERVER-01` is registered and the variable is enabled.
+After the runner-portability fixes, `real-dflowfm-golden` ran the full gateway
+live and `master` recorded three consecutive fully green runs including the
+real gate: `30182833482`, `30183147705`, `30183428672`. Per the criteria
+below, G11/G16/G17/G18 are promoted to `ci_gate:true` (manifest, checker
+REQUIRED tuples, and `LABELS golden`). Without the runtime env the tests
+remain explicit skips; the enforcing execution is the self-hosted gateway job.
+
 ## ci_gate promotion criteria
 
 Per the stability protocol, GoldenSuite entries may serve as merge/release

@@ -95,7 +95,7 @@
     "test_path": "tests/golden/dflowfm_river_steady/",
     "applicable_phase": "Phase 2+",
     "reference_path": "tests/golden/reference/tolerances.md",
-    "ci_gate": false,
+    "ci_gate": true,
     "status": "implemented"
   },
   {
@@ -140,7 +140,7 @@
     "test_path": "tests/golden/dual_engine_shared_cell_real_both/",
     "applicable_phase": "Phase 2+",
     "reference_path": "tests/golden/reference/tolerances.md",
-    "ci_gate": false,
+    "ci_gate": true,
     "status": "implemented"
   },
   {
@@ -149,7 +149,7 @@
     "test_path": "tests/golden/tri_coupling_real_minimal/",
     "applicable_phase": "Phase 2+",
     "reference_path": "tests/golden/reference/tolerances.md",
-    "ci_gate": false,
+    "ci_gate": true,
     "status": "implemented"
   },
   {
@@ -158,7 +158,7 @@
     "test_path": "tests/golden/dflowfm_lateral_response/",
     "applicable_phase": "Phase 2+",
     "reference_path": "tests/golden/reference/tolerances.md",
-    "ci_gate": false,
+    "ci_gate": true,
     "status": "implemented"
   }
 ]
