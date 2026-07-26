@@ -21,7 +21,9 @@ if [ $# -lt 1 ]; then
     exit 2
 fi
 
-BUILD_DIR=$1
+# Normalize to an absolute path: tests are executed with cwd at the case
+# directory, so a caller-relative build dir must be resolved up front.
+BUILD_DIR=$(cd "$1" && pwd)
 CONFIG=${2:-Debug}
 REPO_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 CASE_DIR="$REPO_ROOT/spikes/dflowfm/cases/single_reach_1d"
