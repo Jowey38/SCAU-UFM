@@ -24,6 +24,7 @@ enable_testing()
 
 add_subdirectory(libs/core)
 add_subdirectory(libs/mesh)
+add_subdirectory(libs/stcf)
 add_subdirectory(libs/surface2d)
 add_subdirectory(libs/coupling/core)
 add_subdirectory(libs/coupling/drainage)

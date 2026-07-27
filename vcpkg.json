@@ -5,6 +5,10 @@
     {
       "name": "gtest",
       "version>=": "1.14.0"
+    },
+    {
+      "name": "netcdf-c",
+      "default-features": false
     }
   ],
   "builtin-baseline": "99a97de2cb371449d4fb9dc970f2ac562d689ec2"
