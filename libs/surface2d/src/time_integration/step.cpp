@@ -114,6 +114,18 @@ CellState open_boundary_outside_state(const CellState& inside) {
     };
 }
 
+// WaterLevel boundary ghost state: prescribed stage over the inside cell's
+// bed (z_b = eta - h), inside velocity carried at the ghost depth. Equal
+// stages produce the same reconstructed pair as a lake at rest (zero flux).
+CellState water_level_outside_state(const CellState& inside, core::Real eta_bc) {
+    const core::Real z_b = inside.eta - inside.conserved.h;
+    const core::Real h_out = eta_bc > z_b ? eta_bc - z_b : 0.0;
+    return CellState{
+        .conserved = {.h = h_out, .hu = h_out * inside.u(), .hv = h_out * inside.v()},
+        .eta = z_b + h_out,
+    };
+}
+
 void accumulate_momentum_flux_residual(
     CellStepDiagnostics& sink,
     core::Real signed_integrated_flux_x,
@@ -189,6 +201,7 @@ StepDiagnostics run_flux_core(
     const GeometryCache& geometry) {
     auto diagnostics = base_diagnostics(mesh, state, config, boundary, geometry);
     diagnostics.edges.reserve(mesh.edges.size());
+    core::Real boundary_inflow_rate = 0.0;
     for (std::size_t edge_index = 0; edge_index < mesh.edges.size(); ++edge_index) {
         const auto& edge = mesh.edges[edge_index];
         const auto& adjacency = geometry.edge_cells[edge_index];
@@ -238,22 +251,34 @@ StepDiagnostics run_flux_core(
             continue;
         }
 
-        if (boundary.edges[edge_index] == BoundaryKind::Wall) {
+        const BoundaryKind boundary_kind = boundary.edges[edge_index];
+        if (boundary_kind == BoundaryKind::Wall || boundary_kind == BoundaryKind::DischargeInflow) {
             // Reflective wall (main-spec hard-block / wall boundary): zero mass
             // flux, but the inside cell's hydrostatic pressure pushes back so
             // the closed-polygon pressure sum of a boundary cell balances and a
             // lake at rest stays at rest. Uses the same phi_t-scaled WB pressure
             // form as the interior pairing so the balance is exact for uniform
             // fields (S_phi_t momentum coupling, scope A).
+            // DischargeInflow is a wall carrying a prescribed source-type mass
+            // flux q per unit length into the inside cell (zero boundary
+            // momentum), so with q = 0 it is exactly the wall branch.
             const std::size_t inside_index = adjacency.inside();
             const core::Real h_inside = state.cells[inside_index].conserved.h;
             const core::Real wall_pressure = well_balanced_boundary_pressure(
                 dpm_fields.cells[inside_index].phi_t, h_inside, config.gravity);
+            const core::Real q_inflow = boundary_kind == BoundaryKind::DischargeInflow
+                ? boundary.discharge_at(edge_index)
+                : 0.0;
             diagnostics.edges.push_back(EdgeStepDiagnostics{
+                .mass_flux = adjacency.left.has_value() ? -q_inflow : q_inflow,
                 .momentum_flux_n = wall_pressure,
                 .momentum_x = wall_pressure * edge.normal.x,
                 .momentum_y = wall_pressure * edge.normal.y,
             });
+            if (q_inflow != 0.0) {
+                diagnostics.cells[inside_index].mass_residual += q_inflow * edge.length;
+                boundary_inflow_rate += q_inflow * edge.length;
+            }
 
             const core::Real momentum_x = wall_pressure * edge.normal.x * edge.length;
             const core::Real momentum_y = wall_pressure * edge.normal.y * edge.length;
@@ -265,10 +290,19 @@ StepDiagnostics run_flux_core(
 
         const std::size_t inside_index = adjacency.inside();
         const auto& inside = state.cells[inside_index];
-        const auto outside = open_boundary_outside_state(inside);
+        const auto outside = boundary_kind == BoundaryKind::WaterLevel
+            ? water_level_outside_state(inside, boundary.water_level[edge_index])
+            : open_boundary_outside_state(inside);
+        // Place the inside/ghost states on the sides the stored edge normal
+        // actually references: the normal runs from the left toward the right
+        // cell, so when the inside cell is the edge's right cell the ghost
+        // state is the Riemann LEFT state. (For the symmetric Open copy the
+        // ordering is immaterial; for the asymmetric WaterLevel ghost it
+        // decides the flow direction.)
+        const bool inside_is_left = adjacency.left.has_value();
         const auto flux = hllc_normal_flux(
-            inside,
-            outside,
+            inside_is_left ? inside : outside,
+            inside_is_left ? outside : inside,
             dpm_fields.edges[edge_index],
             Normal2{.x = edge.normal.x, .y = edge.normal.y},
             config.h_min);
@@ -279,19 +313,58 @@ StepDiagnostics run_flux_core(
             .momentum_x = flux.momentum_x,
             .momentum_y = flux.momentum_y,
         };
-        diagnostics.edges.push_back(edge_diagnostics);
 
         const core::Real integrated_flux = edge_diagnostics.mass_flux * edge.length;
-        const core::Real signed_integrated_flux = adjacency.left.has_value() ? -integrated_flux : integrated_flux;
+        const core::Real signed_integrated_flux = inside_is_left ? -integrated_flux : integrated_flux;
         diagnostics.cells[inside_index].mass_residual += signed_integrated_flux;
 
-        const core::Real signed_momentum_x = adjacency.left.has_value() ? -flux.momentum_x * edge.length : flux.momentum_x * edge.length;
-        const core::Real signed_momentum_y = adjacency.left.has_value() ? -flux.momentum_y * edge.length : flux.momentum_y * edge.length;
+        const core::Real signed_momentum_x = inside_is_left ? -flux.momentum_x * edge.length : flux.momentum_x * edge.length;
+        const core::Real signed_momentum_y = inside_is_left ? -flux.momentum_y * edge.length : flux.momentum_y * edge.length;
         accumulate_momentum_flux_residual(diagnostics.cells[inside_index], signed_momentum_x, signed_momentum_y);
+
+        // WaterLevel edges assemble the same WB pressure/topo pairing as an
+        // internal edge against the ghost state (ghost phi_t = inside phi_t),
+        // so a boundary cell's closed-polygon pressure sum stays balanced and
+        // a matching prescribed stage keeps a lake at rest. Open edges keep
+        // their pre-existing semantics (no boundary pairing).
+        if (boundary_kind == BoundaryKind::WaterLevel) {
+            const bool assemble_wb_pairing = classify_edge(
+                dpm_fields.edges[edge_index].omega_edge,
+                dpm_fields.edges[edge_index].phi_e_n).wb_pairing_assembled;
+            if (assemble_wb_pairing) {
+                const auto& left_state = inside_is_left ? inside : outside;
+                const auto& right_state = inside_is_left ? outside : inside;
+                const auto pair = reconstruct_hydrostatic_pair(left_state, right_state);
+                const core::Real phi_t_inside = dpm_fields.cells[inside_index].phi_t;
+                const auto wb = well_balanced_edge_pairing(
+                    phi_t_inside,
+                    phi_t_inside,
+                    left_state.conserved.h,
+                    right_state.conserved.h,
+                    pair.left.conserved.h,
+                    pair.right.conserved.h,
+                    config.gravity);
+                edge_diagnostics.wb_pressure = wb.pressure_flux;
+                edge_diagnostics.s_topo = wb.s_topo_left;
+                if (inside_is_left) {
+                    accumulate_momentum_flux_residual(
+                        diagnostics.cells[inside_index],
+                        wb.left_normal * edge.normal.x * edge.length,
+                        wb.left_normal * edge.normal.y * edge.length);
+                } else {
+                    accumulate_momentum_flux_residual(
+                        diagnostics.cells[inside_index],
+                        -wb.right_normal * edge.normal.x * edge.length,
+                        -wb.right_normal * edge.normal.y * edge.length);
+                }
+            }
+        }
+        diagnostics.edges.push_back(edge_diagnostics);
     }
     if (diagnostics.rollback_required) {
         return diagnostics;
     }
+    diagnostics.boundary_inflow_volume = boundary_inflow_rate * config.dt;
     apply_depth_update(state, config, diagnostics.cells, geometry);
     apply_momentum_update(state, config, diagnostics.cells, geometry);
     return diagnostics;

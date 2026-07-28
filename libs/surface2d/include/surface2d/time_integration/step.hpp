@@ -73,6 +73,9 @@ struct StepDiagnostics {
     core::Real roof_overflow_to_surface_volume{0.0};
     bool missing_roof_overflow_target{false};
     core::Real exchange_volume{0.0};
+    // Plan volume (m^3) added through DischargeInflow boundary edges this
+    // step (sum of q * L * dt). Zero when the step rolls back.
+    core::Real boundary_inflow_volume{0.0};
     std::vector<CellStepDiagnostics> cells;
     std::vector<EdgeStepDiagnostics> edges;
 };
