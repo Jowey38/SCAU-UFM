@@ -9,6 +9,8 @@ namespace scau::surface2d {
 BoundaryConditions BoundaryConditions::for_mesh(const mesh::Mesh& mesh) {
     return BoundaryConditions{
         .edges = std::vector<BoundaryKind>(mesh.edges.size(), BoundaryKind::Wall),
+        .discharge_per_width = {},
+        .water_level = {},
     };
 }
 
