@@ -395,3 +395,12 @@ target_link_libraries(test_runoff_golden_urban_block
         GTest::gtest_main
 )
 add_test(NAME test_runoff_golden_urban_block COMMAND test_runoff_golden_urban_block)
+
+add_executable(test_stcf_bridge_assemble test_stcf_bridge_assemble.cpp)
+target_link_libraries(test_stcf_bridge_assemble
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_stcf_bridge_assemble COMMAND test_stcf_bridge_assemble)
