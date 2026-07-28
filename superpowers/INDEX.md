@@ -138,6 +138,9 @@
 | `superpowers/specs/2026-07-27-m255-stcf-min-slice-evidence.md` | M255 STCF 最小切片证据；`libs/stcf` schema（phi_t/Phi_c/manning_n/z_b/soil_type + omega_edge/phi_e_n/phi_et + Green-Ampt LUT）、§11.2 默认参数分级校验、写前导出门禁与读侧 fail-closed NetCDF I/O，逐位 round-trip 与篡改拒绝覆盖；123/123 全量测试。 |
 | `superpowers/specs/2026-07-28-m256-m257-g21-stcf-pipeline-evidence.md` | M256/M257/G21 Surface2D 数据通路证据；stcf_bridge 装配 seam（file-carried phi_e_n 为 5.3 规则一主装配）、DischargeInflow/WaterLevel 边界（含边界 ghost 左右侧修复与 WaterLevel WB 配对）、G21 `stcf_case_pipeline` Golden（文件承载变床+变 phi_t 静水 1e-12、入流体积审计精确、逐位 round-trip）登记为 ci_gate:true；126/126 全量测试。G19/G20 编号保留给 post-G18 耦合完成线。 |
 
+| `docs/superpowers/plans/2026-07-28-m259-dflowfm-vol1-volume-provider.md` | M259 D-Flow FM `vol1` volume provider 实施计划；将 M258 真实契约转为 rank-1 BMI 状态读取 + driver-owned compensated-sum 观测器，严格保持 river adapter 仅 lifecycle/state I/O。 |
+| `superpowers/specs/2026-07-28-m259-dflowfm-vol1-volume-provider-evidence.md` | M259 `vol1` provider 证据；生产 DFlowFMEngine type/rank/shape fail-closed 立即复制、driver `sum(vol1)` 观测、fake BMI 与真实 G11 100 步验证；D-Flow scope 可完整，但 SWMM 管段储量仍使三引擎报告保持 REVIEW_REQUIRED。 |
+
 ## 历史记录规则
 
 - 根目录历史 Markdown、会话导出、早期方案评审稿与对话记录只作为非规范性背景材料，不得覆盖上表规范性入口。

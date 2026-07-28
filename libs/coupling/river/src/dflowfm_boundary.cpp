@@ -58,6 +58,7 @@ void MockDFlowFMEngine::initialize(const std::string& mdu_path) {
     initialized_ = true;
     elapsed_time_ = 0.0;
     values_.clear();
+    rank1_double_values_.clear();
 }
 
 void MockDFlowFMEngine::update(double dt_dfm) {
@@ -73,6 +74,7 @@ void MockDFlowFMEngine::update(double dt_dfm) {
 void MockDFlowFMEngine::finalize() {
     initialized_ = false;
     values_.clear();
+    rank1_double_values_.clear();
 }
 
 double MockDFlowFMEngine::get_value(const std::string& var_name, int location_id) const {
@@ -91,6 +93,21 @@ double MockDFlowFMEngine::get_value(const std::string& var_name, int location_id
     const auto iter = values_.find(ValueKey{.var_name = var_name, .location_id = location_id});
     if (iter == values_.end()) {
         return 0.0;
+    }
+    return iter->second;
+}
+
+std::vector<double> MockDFlowFMEngine::get_rank1_double_values(
+    const std::string& var_name) const {
+    if (!initialized_) {
+        throw DFlowFMEngineError("D-Flow FM mock engine is not initialized");
+    }
+    const auto iter = rank1_double_values_.find(var_name);
+    if (iter == rank1_double_values_.end()) {
+        throw DFlowFMEngineError(
+            "D-Flow FM rank-1 double variable is unavailable: " + var_name,
+            "DFlowFM",
+            "dflowfm_variable_unavailable");
     }
     return iter->second;
 }
@@ -115,6 +132,18 @@ void MockDFlowFMEngine::set_value(const std::string& var_name, int location_id, 
         throw DFlowFMEngineError("gate_opening must be in [0, 1]");
     }
     values_[ValueKey{.var_name = var_name, .location_id = location_id}] = value;
+}
+
+void MockDFlowFMEngine::set_rank1_double_values_fixture(
+    const std::string& var_name,
+    std::vector<double> values) {
+    if (!initialized_) {
+        throw DFlowFMEngineError("D-Flow FM mock engine is not initialized");
+    }
+    if (var_name.empty() || values.empty()) {
+        throw DFlowFMEngineError("rank-1 fixture name and values must not be empty");
+    }
+    rank1_double_values_[var_name] = std::move(values);
 }
 
 void MockDFlowFMEngine::set_water_level_fixture(int location_id, double water_level) {

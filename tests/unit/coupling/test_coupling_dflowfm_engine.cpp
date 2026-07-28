@@ -47,6 +47,9 @@ TEST(CouplingDFlowFMEngine, InvalidUseFailsClosedWithoutRuntimeLibrary) {
     EXPECT_THROW(static_cast<void>(engine.variable_count()), scau::coupling::river::DFlowFMEngineError);
     EXPECT_THROW(static_cast<void>(engine.variable_names()), scau::coupling::river::DFlowFMEngineError);
     EXPECT_THROW(static_cast<void>(engine.get_value("water_level", 0)), scau::coupling::river::DFlowFMEngineError);
+    EXPECT_THROW(
+        static_cast<void>(engine.get_rank1_double_values("vol1")),
+        scau::coupling::river::DFlowFMEngineError);
     EXPECT_THROW(engine.set_value("lateral_discharge", 0, 1.0), scau::coupling::river::DFlowFMEngineError);
 
     EXPECT_NO_THROW(engine.finalize());
@@ -80,15 +83,22 @@ TEST(CouplingDFlowFMEngine, FakeBmiRuntimeLoadsAndAdvancesLifecycle) {
     EXPECT_TRUE(engine.initialized());
     EXPECT_DOUBLE_EQ(engine.current_time(), 100.0);
     EXPECT_DOUBLE_EQ(engine.elapsed_time(), 0.0);
-    EXPECT_EQ(engine.variable_count(), 2);
+    EXPECT_EQ(engine.variable_count(), 3);
 
     const std::vector<std::string> names = engine.variable_names();
-    ASSERT_EQ(names.size(), 2U);
+    ASSERT_EQ(names.size(), 3U);
     EXPECT_EQ(names[0], "water_level");
     EXPECT_EQ(names[1], "lateral_discharge");
+    EXPECT_EQ(names[2], "vol1");
 
     EXPECT_DOUBLE_EQ(engine.get_value("water_level", 0), 2.5);
     EXPECT_DOUBLE_EQ(engine.get_value("water_level", 1), 3.5);
+
+    const auto vol1 = engine.get_rank1_double_values("vol1");
+    ASSERT_EQ(vol1.size(), 3U);
+    EXPECT_DOUBLE_EQ(vol1[0], 10.0);
+    EXPECT_DOUBLE_EQ(vol1[1], 20.0);
+    EXPECT_DOUBLE_EQ(vol1[2], 30.0);
 
     engine.set_value("lateral_discharge", 0, 1.25);
     EXPECT_DOUBLE_EQ(engine.get_value("lateral_discharge", 0), 1.25);
@@ -121,6 +131,12 @@ TEST(CouplingDFlowFMEngine, FakeBmiRuntimeRejectsInvalidStateAccess) {
 
     EXPECT_THROW(static_cast<void>(engine.get_value("missing", 0)), scau::coupling::river::DFlowFMEngineError);
     EXPECT_THROW(static_cast<void>(engine.get_value("water_level", -1)), scau::coupling::river::DFlowFMEngineError);
+    EXPECT_THROW(
+        static_cast<void>(engine.get_rank1_double_values("missing")),
+        scau::coupling::river::DFlowFMEngineError);
+    EXPECT_THROW(
+        static_cast<void>(engine.get_rank1_double_values("lateral_discharge")),
+        scau::coupling::river::DFlowFMEngineError);
     EXPECT_THROW(engine.set_value("lateral_discharge", 1, 1.0), scau::coupling::river::DFlowFMEngineError);
     EXPECT_THROW(engine.set_value("lateral_discharge", 0, std::numeric_limits<double>::quiet_NaN()), scau::coupling::river::DFlowFMEngineError);
     EXPECT_THROW(engine.update(0.0), scau::coupling::river::DFlowFMEngineError);

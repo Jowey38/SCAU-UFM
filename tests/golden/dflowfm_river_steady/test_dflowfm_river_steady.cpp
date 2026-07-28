@@ -5,6 +5,7 @@
 
 #include <gtest/gtest.h>
 
+#include "coupling/driver/dflowfm_volume_provider.hpp"
 #include "coupling/driver/tri_coupling.hpp"
 #include "coupling/river/dflowfm_engine.hpp"
 
@@ -55,6 +56,11 @@ TEST(GoldenDFlowFMRiverSteady, RealAuthoredCaseAdvancesAndAcceptsMappedLateral) 
     ASSERT_GE(dflowfm.variable_count(), 1);
     const double initial_stage = dflowfm.get_value("s1", 0);
     ASSERT_TRUE(std::isfinite(initial_stage));
+    const auto initial_volume = scau::coupling::driver::observe_dflowfm_volume(dflowfm);
+    ASSERT_TRUE(initial_volume.scope_complete);
+    ASSERT_GT(initial_volume.sample_count, 0U);
+    ASSERT_TRUE(std::isfinite(initial_volume.volume));
+    ASSERT_GE(initial_volume.volume, 0.0);
 
     auto state = make_state();
     scau::coupling::driver::TriCouplingStepConfig config{
@@ -75,8 +81,14 @@ TEST(GoldenDFlowFMRiverSteady, RealAuthoredCaseAdvancesAndAcceptsMappedLateral) 
         EXPECT_DOUBLE_EQ(report.surface_mass_after.surface_mass, report.surface_mass_before.surface_mass);
         ASSERT_TRUE(std::isfinite(dflowfm.get_value("s1", 0)));
         ASSERT_TRUE(std::isfinite(dflowfm.get_value("q1", 0)));
+        const auto volume = scau::coupling::driver::observe_dflowfm_volume(dflowfm);
+        ASSERT_EQ(volume.sample_count, initial_volume.sample_count);
+        ASSERT_TRUE(std::isfinite(volume.volume));
+        ASSERT_GE(volume.volume, 0.0);
     }
 
+    const auto final_volume = scau::coupling::driver::observe_dflowfm_volume(dflowfm);
+    EXPECT_NEAR(final_volume.volume, initial_volume.volume, 1.0e-9);
     EXPECT_DOUBLE_EQ(dflowfm.elapsed_time(), 6000.0);
     EXPECT_DOUBLE_EQ(dflowfm.get_value("laterals/lat1/water_discharge", 0), 0.0);
     dflowfm.finalize();
