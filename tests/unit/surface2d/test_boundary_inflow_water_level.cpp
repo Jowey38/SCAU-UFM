@@ -29,17 +29,6 @@ std::size_t first_boundary_edge_index(const scau::mesh::Mesh& mesh) {
     throw std::invalid_argument("mesh must contain a boundary edge");
 }
 
-std::size_t edge_cell_index(const scau::mesh::Mesh& mesh, std::size_t edge_index) {
-    const auto& edge = mesh.edges[edge_index];
-    const auto& cell_id = edge.left_cell.has_value() ? *edge.left_cell : *edge.right_cell;
-    for (std::size_t index = 0; index < mesh.cells.size(); ++index) {
-        if (mesh.cells[index].id == cell_id) {
-            return index;
-        }
-    }
-    throw std::invalid_argument("mesh must contain boundary edge cell");
-}
-
 double total_water_volume(const scau::mesh::Mesh& mesh, const SurfaceState& state) {
     const auto geometry = GeometryCache::for_mesh(mesh);
     double total = 0.0;
