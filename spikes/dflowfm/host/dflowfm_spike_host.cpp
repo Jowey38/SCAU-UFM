@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <vector>
 
 extern "C" {
 #include "bmi.h"
@@ -42,6 +43,14 @@ struct SpikeOptions {
     bool inventory_only{false};
     bool skip_boundary_write{false};
     const char *verify_lateral_id{nullptr};
+    // Comma-separated list of rank-1 double variables to sum-probe after
+    // initialize and after every update (volume contract spike, M258).
+    std::vector<std::string> probe_sum_vars;
+    // When both set: write inject_lateral_q to
+    // laterals/<inject_lateral_id>/water_discharge before every update.
+    const char *inject_lateral_id{nullptr};
+    double inject_lateral_q{0.0};
+    bool inject_lateral{false};
 };
 
 void BMI_CALLCONV spike_logger(Level level, const char *msg) {
@@ -126,9 +135,141 @@ bool parse_options(int argc, char **argv, SpikeOptions *options) {
             options->verify_lateral_id = argv[++i];
             continue;
         }
+        if (arg == "--probe-sum-vars" && i + 1 < argc) {
+            const std::string list = argv[++i];
+            std::size_t start = 0;
+            while (start <= list.size()) {
+                const std::size_t comma = list.find(',', start);
+                const std::size_t end = comma == std::string::npos ? list.size() : comma;
+                if (end > start) {
+                    options->probe_sum_vars.emplace_back(list.substr(start, end - start));
+                }
+                if (comma == std::string::npos) {
+                    break;
+                }
+                start = comma + 1;
+            }
+            if (options->probe_sum_vars.empty()) {
+                return false;
+            }
+            continue;
+        }
+        if (arg == "--inject-lateral-id" && i + 1 < argc) {
+            options->inject_lateral_id = argv[++i];
+            continue;
+        }
+        if (arg == "--inject-lateral-q" && i + 1 < argc) {
+            if (!parse_double_arg(argv[++i], &options->inject_lateral_q)) {
+                return false;
+            }
+            continue;
+        }
+        return false;
+    }
+    options->inject_lateral =
+        options->inject_lateral_id != nullptr && options->inject_lateral_q > 0.0;
+    if (options->inject_lateral_id != nullptr && !options->inject_lateral) {
         return false;
     }
     return true;
+}
+
+// Copies one rank-1 double BMI variable out of engine memory immediately
+// (engine pointer is only valid until the next BMI call) and returns the
+// copy. Returns an empty vector when the variable is unusable for probing.
+std::vector<double> copy_rank1_double_var(const char *name) {
+    std::array<char, MAXSTRINGLEN> type{};
+    int rank = -1;
+    get_var_type(name, type.data());
+    get_var_rank(name, &rank);
+    if (rank != 1 || std::strcmp(type.data(), "double") != 0) {
+        std::fprintf(stderr,
+                     "[spike] probe var %s skipped: type=%s rank=%d (need rank-1 double)\n",
+                     name, type.data(), rank);
+        return {};
+    }
+    std::array<int, MAXDIMS> shape{};
+    get_var_shape(name, shape.data());
+    if (shape[0] <= 0) {
+        std::fprintf(stderr, "[spike] probe var %s skipped: shape[0]=%d\n", name, shape[0]);
+        return {};
+    }
+    void *engine_ptr = nullptr;
+    get_var(name, &engine_ptr);
+    if (engine_ptr == nullptr) {
+        std::fprintf(stderr, "[spike] probe var %s skipped: get_var returned null\n", name);
+        return {};
+    }
+    const double *values = static_cast<const double *>(engine_ptr);
+    return std::vector<double>(values, values + static_cast<std::size_t>(shape[0]));
+}
+
+// Probes every requested rank-1 double variable and emits
+// step,varname,sum,min,max,finite_count lines to stdout and the trace file.
+// step semantics: 0 = after initialize, k = after the k-th update call.
+// When both hs and ba are probed, also emits sum_hs_ba = sum(hs[i]*ba[i])
+// over the overlapping index range as a geometric cross-check.
+void probe_sum_vars(const SpikeOptions &options, int step, std::FILE *trace_out) {
+    std::vector<double> hs_copy;
+    std::vector<double> ba_copy;
+    for (const std::string &var : options.probe_sum_vars) {
+        const std::vector<double> values = copy_rank1_double_var(var.c_str());
+        if (values.empty()) {
+            std::printf("probe,%d,%s,unavailable\n", step, var.c_str());
+            if (trace_out != nullptr) {
+                std::fprintf(trace_out, "probe,%d,%s,unavailable\n", step, var.c_str());
+            }
+            continue;
+        }
+        double sum = 0.0;
+        double min_value = 0.0;
+        double max_value = 0.0;
+        std::size_t finite_count = 0;
+        for (const double value : values) {
+            if (!std::isfinite(value)) {
+                continue;
+            }
+            if (finite_count == 0) {
+                min_value = value;
+                max_value = value;
+            } else {
+                if (value < min_value) {
+                    min_value = value;
+                }
+                if (value > max_value) {
+                    max_value = value;
+                }
+            }
+            sum += value;
+            ++finite_count;
+        }
+        std::printf("probe,%d,%s,%.15g,%.15g,%.15g,%zu/%zu\n",
+                    step, var.c_str(), sum, min_value, max_value,
+                    finite_count, values.size());
+        if (trace_out != nullptr) {
+            std::fprintf(trace_out, "probe,%d,%s,%.15g,%.15g,%.15g,%zu/%zu\n",
+                         step, var.c_str(), sum, min_value, max_value,
+                         finite_count, values.size());
+        }
+        if (var == "hs") {
+            hs_copy = values;
+        } else if (var == "ba") {
+            ba_copy = values;
+        }
+    }
+    if (!hs_copy.empty() && !ba_copy.empty()) {
+        const std::size_t n = hs_copy.size() < ba_copy.size() ? hs_copy.size() : ba_copy.size();
+        double sum_hs_ba = 0.0;
+        for (std::size_t i = 0; i < n; ++i) {
+            if (std::isfinite(hs_copy[i]) && std::isfinite(ba_copy[i])) {
+                sum_hs_ba += hs_copy[i] * ba_copy[i];
+            }
+        }
+        std::printf("probe,%d,sum_hs_ba,%.15g\n", step, sum_hs_ba);
+        if (trace_out != nullptr) {
+            std::fprintf(trace_out, "probe,%d,sum_hs_ba,%.15g\n", step, sum_hs_ba);
+        }
+    }
 }
 
 }  // namespace
@@ -140,7 +281,9 @@ int main(int argc, char **argv) {
                      "usage: %s <config.mdu> [--steps N] [--dt seconds] "
                      "[--boundary-var name] [--stage-var name] "
                      "[--inventory-out file] [--trace-out file] [--inventory-only] "
-                     "[--skip-boundary-write] [--verify-lateral-id id]\n",
+                     "[--skip-boundary-write] [--verify-lateral-id id] "
+                     "[--probe-sum-vars v1,v2,...] "
+                     "[--inject-lateral-id id --inject-lateral-q q]\n",
                      argv[0]);
         return 2;
     }
@@ -304,6 +447,15 @@ int main(int argc, char **argv) {
                      options.boundary_discharge_var,
                      options.stage_var);
         write_line(trace_out, "# columns: step current_time stage0");
+        if (!options.probe_sum_vars.empty()) {
+            write_line(trace_out,
+                       "# probe columns: probe,step,varname,sum,min,max,finite_count/total "
+                       "(step 0 = after initialize, k = after k-th update)");
+        }
+    }
+
+    if (!options.probe_sum_vars.empty()) {
+        probe_sum_vars(options, 0, trace_out);
     }
 
     int run_rc = 0;
@@ -312,11 +464,19 @@ int main(int argc, char **argv) {
     double last_time = t0;
     double max_dt_abs_error = 0.0;
     bool time_trace_valid = true;
+    const std::string inject_lateral_var =
+        options.inject_lateral
+            ? std::string("laterals/") + options.inject_lateral_id + "/water_discharge"
+            : std::string{};
     for (int step = 0; step < options.steps; ++step) {
         const double q_inject = 1.5;  // SI m^3/s
         if (!options.skip_boundary_write) {
             // GAP D3: caller provides pointer to caller-owned buffer.
             set_var(options.boundary_discharge_var, static_cast<const void *>(&q_inject));
+        }
+        if (options.inject_lateral) {
+            set_var(inject_lateral_var.c_str(),
+                    static_cast<const void *>(&options.inject_lateral_q));
         }
 
         rc = update(options.dt_seconds);
@@ -365,6 +525,10 @@ int main(int argc, char **argv) {
             if (trace_out != nullptr) {
                 std::fprintf(trace_out, "%d %.6f unavailable\n", step, t_now);
             }
+        }
+
+        if (!options.probe_sum_vars.empty()) {
+            probe_sum_vars(options, step + 1, trace_out);
         }
     }
 
