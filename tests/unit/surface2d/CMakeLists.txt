@@ -404,3 +404,12 @@ target_link_libraries(test_stcf_bridge_assemble
         GTest::gtest_main
 )
 add_test(NAME test_stcf_bridge_assemble COMMAND test_stcf_bridge_assemble)
+
+add_executable(test_boundary_inflow_water_level test_boundary_inflow_water_level.cpp)
+target_link_libraries(test_boundary_inflow_water_level
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_boundary_inflow_water_level COMMAND test_boundary_inflow_water_level)

@@ -33,7 +33,11 @@ core::Real raw_cell_cfl(
     for (std::size_t edge_index = 0; edge_index < mesh.edges.size(); ++edge_index) {
         const auto& edge = mesh.edges[edge_index];
         const auto& adjacency = geometry.edge_cells[edge_index];
-        if (!adjacency.is_internal() && boundary.edges[edge_index] == BoundaryKind::Wall) {
+        // Wall and DischargeInflow boundary edges carry no Riemann problem
+        // (inflow is a source-type mass flux), so they contribute no edge wave.
+        if (!adjacency.is_internal()
+            && (boundary.edges[edge_index] == BoundaryKind::Wall
+                || boundary.edges[edge_index] == BoundaryKind::DischargeInflow)) {
             continue;
         }
 
