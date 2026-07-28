@@ -26,6 +26,9 @@ REQUIRED = {
     "G16": ("dual_engine_shared_cell_real_both", "implemented", True),
     "G17": ("tri_coupling_real_minimal", "implemented", True),
     "G18": ("dflowfm_lateral_response", "implemented", True),
+    # G19/G20 are reserved by the post-G18 coupling completion line
+    # (surface2d_tri_coupling_real, dflowfm_longrun_10000) and land with it.
+    "G21": ("stcf_case_pipeline", "implemented", True),
 }
 
 

@@ -24,6 +24,7 @@ add_library(scau_surface2d
     src/source_terms/runoff/roof_step.cpp
     src/source_terms/runoff/step_inputs.cpp
     src/source_terms/well_balanced.cpp
+    src/stcf_bridge/assemble.cpp
     src/time_integration/step.cpp
     src/wetting_drying/limits.cpp
 )
@@ -38,6 +39,7 @@ target_link_libraries(scau_surface2d
     PUBLIC
         scau::core
         scau::mesh
+        scau::stcf
     PRIVATE
         scau::warnings
 )

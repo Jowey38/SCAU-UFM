@@ -27,3 +27,5 @@ add_subdirectory(tri_coupling_real_minimal)
 
 add_subdirectory(dflowfm_checkpoint_reload)
 add_subdirectory(dflowfm_lateral_response)
+
+add_subdirectory(stcf_case_pipeline)
