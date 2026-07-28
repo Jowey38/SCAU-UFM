@@ -41,6 +41,10 @@ public:
     virtual void finalize() = 0;
 
     [[nodiscard]] virtual double get_value(const std::string& var_name, int location_id) const = 0;
+    // Generic rank-1 double state read. Implementations must copy engine-owned
+    // storage before the next BMI call; callers never receive native pointers.
+    [[nodiscard]] virtual std::vector<double> get_rank1_double_values(
+        const std::string& var_name) const = 0;
     virtual void set_value(const std::string& var_name, int location_id, double value) = 0;
 };
 
@@ -64,7 +68,12 @@ public:
     void finalize() override;
 
     [[nodiscard]] double get_value(const std::string& var_name, int location_id) const override;
+    [[nodiscard]] std::vector<double> get_rank1_double_values(
+        const std::string& var_name) const override;
     void set_value(const std::string& var_name, int location_id, double value) override;
+    void set_rank1_double_values_fixture(
+        const std::string& var_name,
+        std::vector<double> values);
     void set_water_level_fixture(int location_id, double water_level);
     void set_discharge_fixture(int location_id, double discharge);
     void set_lateral_discharge_fixture(int location_id, double lateral_discharge);
@@ -90,6 +99,7 @@ private:
     bool initialized_{false};
     double elapsed_time_{0.0};
     std::unordered_map<ValueKey, double, ValueKeyHash> values_{};
+    std::unordered_map<std::string, std::vector<double>> rank1_double_values_{};
 };
 
 [[nodiscard]] core::ExchangeRequest make_dflowfm_exchange_request(double q_request, double dt_sub);

@@ -146,6 +146,9 @@ struct DFlowFMEngine::BmiApi {
     using SetVarFn = void (*)(const char*, const void*);
     using GetVarCountFn = void (*)(int*);
     using GetVarNameFn = void (*)(int, char*);
+    using GetVarTypeFn = void (*)(const char*, char*);
+    using GetVarRankFn = void (*)(const char*, int*);
+    using GetVarShapeFn = void (*)(const char*, int*);
 
     InitializeFn initialize{nullptr};
     UpdateFn update{nullptr};
@@ -157,6 +160,9 @@ struct DFlowFMEngine::BmiApi {
     SetVarFn set_var{nullptr};
     GetVarCountFn get_var_count{nullptr};
     GetVarNameFn get_var_name{nullptr};
+    GetVarTypeFn get_var_type{nullptr};
+    GetVarRankFn get_var_rank{nullptr};
+    GetVarShapeFn get_var_shape{nullptr};
 };
 
 DFlowFMEngine::DFlowFMEngine(std::string library_path) : library_path_(std::move(library_path)) {}
@@ -273,6 +279,54 @@ double DFlowFMEngine::get_value(const std::string& var_name, int location_id) co
     return values[location_id];
 }
 
+std::vector<double> DFlowFMEngine::get_rank1_double_values(
+    const std::string& var_name) const {
+    require_initialized();
+    if (var_name.empty()) {
+        throw DFlowFMEngineError("D-Flow FM variable name must not be empty");
+    }
+
+    std::array<char, kMaxBmiStringLength> type{};
+    api_->get_var_type(var_name.c_str(), type.data());
+    if (std::string(type.data()) != "double") {
+        throw DFlowFMEngineError(
+            "D-Flow FM variable is not double: " + var_name,
+            "DFlowFM",
+            "dflowfm_variable_type_mismatch");
+    }
+
+    int rank = 0;
+    api_->get_var_rank(var_name.c_str(), &rank);
+    if (rank != 1) {
+        throw DFlowFMEngineError(
+            "D-Flow FM variable is not rank 1: " + var_name,
+            "DFlowFM",
+            "dflowfm_variable_rank_mismatch");
+    }
+
+    // Real-runtime evidence shows get_var_shape can access-violate for some
+    // rank>1 variables. Query it only after requiring rank == 1.
+    std::array<int, 6> shape{};
+    api_->get_var_shape(var_name.c_str(), shape.data());
+    if (shape[0] <= 0) {
+        throw DFlowFMEngineError(
+            "D-Flow FM variable has invalid rank-1 shape: " + var_name,
+            "DFlowFM",
+            "dflowfm_variable_shape_invalid");
+    }
+
+    void* engine_ptr = nullptr;
+    api_->get_var(var_name.c_str(), &engine_ptr);
+    if (engine_ptr == nullptr) {
+        throw DFlowFMEngineError(
+            "D-Flow FM variable is unavailable: " + var_name,
+            "DFlowFM",
+            "dflowfm_variable_unavailable");
+    }
+    const auto* values = static_cast<const double*>(engine_ptr);
+    return std::vector<double>(values, values + shape[0]);
+}
+
 void DFlowFMEngine::set_value(const std::string& var_name, int location_id, double value) {
     require_valid_location(location_id);
     if (var_name.empty()) {
@@ -351,6 +405,9 @@ void DFlowFMEngine::load_library() {
         api->set_var = load_symbol<BmiApi::SetVarFn>(library_handle_, "set_var");
         api->get_var_count = load_symbol<BmiApi::GetVarCountFn>(library_handle_, "get_var_count");
         api->get_var_name = load_symbol<BmiApi::GetVarNameFn>(library_handle_, "get_var_name");
+        api->get_var_type = load_symbol<BmiApi::GetVarTypeFn>(library_handle_, "get_var_type");
+        api->get_var_rank = load_symbol<BmiApi::GetVarRankFn>(library_handle_, "get_var_rank");
+        api->get_var_shape = load_symbol<BmiApi::GetVarShapeFn>(library_handle_, "get_var_shape");
     } catch (...) {
         close_library(library_handle_);
         library_handle_ = nullptr;

@@ -13,7 +13,8 @@ double g_start_time = 100.0;
 double g_current_time = 100.0;
 double g_water_level[2] = {2.5, 3.5};
 double g_lateral_discharge = 0.0;
-const char* g_var_names[2] = {"water_level", "lateral_discharge"};
+double g_vol1[3] = {10.0, 20.0, 30.0};
+const char* g_var_names[3] = {"water_level", "lateral_discharge", "vol1"};
 
 }  // namespace
 
@@ -27,6 +28,9 @@ SCAU_BMI_EXPORT int initialize(const char* config_file) {
     g_water_level[0] = 2.5;
     g_water_level[1] = 3.5;
     g_lateral_discharge = 0.0;
+    g_vol1[0] = 10.0;
+    g_vol1[1] = 20.0;
+    g_vol1[2] = 30.0;
     return 0;
 }
 
@@ -66,6 +70,10 @@ SCAU_BMI_EXPORT void get_var(const char* name, void** ptr) {
         *ptr = &g_lateral_discharge;
         return;
     }
+    if (std::strcmp(name, "vol1") == 0) {
+        *ptr = g_vol1;
+        return;
+    }
     *ptr = nullptr;
 }
 
@@ -75,12 +83,45 @@ SCAU_BMI_EXPORT void set_var(const char* name, const void* ptr) {
     }
 }
 
+SCAU_BMI_EXPORT void get_var_type(const char* name, char* type) {
+    if (std::strcmp(name, "water_level") == 0
+        || std::strcmp(name, "lateral_discharge") == 0
+        || std::strcmp(name, "vol1") == 0) {
+        std::strcpy(type, "double");
+        return;
+    }
+    type[0] = '\0';
+}
+
+SCAU_BMI_EXPORT void get_var_rank(const char* name, int* rank) {
+    if (std::strcmp(name, "water_level") == 0 || std::strcmp(name, "vol1") == 0) {
+        *rank = 1;
+        return;
+    }
+    if (std::strcmp(name, "lateral_discharge") == 0) {
+        *rank = 0;
+        return;
+    }
+    *rank = -1;
+}
+
+SCAU_BMI_EXPORT void get_var_shape(const char* name, int* shape) {
+    for (int i = 0; i < 6; ++i) {
+        shape[i] = 0;
+    }
+    if (std::strcmp(name, "water_level") == 0) {
+        shape[0] = 2;
+    } else if (std::strcmp(name, "vol1") == 0) {
+        shape[0] = 3;
+    }
+}
+
 SCAU_BMI_EXPORT void get_var_count(int* count) {
-    *count = 2;
+    *count = 3;
 }
 
 SCAU_BMI_EXPORT void get_var_name(int index, char* name) {
-    if (index < 0 || index >= 2) {
+    if (index < 0 || index >= 3) {
         name[0] = '\0';
         return;
     }

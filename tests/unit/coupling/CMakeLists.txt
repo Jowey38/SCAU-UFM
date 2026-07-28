@@ -457,6 +457,21 @@ if(SCAU_ENABLE_DFLOWFM_BMI_RUNTIME)
     )
     add_dependencies(test_coupling_dflowfm_engine fake_dflowfm_bmi fake_dflowfm_bmi_missing_symbol)
     add_test(NAME test_coupling_dflowfm_engine COMMAND test_coupling_dflowfm_engine)
+
+    add_executable(
+        test_coupling_dflowfm_volume_provider
+        test_coupling_dflowfm_volume_provider.cpp
+    )
+    target_link_libraries(test_coupling_dflowfm_volume_provider
+        PRIVATE
+            scau::coupling_driver
+            scau::warnings
+            GTest::gtest_main
+    )
+    add_test(
+        NAME test_coupling_dflowfm_volume_provider
+        COMMAND test_coupling_dflowfm_volume_provider
+    )
 endif()
 
 add_executable(test_coupling_engine_interface_exchange test_coupling_engine_interface_exchange.cpp)
