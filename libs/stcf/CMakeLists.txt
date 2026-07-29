@@ -3,7 +3,9 @@ find_package(netCDF CONFIG REQUIRED)
 add_library(scau_stcf
     src/schema.cpp
     src/validate.cpp
+    src/topology.cpp
     src/io_netcdf.cpp
+    src/io_ugrid.cpp
 )
 add_library(scau::stcf ALIAS scau_stcf)
 
