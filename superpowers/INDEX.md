@@ -144,6 +144,9 @@
 | `docs/superpowers/plans/2026-07-28-m260-stcf-ugrid-topology.md` | M260 STCF v5 UGRID topology I/O 计划；定义 strict self-contained case API、CF-1.8/UGRID-1.0 拓扑变量、field-only 兼容边界与拓扑交叉校验。 |
 | `superpowers/specs/2026-07-28-m260-stcf-ugrid-topology-evidence.md` | M260 UGRID 拓扑证据；新增 MeshTopology/StcfCase、strict read/write、混合三角/四边形 face/edge 双向连通校验与 UGRID 属性绑定；旧 field-only API 保持兼容，129/129 全量测试。 |
 
+| `docs/superpowers/plans/2026-07-29-m261-stcf-case-mesh-loader.md` | M261 STCF case mesh loader 计划；定义 surface2d-owned loader、CCW face 归一化、UGRID edge 顺序/字段对齐及 EdgeSpec left/right 方向规则。 |
+| `superpowers/specs/2026-07-29-m261-stcf-case-mesh-loader-evidence.md` | M261 loader 证据；strict NetCDF case 构建 mesh+DPM/source/z_b，保持 E<i> 顺序与边字段索引，CW face 归一化、法向校验、文件入口及变床静水 1e-12；130/130 全量测试。 |
+
 ## 历史记录规则
 
 - 根目录历史 Markdown、会话导出、早期方案评审稿与对话记录只作为非规范性背景材料，不得覆盖上表规范性入口。
