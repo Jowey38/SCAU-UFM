@@ -141,6 +141,9 @@
 | `docs/superpowers/plans/2026-07-28-m259-dflowfm-vol1-volume-provider.md` | M259 D-Flow FM `vol1` volume provider 实施计划；将 M258 真实契约转为 rank-1 BMI 状态读取 + driver-owned compensated-sum 观测器，严格保持 river adapter 仅 lifecycle/state I/O。 |
 | `superpowers/specs/2026-07-28-m259-dflowfm-vol1-volume-provider-evidence.md` | M259 `vol1` provider 证据；生产 DFlowFMEngine type/rank/shape fail-closed 立即复制、driver `sum(vol1)` 观测、fake BMI 与真实 G11 100 步验证；D-Flow scope 可完整，但 SWMM 管段储量仍使三引擎报告保持 REVIEW_REQUIRED。 |
 
+| `docs/superpowers/plans/2026-07-28-m260-stcf-ugrid-topology.md` | M260 STCF v5 UGRID topology I/O 计划；定义 strict self-contained case API、CF-1.8/UGRID-1.0 拓扑变量、field-only 兼容边界与拓扑交叉校验。 |
+| `superpowers/specs/2026-07-28-m260-stcf-ugrid-topology-evidence.md` | M260 UGRID 拓扑证据；新增 MeshTopology/StcfCase、strict read/write、混合三角/四边形 face/edge 双向连通校验与 UGRID 属性绑定；旧 field-only API 保持兼容，129/129 全量测试。 |
+
 ## 历史记录规则
 
 - 根目录历史 Markdown、会话导出、早期方案评审稿与对话记录只作为非规范性背景材料，不得覆盖上表规范性入口。
