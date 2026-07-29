@@ -150,6 +150,9 @@
 | `docs/superpowers/plans/2026-07-29-m262-preproc-cli-g22.md` | M262 PreProc CLI + G22 计划；定义 C++ `scau_preproc generate`、deterministic mixed-minimal profile、原子导出与 CTest fixture 驱动的完整文件链路。 |
 | `superpowers/specs/2026-07-29-m262-preproc-cli-g22-evidence.md` | M262/G22 证据；CLI 严格生成 STCF v5 UGRID case，失败/覆盖 fail-closed；G22 两次 CLI 生成逻辑确定性、strict load、变床静水 1e-12 与入流体积审计，133/133 全量测试。 |
 
+| `docs/superpowers/plans/2026-07-29-m263-cvc-spatial-phi-t-fluctuation.md` | M263 CVC spatial phi_t fluctuation 计划；纠正 M252 单一 h-flux 无法在 phi 跳变处守恒 phi*h 的数学矛盾，采用 side-specific 物理储量/动量 fluctuation、默认关闭门控与 G23 路线。 |
+| `superpowers/specs/2026-07-29-m263-g23-cvc-spatial-phi-t-evidence.md` | M263/G23 证据；opt-in side-specific CVC fluctuation 将 M253 phi_t 1.0->0.4 非零速度储量残差从 >1e-6 降至 <=1e-12，100 步守恒与 bitwise replay，静水/默认路径零回归；135/135 全量测试。 |
+
 ## 历史记录规则
 
 - 根目录历史 Markdown、会话导出、早期方案评审稿与对话记录只作为非规范性背景材料，不得覆盖上表规范性入口。

@@ -251,6 +251,15 @@ target_link_libraries(test_dpm_phi_t_remap
 add_test(NAME test_dpm_phi_t_remap COMMAND test_dpm_phi_t_remap)
 set_tests_properties(test_dpm_phi_t_remap PROPERTIES LABELS "golden_candidate;cvc;surface2d")
 
+add_executable(test_cvc_augmented_flux test_cvc_augmented_flux.cpp)
+target_link_libraries(test_cvc_augmented_flux
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_cvc_augmented_flux COMMAND test_cvc_augmented_flux)
+
 add_executable(test_cvc_spatial_phi_t_dynamic_perturbation test_cvc_spatial_phi_t_dynamic_perturbation.cpp)
 target_link_libraries(test_cvc_spatial_phi_t_dynamic_perturbation
     PRIVATE

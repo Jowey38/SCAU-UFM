@@ -30,6 +30,7 @@ REQUIRED = {
     # (surface2d_tri_coupling_real, dflowfm_longrun_10000) and land with it.
     "G21": ("stcf_case_pipeline", "implemented", True),
     "G22": ("preproc_mixed_mesh_case", "implemented", True),
+    "G23": ("cvc_spatial_phi_t_dynamic", "implemented", True),
 }
 
 

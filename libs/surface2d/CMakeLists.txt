@@ -2,6 +2,7 @@ add_library(scau_surface2d
     src/boundary/conditions.cpp
     src/cfl/diagnostics.cpp
     src/dpm/closure_laws.cpp
+    src/dpm/cvc_augmented_flux.cpp
     src/dpm/edge_classification.cpp
     src/dpm/edge_conveyance.cpp
     src/dpm/fields.cpp
