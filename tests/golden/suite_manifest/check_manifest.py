@@ -29,6 +29,7 @@ REQUIRED = {
     # G19/G20 are reserved by the post-G18 coupling completion line
     # (surface2d_tri_coupling_real, dflowfm_longrun_10000) and land with it.
     "G21": ("stcf_case_pipeline", "implemented", True),
+    "G22": ("preproc_mixed_mesh_case", "implemented", True),
 }
 
 

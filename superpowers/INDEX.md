@@ -147,6 +147,9 @@
 | `docs/superpowers/plans/2026-07-29-m261-stcf-case-mesh-loader.md` | M261 STCF case mesh loader 计划；定义 surface2d-owned loader、CCW face 归一化、UGRID edge 顺序/字段对齐及 EdgeSpec left/right 方向规则。 |
 | `superpowers/specs/2026-07-29-m261-stcf-case-mesh-loader-evidence.md` | M261 loader 证据；strict NetCDF case 构建 mesh+DPM/source/z_b，保持 E<i> 顺序与边字段索引，CW face 归一化、法向校验、文件入口及变床静水 1e-12；130/130 全量测试。 |
 
+| `docs/superpowers/plans/2026-07-29-m262-preproc-cli-g22.md` | M262 PreProc CLI + G22 计划；定义 C++ `scau_preproc generate`、deterministic mixed-minimal profile、原子导出与 CTest fixture 驱动的完整文件链路。 |
+| `superpowers/specs/2026-07-29-m262-preproc-cli-g22-evidence.md` | M262/G22 证据；CLI 严格生成 STCF v5 UGRID case，失败/覆盖 fail-closed；G22 两次 CLI 生成逻辑确定性、strict load、变床静水 1e-12 与入流体积审计，133/133 全量测试。 |
+
 ## 历史记录规则
 
 - 根目录历史 Markdown、会话导出、早期方案评审稿与对话记录只作为非规范性背景材料，不得覆盖上表规范性入口。
