@@ -413,3 +413,12 @@ target_link_libraries(test_boundary_inflow_water_level
         GTest::gtest_main
 )
 add_test(NAME test_boundary_inflow_water_level COMMAND test_boundary_inflow_water_level)
+
+add_executable(test_stcf_case_loader test_stcf_case_loader.cpp)
+target_link_libraries(test_stcf_case_loader
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_stcf_case_loader COMMAND test_stcf_case_loader)
