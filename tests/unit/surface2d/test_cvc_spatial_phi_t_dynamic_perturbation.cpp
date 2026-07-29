@@ -42,7 +42,14 @@ double stored_volume(
     return total;
 }
 
-double run_one_dynamic_interface_step(scau::surface2d::DpmFields dpm_fields) {
+struct RunResult {
+    double storage_residual{0.0};
+    scau::surface2d::StepDiagnostics diagnostics;
+};
+
+RunResult run_one_dynamic_interface_step(
+    scau::surface2d::DpmFields dpm_fields,
+    bool enable_cvc = false) {
     const auto mesh = scau::mesh::build_mixed_minimal_mesh();
     const auto geometry = scau::surface2d::GeometryCache::for_mesh(mesh);
     const auto edge_index = first_internal_edge_index(mesh);
@@ -61,11 +68,20 @@ double run_one_dynamic_interface_step(scau::surface2d::DpmFields dpm_fields) {
     state.cells[right_index].conserved.hu = -0.10;
 
     const double before = stored_volume(state, dpm_fields, geometry);
-    const scau::surface2d::StepConfig config{.dt = 0.01, .cfl_safety = 0.45, .c_rollback = 100.0, .h_min = 1.0e-8};
+    const scau::surface2d::StepConfig config{
+        .dt = 0.01,
+        .cfl_safety = 0.45,
+        .c_rollback = 100.0,
+        .h_min = 1.0e-8,
+        .enable_cvc_spatial_phi_t_correction = enable_cvc,
+    };
     const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields);
     EXPECT_FALSE(diagnostics.rollback_required);
     const double after = stored_volume(state, dpm_fields, geometry);
-    return std::abs(after - before);
+    return RunResult{
+        .storage_residual = std::abs(after - before),
+        .diagnostics = diagnostics,
+    };
 }
 
 }  // namespace
@@ -82,10 +98,17 @@ TEST(CvcSpatialPhiTDynamicPerturbation, QuantifiesCurrentStorageResidualAcrossSp
     jumped.cells[left_index].phi_t = 1.0;
     jumped.cells[right_index].phi_t = 0.4;
 
-    const double uniform_residual = run_one_dynamic_interface_step(uniform);
-    const double jumped_residual = run_one_dynamic_interface_step(jumped);
+    const auto uniform_result = run_one_dynamic_interface_step(uniform);
+    const auto baseline_result = run_one_dynamic_interface_step(jumped);
+    const auto cvc_result = run_one_dynamic_interface_step(jumped, true);
 
-    EXPECT_NEAR(uniform_residual, 0.0, 1.0e-12);
-    EXPECT_GT(jumped_residual, 1.0e-6);
-    EXPECT_GT(jumped_residual, 1000.0 * uniform_residual);
+    EXPECT_NEAR(uniform_result.storage_residual, 0.0, 1.0e-12);
+    EXPECT_GT(baseline_result.storage_residual, 1.0e-6);
+    EXPECT_GT(
+        baseline_result.storage_residual,
+        1000.0 * uniform_result.storage_residual);
+    EXPECT_NEAR(cvc_result.storage_residual, 0.0, 1.0e-12);
+    EXPECT_EQ(cvc_result.diagnostics.count_phi_t_jump_events, 1U);
+    EXPECT_NEAR(cvc_result.diagnostics.max_cvc_storage_residual_after, 0.0, 1.0e-12);
+    EXPECT_NE(cvc_result.diagnostics.cvc_mass_correction_volume, 0.0);
 }

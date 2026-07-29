@@ -21,6 +21,9 @@ struct StepConfig {
     core::Real c_rollback{1.0};
     core::Real h_min{1.0e-8};
     core::Real gravity{9.81};
+    // Opt-in CVC side-specific fluctuations for nonzero-velocity spatial
+    // phi_t jumps. Default off preserves the validated baseline path.
+    bool enable_cvc_spatial_phi_t_correction{false};
 };
 
 struct EdgeStepDiagnostics {
@@ -76,6 +79,11 @@ struct StepDiagnostics {
     // Plan volume (m^3) added through DischargeInflow boundary edges this
     // step (sum of q * L * dt). Zero when the step rolls back.
     core::Real boundary_inflow_volume{0.0};
+    std::size_t count_phi_t_jump_events{0U};
+    core::Real cvc_mass_correction_volume{0.0};
+    core::Real cvc_momentum_correction_x{0.0};
+    core::Real cvc_momentum_correction_y{0.0};
+    core::Real max_cvc_storage_residual_after{0.0};
     std::vector<CellStepDiagnostics> cells;
     std::vector<EdgeStepDiagnostics> edges;
 };

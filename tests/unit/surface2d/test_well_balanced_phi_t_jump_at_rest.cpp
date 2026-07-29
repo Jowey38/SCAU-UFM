@@ -29,10 +29,17 @@ TEST(WellBalancedPhiTJumpAtRest, FlatBedPhiTJumpKeepsMomentumZero) {
     for (std::size_t i = 0; i < dpm_fields.cells.size(); ++i) {
         dpm_fields.cells[i].phi_t = (i % 2 == 0) ? 1.0 : 1.5;  // strong jump
     }
-    const scau::surface2d::StepConfig config{.dt = 0.1, .cfl_safety = 0.45, .c_rollback = 100.0, .h_min = 1.0e-8};
+    const scau::surface2d::StepConfig config{
+        .dt = 0.1,
+        .cfl_safety = 0.45,
+        .c_rollback = 100.0,
+        .h_min = 1.0e-8,
+        .enable_cvc_spatial_phi_t_correction = true,
+    };
 
     const auto diagnostics = scau::surface2d::advance_one_step_cpu(mesh, state, config, dpm_fields);
 
     ASSERT_FALSE(diagnostics.rollback_required);
+    EXPECT_EQ(diagnostics.count_phi_t_jump_events, 0U);
     EXPECT_NEAR(max_abs_momentum(state), 0.0, 1.0e-12);
 }

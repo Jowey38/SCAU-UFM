@@ -30,3 +30,4 @@ add_subdirectory(dflowfm_lateral_response)
 
 add_subdirectory(stcf_case_pipeline)
 add_subdirectory(preproc_mixed_mesh_case)
+add_subdirectory(cvc_spatial_phi_t_dynamic)

@@ -1,10 +1,12 @@
 #include "surface2d/time_integration/step.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 #include <vector>
 
 #include "surface2d/cfl/diagnostics.hpp"
+#include "surface2d/dpm/cvc_augmented_flux.hpp"
 #include "surface2d/dpm/edge_classification.hpp"
 #include "surface2d/reconstruction/hydrostatic.hpp"
 #include "surface2d/riemann/hllc.hpp"
@@ -220,13 +222,48 @@ StepDiagnostics run_flux_core(
                 dpm_fields.edges[edge_index].phi_e_n).wb_pairing_assembled;
             const auto edge_diagnostics = edge_step_diagnostics(adjacency, state, dpm_fields, flux, assemble_wb_pairing);
             diagnostics.edges.push_back(edge_diagnostics);
-            const core::Real integrated_flux = edge_diagnostics.mass_flux * edge.length;
-            diagnostics.cells[left_index].mass_residual -= integrated_flux;
-            diagnostics.cells[right_index].mass_residual += integrated_flux;
-            const core::Real integrated_momentum_x = flux.momentum_x * edge.length;
-            const core::Real integrated_momentum_y = flux.momentum_y * edge.length;
-            accumulate_momentum_flux_residual(diagnostics.cells[left_index], -integrated_momentum_x, -integrated_momentum_y);
-            accumulate_momentum_flux_residual(diagnostics.cells[right_index], integrated_momentum_x, integrated_momentum_y);
+
+            CvcSideFluxes side_fluxes{
+                .left_mass = flux.mass,
+                .right_mass = flux.mass,
+                .left_momentum_x = flux.momentum_x,
+                .right_momentum_x = flux.momentum_x,
+                .left_momentum_y = flux.momentum_y,
+                .right_momentum_y = flux.momentum_y,
+            };
+            const core::Real phi_t_left = dpm_fields.cells[left_index].phi_t;
+            const core::Real phi_t_right = dpm_fields.cells[right_index].phi_t;
+            if (config.enable_cvc_spatial_phi_t_correction
+                && assemble_wb_pairing
+                && phi_t_left != phi_t_right) {
+                side_fluxes = cvc_side_fluxes(flux, phi_t_left, phi_t_right);
+                if (side_fluxes.applied) {
+                    ++diagnostics.count_phi_t_jump_events;
+                    diagnostics.cvc_mass_correction_volume += config.dt * edge.length * (
+                        phi_t_left * (flux.mass - side_fluxes.left_mass)
+                        + phi_t_right * (side_fluxes.right_mass - flux.mass));
+                    diagnostics.cvc_momentum_correction_x += config.dt * edge.length * (
+                        phi_t_left * (flux.momentum_x - side_fluxes.left_momentum_x)
+                        + phi_t_right * (side_fluxes.right_momentum_x - flux.momentum_x));
+                    diagnostics.cvc_momentum_correction_y += config.dt * edge.length * (
+                        phi_t_left * (flux.momentum_y - side_fluxes.left_momentum_y)
+                        + phi_t_right * (side_fluxes.right_momentum_y - flux.momentum_y));
+                    diagnostics.max_cvc_storage_residual_after = std::max(
+                        diagnostics.max_cvc_storage_residual_after,
+                        std::abs(side_fluxes.storage_residual_after));
+                }
+            }
+
+            diagnostics.cells[left_index].mass_residual -= side_fluxes.left_mass * edge.length;
+            diagnostics.cells[right_index].mass_residual += side_fluxes.right_mass * edge.length;
+            accumulate_momentum_flux_residual(
+                diagnostics.cells[left_index],
+                -side_fluxes.left_momentum_x * edge.length,
+                -side_fluxes.left_momentum_y * edge.length);
+            accumulate_momentum_flux_residual(
+                diagnostics.cells[right_index],
+                side_fluxes.right_momentum_x * edge.length,
+                side_fluxes.right_momentum_y * edge.length);
             if (assemble_wb_pairing) {
                 const auto pair = reconstruct_hydrostatic_pair(state.cells[left_index], state.cells[right_index]);
                 const auto wb = well_balanced_edge_pairing(
@@ -362,6 +399,11 @@ StepDiagnostics run_flux_core(
         diagnostics.edges.push_back(edge_diagnostics);
     }
     if (diagnostics.rollback_required) {
+        diagnostics.count_phi_t_jump_events = 0U;
+        diagnostics.cvc_mass_correction_volume = 0.0;
+        diagnostics.cvc_momentum_correction_x = 0.0;
+        diagnostics.cvc_momentum_correction_y = 0.0;
+        diagnostics.max_cvc_storage_residual_after = 0.0;
         return diagnostics;
     }
     diagnostics.boundary_inflow_volume = boundary_inflow_rate * config.dt;
