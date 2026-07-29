@@ -46,3 +46,12 @@ target_link_libraries(test_stcf_io_ugrid
         netCDF::netcdf
 )
 add_test(NAME test_stcf_io_ugrid COMMAND test_stcf_io_ugrid)
+
+add_test(
+    NAME test_preproc_cli
+    COMMAND ${CMAKE_COMMAND}
+        -DPREPROC=$<TARGET_FILE:scau_preproc>
+        -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/preproc_cli_test.stcf.nc
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/test_preproc_cli.cmake
+)
+add_dependencies(test_stcf_io_ugrid scau_preproc)

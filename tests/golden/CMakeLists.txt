@@ -29,3 +29,4 @@ add_subdirectory(dflowfm_checkpoint_reload)
 add_subdirectory(dflowfm_lateral_response)
 
 add_subdirectory(stcf_case_pipeline)
+add_subdirectory(preproc_mixed_mesh_case)
