@@ -6,4 +6,4 @@ target_link_libraries(test_dual_engine_shared_cell
         GTest::gtest_main
 )
 add_test(NAME test_dual_engine_shared_cell COMMAND test_dual_engine_shared_cell)
-set_tests_properties(test_dual_engine_shared_cell PROPERTIES LABELS "candidate_non_gating")
+set_tests_properties(test_dual_engine_shared_cell PROPERTIES LABELS golden)

@@ -152,6 +152,7 @@
 
 | `docs/superpowers/plans/2026-07-29-m263-cvc-spatial-phi-t-fluctuation.md` | M263 CVC spatial phi_t fluctuation 计划；纠正 M252 单一 h-flux 无法在 phi 跳变处守恒 phi*h 的数学矛盾，采用 side-specific 物理储量/动量 fluctuation、默认关闭门控与 G23 路线。 |
 | `superpowers/specs/2026-07-29-m263-g23-cvc-spatial-phi-t-evidence.md` | M263/G23 证据；opt-in side-specific CVC fluctuation 将 M253 phi_t 1.0->0.4 非零速度储量残差从 >1e-6 降至 <=1e-12，100 步守恒与 bitwise replay，静水/默认路径零回归；135/135 全量测试。 |
+| `superpowers/specs/2026-07-30-m264-phase-gate-alignment-evidence.md` | M264 Phase/GoldenSuite 门禁对齐证据；解决 CUDA 属 Phase 2 而 G9 曾列 Phase 1 的冲突，锁定 Phase 1=G1-G8+G10、Phase 2 追加 G9/G11/G12，提升 G10/G12 为 active gate，并保留 G19/G20 未实现状态。 |
 
 ## 历史记录规则
 
