@@ -78,17 +78,17 @@
 
 ### 2.1 GoldenSuite 与 CI 硬闸门 〔Level A〕
 
-- `GoldenSuite` 与主 Spec 定义的 10 项最小 GoldenTest 的测试语义、判据、容差与确定性正确性路径定义，均以主 Spec 对应章节为准。
+- `GoldenSuite` 与主 Spec 按 release Phase 定义的最小 GoldenTest 集合，其测试语义、判据、容差与确定性正确性路径定义，均以主 Spec 对应章节为准。Phase 1 最小集合为九项 G1–G8 + G10；Phase 2 在其上追加 G9、G11、G12。
 - 本协议只定义其执行后果：
   - GoldenSuite 必须挂入 CI 主流水线。
   - 任一 merge / pull request 必须附 GoldenSuite 通过证据。
-  - 主 Spec 定义的 10 项物理不变式 GoldenTest 必须作为 GoldenSuite 最小集合；缺少任一脚本、确定性参考路径或可复现实证记录，均按 GoldenSuite 不完整处理。
+  - 主 Spec 为当前 release Phase 定义的物理不变式 GoldenTest 必须全部进入 GoldenSuite；缺少任一脚本、确定性参考路径或可复现实证记录，均按 GoldenSuite 不完整处理。
   - 若主 Spec 定义的 GoldenTest 判据在正确性路径上失败：立即 `BLOCK_MERGE`；当前结果不得进入发布链路。
   - 若 PR 仅提供人工截图、大算例通过记录或非确定性 GPU 性能路径输出，而缺少主 Spec 要求的 GoldenTest 证据：直接 `BLOCK_MERGE`。
   - 若实现无法提供主 Spec 要求的确定性正确性路径证据：直接 `BLOCK_MERGE`；必要时默认禁止开启 `USE_CUDA_SOLVER`。
   - 若三角/四边形混合非结构化网格缺少几何量、边法向、邻接关系、退化单元、非流形边与遍历一致性验证证据，或证据显示 `CellType` / `node_count` / `edge_count` 语义被违反：直接 `BLOCK_MERGE`。
   - CI GPU 基础设施采用混合模式：本地 GPU Runner 承担主线阻断测试，云端 GPU 承担性能/大算例补充验证。
-  - Phase 2 release 准入必须附 G11 `dflowfm_river_steady` 与 G12 `dual_engine_shared_cell` 通过证据；缺失任一项：`BLOCK_RELEASE`。Phase 1 release gate 仍为 G1–G10，不受影响。
+  - Phase 2 release 准入必须附 G9 `cpu_gpu_deterministic_match`、G11 `dflowfm_river_steady` 与 G12 `dual_engine_shared_cell` 通过证据；缺失任一项：`BLOCK_RELEASE`。Phase 1 release gate 为 G1–G8 + G10，不依赖 CUDA/GPU 基础设施。
   - 不允许以“大算例能跑”为由绕过主 Spec 与本协议共同要求的 GoldenSuite gate。
 
 ---
@@ -316,9 +316,9 @@
 以下条件全部满足，方可进入 Phase 1 主线开发：
 
 - 必须提供 GoldenSuite 通过证据
-  - 证据至少包括：CI 通过记录、10 项物理不变式 GoldenTest 的脚本映射、确定性参考路径说明、失败即阻断的门禁结果
+  - 证据至少包括：CI 通过记录、Phase 1 九项物理不变式 G1–G8 + G10 的脚本映射、确定性参考路径说明、失败即阻断的门禁结果
 - 必须提供 Q_limit 数据类型检查证据
-  - 证据至少包括：`0.9 * phi_t * h * A / dt_sub` 静态类型检查结果，以及边界工况下 CPU/GPU 正确性路径误差不超过 `1e-12` 的运行记录
+  - Phase 1 至少包括 `0.9 * phi_t * h * A / dt_sub` 静态类型检查与 CPU double 正确性路径记录；Phase 2 启用 CUDA 后追加 G9 CPU/GPU 误差不超过 `1e-12` 的运行记录
 - 必须提供 snapshot / rollback / replay 正确性证据
   - 证据至少包括：rollback 后 `mass_deficit_account` 与 exchange buffer 同步恢复，以及 replay 路径在相同输入下结果确定性可重复
 - 必须提供 MockSwmmEngine 最低能力验证证据
@@ -326,10 +326,10 @@
 - 主 Spec 已升级到 v5.3.3
 - STCF v5 字段集已锁定
 - `validate_dpm_consistency()` 已在 PreProc 每一级接入
-- CI GPU 采用混合模式并完成验证：
-  - 本地 GPU Runner 可执行 GoldenTest / CUDA 回归
+- Phase 1 不要求 GPU 基础设施；进入 Phase 2 前，CI GPU 必须采用混合模式并完成验证：
+  - 本地 GPU Runner 可执行 G9 / CUDA 回归
   - 云端 GPU 实例可执行性能基准与大算例验证
-  - “完成验证”定义为：本地 GoldenTest 全通过，云端性能基准完成且无 FATAL/ERROR
+  - “完成验证”定义为：本地 G9 与 CUDA GoldenTest 全通过，云端性能基准完成且无 FATAL/ERROR
 
 ## 9. 第三方版本与兼容性治理
 
@@ -449,7 +449,7 @@
 | 证据项 | Phase 1 准入 | Release 准入 | 说明 |
 |---|---|---|---|
 | GoldenSuite CI 通过记录 | 必须 | 必须 | 含确定性参考路径说明 |
-| `Q_limit` 数据类型检查 | 必须 | 必须 | 静态类型检查 + CPU/GPU 误差 ≤ 1e-12 |
+| `Q_limit` 数据类型检查 | 必须 | 必须 | Phase 1: 静态类型检查 + CPU double；Phase 2+: 追加 G9 CPU/GPU 误差 ≤ 1e-12 |
 | snapshot / rollback / replay 正确性 | 必须 | 必须 | deficit 账 + exchange buffer 同步恢复 |
 | MockSwmmEngine 最低能力验证 | 必须 | — | `get_node_head` / `set_node_lateral_inflow` / `step` |
 | 张量合法性校验证据 | 必须 | 必须 | PreProc 每级接入 `validate_dpm_consistency()` |

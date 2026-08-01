@@ -1664,7 +1664,7 @@ GoldenTest G10 evidence 必须包含 snapshot 起点 `content_hash`、replay 终
 - `GoldenSuite` 是发布 / 合并门禁级集合（每次 CI / merge 必须通过）
 - 每个 `GoldenTest ∈ GoldenSuite`
 - 缺少任一强制项脚本、确定性参考路径或可复现实证记录，均视为 GoldenSuite 不完整；执行后果由配套稳定性协议定义
-- GoldenSuite 按 release Phase 分级：Phase 1 release gate 为 G1–G10；Phase 2 扩展为 G1–G12（追加 D-Flow FM 河网稳态与双 1D 引擎共享单元仲裁两项）。Phase 3 GoldenTest 扩展登记于 §12 未来扩展能力
+- GoldenSuite 按 release Phase 分级：Phase 1 release gate 为九项 CPU/SWMM 正确性基准 G1–G8 + G10；Phase 2 扩展为 G1–G12（追加 CUDA CPU/GPU 一致性 G9、D-Flow FM 河网稳态 G11 与双 1D 引擎共享单元仲裁 G12）。Phase 3 GoldenTest 扩展登记于 §12 未来扩展能力。G13 及后续登记项是适用能力的增强门禁，不替代对应 release Phase 的最小集合。
 
 ### 10.2 GoldenSuite 物理不变式矩阵（v5.3.3 主权）
 
@@ -1678,7 +1678,7 @@ GoldenTest G10 evidence 必须包含 snapshot 起点 `content_hash`、replay 终
 | G6 | `phi_c_spd_reject` | 非正定或病态 `Phi_c` 不得进入 GPU / 正确性路径 | PreProc 拒绝证据 | Phase 1+ |
 | G7 | `stcf_v4_to_v5_migration` | 字段迁移后语义与单位不漂移 | schema 映射报告 | Phase 1+ |
 | G8 | `swmm_single_pipe_surcharge` | SWMM 溢流交换不突破 `Q_limit` | deficit 与 split 审计 | Phase 1+ |
-| G9 | `cpu_gpu_deterministic_match` | CPU/GPU 正确性路径误差满足协议阈值 | double + 确定性 reduction 记录 | Phase 1+ |
+| G9 | `cpu_gpu_deterministic_match` | CPU/GPU 正确性路径误差满足协议阈值 | double + 确定性 reduction 记录 | Phase 2+ |
 | G10 | `snapshot_replay_mass_deficit` | rollback/replay 后 `mass_deficit_account` 一致（严格 0） | replay 审计日志 | Phase 1+ |
 | G11 | `dflowfm_river_steady` | D-Flow FM 单引擎稳态通路无虚假流量；`Q_limit` 不被违反 | RiverExchangePoint 仲裁日志 + 守恒证据 | Phase 2+ |
 | G12 | `dual_engine_shared_cell` | SWMM 与 D-Flow FM 共享 2D 单元时 `V_limit_k` 切分、`Q_limit` 仲裁、deficit 账与 replay 一致 | 共享单元仲裁审计 + replay 一致性 | Phase 2+ |
