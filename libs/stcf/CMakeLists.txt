@@ -3,6 +3,7 @@ find_package(netCDF CONFIG REQUIRED)
 add_library(scau_stcf
     src/schema.cpp
     src/case_profiles.cpp
+    src/migrate_v4_to_v5.cpp
     src/validate.cpp
     src/topology.cpp
     src/io_netcdf.cpp
