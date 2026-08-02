@@ -1,4 +1,5 @@
 add_library(scau_surface2d
+    src/backend.cpp
     src/boundary/conditions.cpp
     src/cfl/diagnostics.cpp
     src/dpm/closure_laws.cpp

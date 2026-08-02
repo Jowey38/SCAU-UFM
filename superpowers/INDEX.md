@@ -154,6 +154,7 @@
 | `superpowers/specs/2026-07-29-m263-g23-cvc-spatial-phi-t-evidence.md` | M263/G23 证据；opt-in side-specific CVC fluctuation 将 M253 phi_t 1.0->0.4 非零速度储量残差从 >1e-6 降至 <=1e-12，100 步守恒与 bitwise replay，静水/默认路径零回归；135/135 全量测试。 |
 | `superpowers/specs/2026-07-30-m264-phase-gate-alignment-evidence.md` | M264 Phase/GoldenSuite 门禁对齐证据；解决 CUDA 属 Phase 2 而 G9 曾列 Phase 1 的冲突，锁定 Phase 1=G1-G8+G10、Phase 2 追加 G9/G11/G12，提升 G10/G12 为 active gate，并保留 G19/G20 未实现状态。 |
 | `superpowers/specs/2026-07-30-m265-g7-stcf-v4-v5-migration-evidence.md` | M265/G7 STCF v4→v5 迁移证据；按历史契约迁移 phi_s 与 psi_tensor，显式记录 v5 必填默认值，复用 strict v5 validation，登记 active Golden，并限定未承载 drag 字段与真实 v4 NetCDF reader 为后续范围。 |
+| `superpowers/specs/2026-07-30-m267-first-batch-runtime-contracts-evidence.md` | M267 首批运行契约证据；新增 SimDriver 生命周期骨架、三引擎 checkpoint commit 判定、SWMM node+link 全域储量 bridge、真实数据/mesh-quality 契约、CPU/CUDA backend fail-closed seam 与 CVC near-dry/斜向动量失败暴露边界。 |
 
 ## 历史记录规则
 

@@ -16,6 +16,15 @@ target_link_libraries(test_surface_step
 )
 add_test(NAME test_surface_step COMMAND test_surface_step)
 
+add_executable(test_backend_contract test_backend_contract.cpp)
+target_link_libraries(test_backend_contract
+    PRIVATE
+        scau::surface2d
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_backend_contract COMMAND test_backend_contract)
+
 add_executable(test_dpm_fields test_dpm_fields.cpp)
 target_link_libraries(test_dpm_fields
     PRIVATE

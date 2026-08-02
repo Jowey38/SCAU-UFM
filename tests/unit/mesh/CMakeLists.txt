@@ -15,3 +15,12 @@ target_link_libraries(test_mesh_validation
         GTest::gtest_main
 )
 add_test(NAME test_mesh_validation COMMAND test_mesh_validation)
+
+add_executable(test_mesh_quality test_mesh_quality.cpp)
+target_link_libraries(test_mesh_quality
+    PRIVATE
+        scau::mesh
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_mesh_quality COMMAND test_mesh_quality)

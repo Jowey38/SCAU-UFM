@@ -86,6 +86,11 @@ RunResult run_one_dynamic_interface_step(
 
 }  // namespace
 
+TEST(CvcSpatialPhiTDynamicPerturbation, DefaultCorrectionRemainsDisabled) {
+    const scau::surface2d::StepConfig defaults{};
+    EXPECT_FALSE(defaults.enable_cvc_spatial_phi_t_correction);
+}
+
 TEST(CvcSpatialPhiTDynamicPerturbation, QuantifiesCurrentStorageResidualAcrossSpatialJump) {
     const auto mesh = scau::mesh::build_mixed_minimal_mesh();
     auto uniform = scau::surface2d::DpmFields::for_mesh(mesh);

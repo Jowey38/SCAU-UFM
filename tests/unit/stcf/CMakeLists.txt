@@ -18,6 +18,15 @@ target_link_libraries(test_stcf_migrate_v4_to_v5
 )
 add_test(NAME test_stcf_migrate_v4_to_v5 COMMAND test_stcf_migrate_v4_to_v5)
 
+add_executable(test_stcf_import_contract test_stcf_import_contract.cpp)
+target_link_libraries(test_stcf_import_contract
+    PRIVATE
+        scau::stcf
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_stcf_import_contract COMMAND test_stcf_import_contract)
+
 add_executable(test_stcf_validate test_stcf_validate.cpp)
 target_link_libraries(test_stcf_validate
     PRIVATE

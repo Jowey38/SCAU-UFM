@@ -9,6 +9,11 @@
 // this translation unit (project-layout-design.md section 4 ABI firewall).
 #include "swmm5.h"
 
+// Governed SWMM 5.2.4 internal ABI bridge. massbal_getStorage(FALSE) is the
+// upstream node+link storage calculation used by SWMM's own flow balance. It
+// returns internal ft3; swmm_NODE_VOLUME exposes the project-unit conversion.
+extern "C" double massbal_getStorage(char is_final_storage);
+
 namespace scau::coupling::drainage {
 namespace {
 
@@ -212,6 +217,20 @@ int SwmmEngine::link_index(const std::string& link_name) const {
             "SWMM link '" + link_name + "' was not found", "SWMM", "swmm_link_not_found");
     }
     return index;
+}
+
+double SwmmEngine::total_stored_volume() const {
+    require_initialized();
+    const double internal_storage_ft3 = massbal_getStorage(0);
+    // All accepted SCAU-UFM projects are metric CMS. Keep the locked upstream
+    // 5.2.4 VOLUME conversion explicit instead of exposing private UnitSystem.
+    constexpr double kCubicMetresPerCubicFoot = 0.02832;
+    const double storage_m3 = internal_storage_ft3 * kCubicMetresPerCubicFoot;
+    if (!std::isfinite(storage_m3) || storage_m3 < 0.0) {
+        throw SwmmEngineError(
+            "SWMM total stored volume is invalid", "SWMM", "swmm_storage_invalid");
+    }
+    return storage_m3;
 }
 
 void SwmmEngine::require_initialized() const {

@@ -1,5 +1,6 @@
 add_library(scau_mesh
     src/mesh.cpp
+    src/quality.cpp
 )
 add_library(scau::mesh ALIAS scau_mesh)
 
