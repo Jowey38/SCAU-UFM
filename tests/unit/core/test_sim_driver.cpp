@@ -5,13 +5,13 @@
 namespace {
 
 scau::apps::sim_driver::RuntimeConfig minimal_config() {
-    return {
-        .start_time = 0.0,
-        .end_time = 600.0,
-        .dt_couple = 60.0,
-        .dt_surface = 10.0,
-        .stcf_case_path = "case.stcf.nc",
-    };
+    scau::apps::sim_driver::RuntimeConfig config{};
+    config.start_time = 0.0;
+    config.end_time = 600.0;
+    config.dt_couple = 60.0;
+    config.dt_surface = 10.0;
+    config.stcf_case_path = "case.stcf.nc";
+    return config;
 }
 
 }  // namespace
