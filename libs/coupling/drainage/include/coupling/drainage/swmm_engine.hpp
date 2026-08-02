@@ -50,6 +50,10 @@ public:
     [[nodiscard]] int node_index(const std::string& node_name) const;
     [[nodiscard]] int link_index(const std::string& link_name) const;
 
+    // Whole-domain current hydraulic storage (nodes + links) in m3. This is a
+    // concrete embedded-SWMM observation, not part of the generic engine ABI.
+    [[nodiscard]] double total_stored_volume() const;
+
 private:
     void require_initialized() const;
     void require_valid_node(int node_id) const;

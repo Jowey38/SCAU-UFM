@@ -514,3 +514,8 @@ add_executable(test_coupling_dflowfm_checkpoint test_coupling_dflowfm_checkpoint
 target_link_libraries(test_coupling_dflowfm_checkpoint
     PRIVATE scau::coupling_driver scau::warnings GTest::gtest_main)
 add_test(NAME test_coupling_dflowfm_checkpoint COMMAND test_coupling_dflowfm_checkpoint)
+
+add_executable(test_coupling_checkpoint_coordinator test_coupling_checkpoint_coordinator.cpp)
+target_link_libraries(test_coupling_checkpoint_coordinator
+    PRIVATE scau::coupling_driver scau::warnings GTest::gtest_main)
+add_test(NAME test_coupling_checkpoint_coordinator COMMAND test_coupling_checkpoint_coordinator)

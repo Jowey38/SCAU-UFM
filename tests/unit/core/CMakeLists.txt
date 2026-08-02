@@ -15,3 +15,12 @@ target_link_libraries(test_core_error
         GTest::gtest_main
 )
 add_test(NAME test_core_error COMMAND test_core_error)
+
+add_executable(test_sim_driver test_sim_driver.cpp)
+target_link_libraries(test_sim_driver
+    PRIVATE
+        scau::sim_driver
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_sim_driver COMMAND test_sim_driver)

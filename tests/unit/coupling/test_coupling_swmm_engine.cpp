@@ -65,6 +65,24 @@ TEST(CouplingSwmmEngine, LateralInflowRoutesTowardOutfall) {
     engine.finalize();
 }
 
+TEST(CouplingSwmmEngine, ReportsWholeDomainNodeAndLinkStorage) {
+    SwmmEngine engine;
+    engine.initialize(minimal_case_path());
+    const int j1 = engine.node_index("J1");
+
+    const double initial = engine.total_stored_volume();
+    EXPECT_TRUE(std::isfinite(initial));
+    EXPECT_GE(initial, 0.0);
+
+    engine.set_node_lateral_inflow(j1, 0.05);
+    engine.step(60.0);
+    const double after = engine.total_stored_volume();
+    EXPECT_TRUE(std::isfinite(after));
+    EXPECT_GT(after, initial);
+    EXPECT_THROW(static_cast<void>(SwmmEngine{}.total_stored_volume()), SwmmEngineError);
+    engine.finalize();
+}
+
 TEST(CouplingSwmmEngine, SetOutfallStageOnlyTargetsOutfalls) {
     SwmmEngine engine;
     engine.initialize(minimal_case_path());
