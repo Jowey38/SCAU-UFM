@@ -47,6 +47,30 @@ With the opt-in G23 correction enabled the same run closes to 2.2e-16 with the
 deficit ledger fully repaid. The knob therefore surfaced in RuntimeConfig v2;
 the project-wide default remains OFF.
 
+## Runtime netcdf deployment finding (bug-188)
+
+G19 is the first golden whose executable statically imports the vcpkg
+`netcdf.dll` (STCF I/O, deployed app-local beside the executable) AND loads
+the real D-Flow FM runtime. The Windows loader resolves `netcdff.dll`'s
+`netcdf.dll` dependency against the already-loaded module by base name, and
+the vcpkg build lacks the `nc_def_var_chunking_ints` /
+`nc_inq_var_chunking_ints` exports the runtime needs, so `LoadLibrary`
+failed with error 127 on the governed runner. Fix: the gateway script deploys
+the runtime's `netcdf.dll` beside the G19 executable before running it;
+`dumpbin` verified the runtime build is a superset of all 24 `nc_*` imports
+the executable needs. The same deployment rule applies to `scau_sim` in real
+engine mode. Hosted CI is unaffected (G19 skips without the runtime env).
+
+## Real gateway evidence (governed runner environment, local execution)
+
+`tools/dflowfm/run_real_goldens.sh H:/scau-b-m268 Debug` with the production
+runtime (`SCAU_DFLOWFM_LIBRARY` -> Delft3D install): **6/6 goldens passed**
+(G11, G18, G16, G17, checkpoint reload, G19). G19 drove the real Surface2D
+solver, real embedded SWMM, and real D-Flow FM BMI runtime through
+`run_simulation` for 3 coupled epochs with the analytic `phi_t*h*A` closure
+holding to 1e-9; the real SWMM engine overshoots the requested elapsed target
+by less than one ROUTING_STEP (asserted as an interval, not an equality).
+
 ## Verification (MSVC Debug, clean master@8eafd23 + this change only)
 
 - Build: no C/C++/link/MSBuild errors.

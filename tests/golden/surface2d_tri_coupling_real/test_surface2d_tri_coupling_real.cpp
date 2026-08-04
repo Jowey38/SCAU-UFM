@@ -124,9 +124,12 @@ TEST(GoldenSurface2DTriCouplingReal, RunLoopDrivesRealSolverAndBothRealEngines) 
     EXPECT_EQ(result.committed_epochs, 3U);
     ASSERT_EQ(result.summary.epochs.size(), 3U);
 
-    // Real engines advanced exactly one dt_couple per committed epoch.
+    // Real engines advanced exactly one dt_couple per committed epoch. The
+    // real SWMM engine steps in its own routing increments and may overshoot
+    // the requested target by up to one ROUTING_STEP (5 s in this case).
     EXPECT_DOUBLE_EQ(dflowfm.elapsed_time(), 180.0);
-    EXPECT_NEAR(swmm.elapsed_time(), 180.0, 1.0e-6);
+    EXPECT_GE(swmm.elapsed_time(), 180.0 - 1.0e-6);
+    EXPECT_LT(swmm.elapsed_time(), 185.0);
 
     // Head-driven drains moved real volume off the surface.
     EXPECT_GT(result.summary.total_drained_volume, 0.0);
