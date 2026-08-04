@@ -28,6 +28,7 @@ add_subdirectory(tri_coupling_real_minimal)
 
 add_subdirectory(dflowfm_checkpoint_reload)
 add_subdirectory(dflowfm_lateral_response)
+add_subdirectory(surface2d_tri_coupling_real)
 
 add_subdirectory(stcf_case_pipeline)
 add_subdirectory(preproc_mixed_mesh_case)

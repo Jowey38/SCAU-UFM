@@ -24,3 +24,12 @@ target_link_libraries(test_sim_driver
         GTest::gtest_main
 )
 add_test(NAME test_sim_driver COMMAND test_sim_driver)
+
+add_executable(test_runtime_config_io test_runtime_config_io.cpp)
+target_link_libraries(test_runtime_config_io
+    PRIVATE
+        scau::sim_driver
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_runtime_config_io COMMAND test_runtime_config_io)

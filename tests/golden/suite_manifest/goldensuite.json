@@ -162,6 +162,15 @@
     "status": "implemented"
   },
   {
+    "test_id": "G19",
+    "name": "surface2d_tri_coupling_real",
+    "test_path": "tests/golden/surface2d_tri_coupling_real/",
+    "applicable_phase": "Phase 2+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": false,
+    "status": "implemented"
+  },
+  {
     "test_id": "G21",
     "name": "stcf_case_pipeline",
     "test_path": "tests/golden/stcf_case_pipeline/",

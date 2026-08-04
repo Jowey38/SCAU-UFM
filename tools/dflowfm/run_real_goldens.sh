@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # SCAU-UFM real D-Flow FM Phase Gateway.
 #
-# Runs the five real-runtime Goldens (G11, G16, G17, checkpoint reload, G18)
+# Runs the six real-runtime Goldens (G11, G16, G17, checkpoint reload, G18,
+# G19)
 # against the authored single_reach_1d case in one reproducible command.
 # This is the local/release gateway and the exact sequence the future
 # self-hosted CI job executes.
@@ -85,4 +86,15 @@ if [ ! -f "$SCAU_DFLOWFM_G11_CHECKPOINT_600" ]; then
 fi
 run_test dflowfm_checkpoint_reload
 
-echo "OK real D-Flow FM phase gateway: 5/5 goldens passed"
+# G19 is the first golden whose executable statically imports the vcpkg
+# netcdf.dll (STCF I/O) AND loads the D-Flow FM runtime. The Windows loader
+# resolves netcdff.dll's netcdf dependency against the already-loaded module
+# by base name, and the vcpkg build lacks the nc_*_chunking_ints exports the
+# runtime needs (error 127). Deploy the runtime's netcdf.dll beside the G19
+# executable so one netcdf serves both; it is a verified superset of the 24
+# nc_* imports the executable needs.
+G19_EXE=$(find_test surface2d_tri_coupling_real)
+cp "$RUNTIME_BIN/netcdf.dll" "$(dirname "$G19_EXE")/netcdf.dll"
+run_test surface2d_tri_coupling_real
+
+echo "OK real D-Flow FM phase gateway: 6/6 goldens passed"
