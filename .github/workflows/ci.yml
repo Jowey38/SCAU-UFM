@@ -169,6 +169,7 @@ jobs:
           test_dual_engine_shared_cell_real_both
           test_tri_coupling_real_minimal
           test_dflowfm_checkpoint_reload
+          test_surface2d_tri_coupling_real
 
       - name: Run real D-Flow FM phase gateway
         run: tools/dflowfm/run_real_goldens.sh build/windows-msvc Debug

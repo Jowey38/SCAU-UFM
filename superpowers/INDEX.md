@@ -155,6 +155,8 @@
 | `superpowers/specs/2026-07-30-m264-phase-gate-alignment-evidence.md` | M264 Phase/GoldenSuite 门禁对齐证据；解决 CUDA 属 Phase 2 而 G9 曾列 Phase 1 的冲突，锁定 Phase 1=G1-G8+G10、Phase 2 追加 G9/G11/G12，提升 G10/G12 为 active gate，并保留 G19/G20 未实现状态。 |
 | `superpowers/specs/2026-07-30-m265-g7-stcf-v4-v5-migration-evidence.md` | M265/G7 STCF v4→v5 迁移证据；按历史契约迁移 phi_s 与 psi_tensor，显式记录 v5 必填默认值，复用 strict v5 validation，登记 active Golden，并限定未承载 drag 字段与真实 v4 NetCDF reader 为后续范围。 |
 | `superpowers/specs/2026-07-30-m267-first-batch-runtime-contracts-evidence.md` | M267 首批运行契约证据；新增 SimDriver 生命周期骨架、三引擎 checkpoint commit 判定、SWMM node+link 全域储量 bridge、真实数据/mesh-quality 契约、CPU/CUDA backend fail-closed seam 与 CVC near-dry/斜向动量失败暴露边界。 |
+| `docs/superpowers/plans/2026-08-03-m268-sim-driver-tri-run-loop.md` | M268 计划；SimDriver 最小可执行三模型 run loop 架构：surface2d_coupling_map 适配层、epoch 次序不变量（surface 步全部接受后引擎才推进）、写回动量约定决策记录与 G19 non-gating 登记路线。 |
+| `superpowers/specs/2026-08-03-m268-sim-driver-tri-run-loop-evidence.md` | M268 证据；首个端到端三模型可执行闭环：RuntimeConfig v2 + 严格 key=value 配置、run_simulation epoch 循环、守恒写回（排水保速度/回流零动量）、G19 surface2d_tri_coupling_real 登记 non-gating 并入 self-hosted gateway；bug-186 记录 mixed-minimal phi_t 跳变需 opt-in CVC 才能 1e-9 闭合；147/147 全量测试。 |
 
 ## 历史记录规则
 

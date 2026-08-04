@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # SCAU-UFM real D-Flow FM Phase Gateway.
 #
-# Runs the five real-runtime Goldens (G11, G16, G17, checkpoint reload, G18)
+# Runs the six real-runtime Goldens (G11, G16, G17, checkpoint reload, G18,
+# G19)
 # against the authored single_reach_1d case in one reproducible command.
 # This is the local/release gateway and the exact sequence the future
 # self-hosted CI job executes.
@@ -84,5 +85,6 @@ if [ ! -f "$SCAU_DFLOWFM_G11_CHECKPOINT_600" ]; then
     exit 1
 fi
 run_test dflowfm_checkpoint_reload
+run_test surface2d_tri_coupling_real
 
-echo "OK real D-Flow FM phase gateway: 5/5 goldens passed"
+echo "OK real D-Flow FM phase gateway: 6/6 goldens passed"

@@ -26,8 +26,10 @@ REQUIRED = {
     "G16": ("dual_engine_shared_cell_real_both", "implemented", True),
     "G17": ("tri_coupling_real_minimal", "implemented", True),
     "G18": ("dflowfm_lateral_response", "implemented", True),
-    # G19/G20 are reserved by the post-G18 coupling completion line
-    # (surface2d_tri_coupling_real, dflowfm_longrun_10000) and land with it.
+    # G19 landed with the M268 SimDriver tri-model run loop as a non-gating
+    # candidate; promotion to ci_gate follows the whole-system mass audit
+    # (M270). G20 (dflowfm_longrun_10000) remains reserved.
+    "G19": ("surface2d_tri_coupling_real", "implemented", False),
     "G21": ("stcf_case_pipeline", "implemented", True),
     "G22": ("preproc_mixed_mesh_case", "implemented", True),
     "G23": ("cvc_spatial_phi_t_dynamic", "implemented", True),

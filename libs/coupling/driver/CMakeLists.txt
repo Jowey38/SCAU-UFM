@@ -5,6 +5,7 @@ add_library(scau_coupling_driver
     src/dflowfm_volume_provider.cpp
     src/roof_exchange_gate.cpp
     src/roof_swmm_step_driver.cpp
+    src/surface2d_coupling_map.cpp
     src/tri_coupling.cpp
 )
 add_library(scau::coupling_driver ALIAS scau_coupling_driver)
