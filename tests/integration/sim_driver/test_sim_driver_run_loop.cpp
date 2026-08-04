@@ -24,11 +24,22 @@ namespace {
 namespace sim = scau::apps::sim_driver;
 
 std::string case_path_from_env() {
+#ifdef _WIN32
+    char* value = nullptr;
+    std::size_t size = 0;
+    if (::_dupenv_s(&value, &size, "SCAU_SIM_RUN_LOOP_CASE") != 0 || value == nullptr) {
+        throw std::runtime_error("SCAU_SIM_RUN_LOOP_CASE is not set");
+    }
+    std::string result(value);
+    std::free(value);
+    return result;
+#else
     const char* value = std::getenv("SCAU_SIM_RUN_LOOP_CASE");
     if (value == nullptr || *value == '\0') {
         throw std::runtime_error("SCAU_SIM_RUN_LOOP_CASE is not set");
     }
     return value;
+#endif
 }
 
 // mixed-minimal: cell 0 quad (phi_t=1.0, z_b=0.0), cell 1 triangle
