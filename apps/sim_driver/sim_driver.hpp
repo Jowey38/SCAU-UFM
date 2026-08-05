@@ -78,6 +78,13 @@ struct RuntimeConfig {
     // phi_t*h*A closure when the case has spatial phi_t jumps under nonzero
     // velocity; stays default-off per the project-wide CVC decision.
     bool enable_cvc_spatial_phi_t_correction{false};
+    // M270 whole-system audit. Disabled by default for backward compatibility;
+    // when enabled the run requires complete SWMM and D-Flow storage providers.
+    bool enable_whole_system_mass_audit{false};
+    // Real third-party path tolerance. Strict mock/correctness mode ignores
+    // these and uses epsilon_deficit only.
+    double mass_audit_engine_residual_absolute{1.0e-4};
+    double mass_audit_engine_residual_relative{1.0e-6};
     EngineMode engine_mode{EngineMode::mock};
     // Project-standard variable name; real BMI kernels expose "s1".
     std::string river_water_level_variable{"water_level"};

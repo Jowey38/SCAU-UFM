@@ -440,3 +440,8 @@ target_link_libraries(test_stcf_case_loader
         GTest::gtest_main
 )
 add_test(NAME test_stcf_case_loader COMMAND test_stcf_case_loader)
+
+add_executable(test_surface2d_audit_mass test_surface2d_audit_mass.cpp)
+target_link_libraries(test_surface2d_audit_mass
+    PRIVATE scau::surface2d scau::warnings GTest::gtest_main)
+add_test(NAME test_surface2d_audit_mass COMMAND test_surface2d_audit_mass)

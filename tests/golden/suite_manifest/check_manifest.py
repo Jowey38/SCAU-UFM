@@ -33,6 +33,7 @@ REQUIRED = {
     "G21": ("stcf_case_pipeline", "implemented", True),
     "G22": ("preproc_mixed_mesh_case", "implemented", True),
     "G23": ("cvc_spatial_phi_t_dynamic", "implemented", True),
+    "G24": ("whole_system_mass_audit", "implemented", True),
 }
 
 

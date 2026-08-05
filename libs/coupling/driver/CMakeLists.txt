@@ -8,6 +8,7 @@ add_library(scau_coupling_driver
     src/roof_swmm_step_driver.cpp
     src/surface2d_coupling_map.cpp
     src/tri_coupling.cpp
+    src/whole_system_mass_audit.cpp
 )
 add_library(scau::coupling_driver ALIAS scau_coupling_driver)
 

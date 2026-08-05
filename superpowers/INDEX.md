@@ -159,6 +159,8 @@
 | `superpowers/specs/2026-08-03-m268-sim-driver-tri-run-loop-evidence.md` | M268 证据；首个端到端三模型可执行闭环：RuntimeConfig v2 + 严格 key=value 配置、run_simulation epoch 循环、守恒写回（排水保速度/回流零动量）、G19 surface2d_tri_coupling_real 登记 non-gating 并入 self-hosted gateway；bug-186 记录 mixed-minimal phi_t 跳变需 opt-in CVC 才能 1e-9 闭合；147/147 全量测试。 |
 | `docs/superpowers/plans/2026-08-05-m269-checkpoint-commit-integration.md` | M269 计划；将 M267 checkpoint coordinator 接入 M268 run loop，定义五模块同 epoch 原子提交、单 epoch 内存 rolling window、引擎推进前精确恢复与推进后拒绝回滚的边界。 |
 | `superpowers/specs/2026-08-05-m269-checkpoint-commit-integration-evidence.md` | M269 证据；FNV-1a 确定性 Surface2D/CouplingSnapshot 哈希与五模块 PreparedModuleCheckpoint 构建器；committed verdict 才推进 SimDriver 计数；CFL 路径恢复到最后提交 hash bit-exact，SWMM 已推进路径 fail-closed 拒绝回滚；149/149 测试与真实网关 6/6。 |
+| `docs/superpowers/plans/2026-08-06-m270-whole-system-mass-audit.md` | M270 计划；定义 Surface2D+SWMM+D-Flow 物理储量闭合、deficit 作为并行义务而非储量、near-dry 物理水量与 M_ref 分离、完整外部净通量 scope 才能宣称 conserved 的 fail-closed 边界；G24 active gate 与 G19 real complement 路线。 |
+| `superpowers/specs/2026-08-06-m270-whole-system-mass-audit-evidence.md` | M270 证据；生产 Surface2D 储量助手与 WholeSystemMassAudit 接入 SimDriver committed epoch；G24 20 epoch 完整 scope 严格闭合；G19 实测 raw residual +141.801 m3 揭示真实引擎外部通量 API 缺口，明确 scope-incomplete REVIEW_REQUIRED、不放宽容差、不提升 G19；154/154、golden 25/25、真实网关 6/6。 |
 
 ## 历史记录规则
 

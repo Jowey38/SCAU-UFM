@@ -87,6 +87,13 @@ void validate_runtime_config(const RuntimeConfig& config) {
         throw std::invalid_argument("cfl_safety must not exceed 1.0");
     }
     require_positive_finite(config.c_rollback, "c_rollback");
+    if (!std::isfinite(config.mass_audit_engine_residual_absolute) ||
+        config.mass_audit_engine_residual_absolute < 0.0 ||
+        !std::isfinite(config.mass_audit_engine_residual_relative) ||
+        config.mass_audit_engine_residual_relative < 0.0) {
+        throw std::invalid_argument(
+            "mass audit engine tolerances must be finite and non-negative");
+    }
 
     if (config.enable_swmm) {
         require_positive_finite(config.dt_swmm, "dt_swmm");

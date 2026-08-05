@@ -193,6 +193,12 @@ RuntimeConfig parse_runtime_config_text(const std::string& text) {
             config.c_rollback = parse_double(value, key);
         } else if (key == "enable_cvc_spatial_phi_t_correction") {
             config.enable_cvc_spatial_phi_t_correction = parse_bool(value, key);
+        } else if (key == "enable_whole_system_mass_audit") {
+            config.enable_whole_system_mass_audit = parse_bool(value, key);
+        } else if (key == "mass_audit_engine_residual_absolute") {
+            config.mass_audit_engine_residual_absolute = parse_double(value, key);
+        } else if (key == "mass_audit_engine_residual_relative") {
+            config.mass_audit_engine_residual_relative = parse_double(value, key);
         } else if (key == "engine_mode") {
             if (value == "mock") {
                 config.engine_mode = EngineMode::mock;

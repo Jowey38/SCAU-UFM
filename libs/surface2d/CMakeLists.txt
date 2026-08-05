@@ -1,4 +1,5 @@
 add_library(scau_surface2d
+    src/audit/mass.cpp
     src/backend.cpp
     src/boundary/conditions.cpp
     src/cfl/diagnostics.cpp

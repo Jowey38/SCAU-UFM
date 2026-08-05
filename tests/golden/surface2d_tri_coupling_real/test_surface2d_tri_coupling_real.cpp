@@ -5,6 +5,8 @@
 
 #include <gtest/gtest.h>
 
+#include "coupling/driver/dflowfm_volume_provider.hpp"
+#include "coupling/driver/whole_system_mass_audit.hpp"
 #include "coupling/drainage/swmm_engine.hpp"
 #include "coupling/river/dflowfm_engine.hpp"
 #include "run_loop.hpp"
@@ -78,6 +80,10 @@ TEST(GoldenSurface2DTriCouplingReal, RunLoopDrivesRealSolverAndBothRealEngines) 
     // mixed-minimal carries a spatial phi_t jump (1.0 / 0.8); exact
     // phi_t*h*A closure requires the opt-in G23 CVC correction.
     config.enable_cvc_spatial_phi_t_correction = true;
+    // G19 keeps the run-loop gate disabled because the governed real-engine
+    // APIs do not yet expose complete external flux scope. The test constructs
+    // and asserts the scope-incomplete audit report after the 3-epoch run.
+    config.enable_whole_system_mass_audit = false;
     config.engine_mode = sim::EngineMode::real;
     config.river_water_level_variable = "s1";
 
@@ -113,10 +119,17 @@ TEST(GoldenSurface2DTriCouplingReal, RunLoopDrivesRealSolverAndBothRealEngines) 
     swmm.initialize(config.swmm_inp_path);
     dflowfm.initialize(config.dflowfm_mdu_path);
 
+    const double swmm_storage_initial = swmm.total_stored_volume();
+    const double dflow_storage_initial =
+        scau::coupling::driver::observe_dflowfm_volume(dflowfm).volume;
+
     sim::RunLoopHooks hooks{};
     hooks.resolve_swmm_node = [&swmm](const std::string& node_name) {
         return swmm.node_index(node_name);
     };
+    hooks.swmm_elapsed_time = [&swmm]() { return swmm.elapsed_time(); };
+    hooks.dflowfm_elapsed_time = [&dflowfm]() { return dflowfm.elapsed_time(); };
+    hooks.swmm_storage_volume = [&swmm]() { return swmm.total_stored_volume(); };
 
     const sim::RunLoopResult result = sim::run_simulation(driver, swmm, dflowfm, hooks);
 
@@ -157,6 +170,39 @@ TEST(GoldenSurface2DTriCouplingReal, RunLoopDrivesRealSolverAndBothRealEngines) 
         EXPECT_EQ(record.checkpoint_status, "committed");
     }
     EXPECT_TRUE(result.summary.recovery_action.empty());
+
+    // M270 real-scope evidence: storage providers are complete, but the
+    // governed wrappers do not yet expose complete cumulative external
+    // source/sink terms. A zero-external assumption produces a raw 141.8 m3
+    // residual; the honest verdict is scope-incomplete REVIEW_REQUIRED, not a
+    // relaxed-tolerance conservation claim.
+    const double swmm_storage_final = swmm.total_stored_volume();
+    const double dflow_storage_final =
+        scau::coupling::driver::observe_dflowfm_volume(dflowfm).volume;
+    scau::coupling::driver::WholeSystemMassSample mass_baseline{};
+    mass_baseline.epoch = 0U;
+    mass_baseline.logical_time = 0.0;
+    mass_baseline.surface_volume = initial_volume;
+    mass_baseline.surface_reference_volume = initial_volume;
+    mass_baseline.swmm_storage_volume = swmm_storage_initial;
+    mass_baseline.dflowfm_volume = dflow_storage_initial;
+    scau::coupling::driver::WholeSystemMassSample mass_current{};
+    mass_current.epoch = 3U;
+    mass_current.logical_time = 180.0;
+    mass_current.surface_volume = result.summary.final_surface_physical_volume;
+    mass_current.surface_reference_volume = result.summary.final_surface_physical_volume;
+    mass_current.coupling_deficit_volume =
+        result.summary.final_coupling_deficit_volume;
+    mass_current.swmm_storage_volume = swmm_storage_final;
+    mass_current.dflowfm_volume = dflow_storage_final;
+    const auto mass_report = scau::coupling::driver::audit_whole_system_mass(
+        mass_baseline, mass_current);
+    EXPECT_FALSE(mass_report.scope_complete);
+    EXPECT_FALSE(mass_report.conserved);
+    EXPECT_EQ(mass_report.verdict,
+              scau::coupling::driver::WholeSystemMassVerdict::review_required);
+    EXPECT_GT(std::abs(mass_report.residual), 100.0);
+    EXPECT_LT(std::abs(mass_report.residual), 200.0);
 
     swmm.finalize();
     dflowfm.finalize();
