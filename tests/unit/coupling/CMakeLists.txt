@@ -524,3 +524,8 @@ add_executable(test_coupling_surface2d_map test_coupling_surface2d_map.cpp)
 target_link_libraries(test_coupling_surface2d_map
     PRIVATE scau::coupling_driver scau::warnings GTest::gtest_main)
 add_test(NAME test_coupling_surface2d_map COMMAND test_coupling_surface2d_map)
+
+add_executable(test_coupling_checkpoint_payloads test_coupling_checkpoint_payloads.cpp)
+target_link_libraries(test_coupling_checkpoint_payloads
+    PRIVATE scau::coupling_driver scau::warnings GTest::gtest_main)
+add_test(NAME test_coupling_checkpoint_payloads COMMAND test_coupling_checkpoint_payloads)

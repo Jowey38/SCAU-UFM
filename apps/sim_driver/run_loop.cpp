@@ -9,6 +9,9 @@
 #include <vector>
 
 #include "coupling/core/state.hpp"
+#include "coupling/driver/checkpoint_coordinator.hpp"
+#include "coupling/driver/checkpoint_payloads.hpp"
+#include "coupling/driver/dflowfm_checkpoint.hpp"
 #include "coupling/driver/surface2d_coupling_map.hpp"
 #include "coupling/driver/tri_coupling.hpp"
 #include "surface2d/boundary/conditions.hpp"
@@ -60,6 +63,29 @@ double physical_surface_volume(const s2d::SurfaceState& state,
     }
     return total;
 }
+
+const char* rollback_action_name(driver_ns::DFlowFMRollbackAction action) {
+    switch (action) {
+        case driver_ns::DFlowFMRollbackAction::memory_only:
+            return "memory_only";
+        case driver_ns::DFlowFMRollbackAction::checkpoint_reload:
+            return "checkpoint_reload";
+        case driver_ns::DFlowFMRollbackAction::abort_no_checkpoint:
+            return "abort_no_checkpoint";
+        case driver_ns::DFlowFMRollbackAction::abort_replay_unavailable:
+            return "abort_replay_unavailable";
+    }
+    return "unknown";
+}
+
+// The rolling in-memory window: exactly the last committed epoch boundary.
+struct LastCommit {
+    s2d::SurfaceState state{};
+    std::optional<core::CouplingSnapshot> coupling{};
+    double total_drained_volume{0.0};
+    double total_returned_volume{0.0};
+    double total_boundary_inflow_volume{0.0};
+};
 
 }  // namespace
 
@@ -116,6 +142,10 @@ RunLoopResult run_simulation(
     const std::size_t n_surface = surface_substep_count(config);
     std::optional<core::CouplingState> previous_coupling{};
 
+    // The initial state is the epoch-zero commit baseline.
+    LastCommit last_commit{};
+    last_commit.state = state;
+
     const auto finish = [&](const char* outcome, const std::string& reason) {
         summary.outcome = outcome;
         summary.reason = reason;
@@ -126,8 +156,41 @@ RunLoopResult run_simulation(
             previous_coupling.has_value()
                 ? previous_coupling->compute_system_mass(config.h_wet).deficit_mass
                 : 0.0;
+        summary.final_surface_state_hash = driver_ns::hash_surface_state(state);
         result.final_state = driver.state();
         result.committed_epochs = driver.completed_coupling_steps();
+    };
+
+    // Failure BEFORE any engine advanced this epoch: restore exactly the last
+    // committed boundary (surface state, coupling ledgers, cumulative totals).
+    const auto restore_last_commit = [&]() {
+        state = last_commit.state;
+        if (last_commit.coupling.has_value()) {
+            previous_coupling.emplace(
+                core::CouplingState{last_commit.coupling->cells()});
+        } else {
+            previous_coupling.reset();
+        }
+        summary.total_drained_volume = last_commit.total_drained_volume;
+        summary.total_returned_volume = last_commit.total_returned_volume;
+        summary.total_boundary_inflow_volume = last_commit.total_boundary_inflow_volume;
+        driver_ns::DFlowFMRollbackRequest request{};
+        request.engine_advanced = false;
+        request.deterministic_replay_available = true;
+        summary.recovery_action = "restored_to_last_commit";
+        summary.dflowfm_rollback_decision =
+            rollback_action_name(driver_ns::decide_dflowfm_rollback_action(request));
+    };
+
+    // Failure AT or AFTER engine advancement: SWMM cannot rewind, so rollback
+    // across the engine boundary is refused and the decision is evidence.
+    const auto refuse_engine_rollback = [&]() {
+        driver_ns::DFlowFMRollbackRequest request{};
+        request.engine_advanced = true;
+        request.deterministic_replay_available = false;
+        summary.recovery_action = "refused_engine_rollback";
+        summary.dflowfm_rollback_decision =
+            rollback_action_name(driver_ns::decide_dflowfm_rollback_action(request));
     };
 
     for (std::size_t epoch = 0U; epoch < n_epochs; ++epoch) {
@@ -151,20 +214,34 @@ RunLoopResult run_simulation(
             summary.total_boundary_inflow_volume +=
                 static_cast<double>(diagnostics.boundary_inflow_volume);
             if (diagnostics.rollback_required) {
+                restore_last_commit();
                 driver.require_review();
                 finish("review_required",
                        "cfl_rollback at epoch " + std::to_string(epoch) +
-                           " (max_cell_cfl exceeded c_rollback; surface state not advanced)");
+                           " (max_cell_cfl exceeded c_rollback before engine advancement; "
+                           "state restored to the last committed boundary)");
                 return result;
             }
         }
 
-        // 2. Project the current surface into fresh exchange cells.
-        const std::vector<core::ExchangeCellState> cells_before =
-            driver_ns::build_exchange_cells(
+        // 2. Project the current surface into fresh exchange cells. Failures
+        // here happen BEFORE any engine write: restore and review.
+        std::vector<core::ExchangeCellState> cells_before;
+        std::optional<core::CouplingState> coupling_opt;
+        try {
+            cells_before = driver_ns::build_exchange_cells(
                 state, loaded.dpm_fields, geometry, map,
                 previous_coupling.has_value() ? &*previous_coupling : nullptr);
-        core::CouplingState coupling{cells_before};
+            coupling_opt.emplace(cells_before);
+        } catch (const std::exception& error) {
+            restore_last_commit();
+            driver.require_review();
+            finish("review_required",
+                   "exchange projection failed at epoch " + std::to_string(epoch) +
+                       " before engine advancement: " + error.what());
+            return result;
+        }
+        core::CouplingState& coupling = *coupling_opt;
 
         // 3. One coupled substep (head-driven links), dt_sub = dt_couple.
         driver_ns::TriCouplingStepConfig tri_config{};
@@ -213,21 +290,71 @@ RunLoopResult run_simulation(
             tri_config.drainage_river.push_back(link);
         }
 
-        const driver_ns::TriCouplingStepReport report = driver_ns::advance_tri_coupling_step(
-            coupling, swmm, dflowfm, tri_config, config.dt_couple, config.h_wet);
-
-        // 4. Unconditional conservative write-back (post-replay storage update).
-        const driver_ns::ExchangeWriteBackReport write_back =
-            driver_ns::apply_exchange_write_back(
+        // 3.-4. One coupled substep (dt_sub = dt_couple) and the unconditional
+        // conservative write-back. Any failure in this window may have
+        // advanced an engine: rollback is refused and the run stops.
+        driver_ns::TriCouplingStepReport report{};
+        driver_ns::ExchangeWriteBackReport write_back{};
+        try {
+            report = driver_ns::advance_tri_coupling_step(
+                coupling, swmm, dflowfm, tri_config, config.dt_couple, config.h_wet);
+            write_back = driver_ns::apply_exchange_write_back(
                 state, loaded.dpm_fields, geometry, map, cells_before, coupling,
                 loaded.bed_elevations);
+        } catch (const std::exception& error) {
+            refuse_engine_rollback();
+            driver.require_review();
+            finish("review_required",
+                   "coupled substep failed at epoch " + std::to_string(epoch) +
+                       " at or after engine advancement (rollback refused): " +
+                       error.what());
+            return result;
+        }
         summary.total_drained_volume += write_back.drained_volume;
         summary.total_returned_volume += write_back.returned_volume;
 
-        // 5. Commit the orchestration boundary.
+        // 5. Epoch commit protocol: only a committed coordinator verdict
+        // advances the committed-step counter and the rolling window.
+        const std::uint64_t epoch_id = static_cast<std::uint64_t>(epoch) + 1U;
+        const core::CouplingSnapshot coupling_snapshot = coupling.snapshot();
+        const double swmm_elapsed =
+            hooks.swmm_elapsed_time ? hooks.swmm_elapsed_time() : logical_time;
+        const double dflowfm_elapsed =
+            hooks.dflowfm_elapsed_time ? hooks.dflowfm_elapsed_time() : logical_time;
+        std::vector<driver_ns::PreparedModuleCheckpoint> prepared{
+            driver_ns::prepare_surface2d_checkpoint(state, epoch_id, logical_time),
+            driver_ns::prepare_coupling_checkpoint(coupling_snapshot, epoch_id,
+                                                   logical_time),
+            driver_ns::prepare_sim_driver_checkpoint(
+                driver.completed_coupling_steps() + 1U, epoch_id, logical_time),
+            driver_ns::prepare_swmm_checkpoint(swmm_elapsed, epoch_id, logical_time),
+            driver_ns::prepare_dflowfm_checkpoint_record(dflowfm_elapsed, nullptr,
+                                                         epoch_id, logical_time),
+        };
+        driver_ns::CheckpointRequirements requirements{};
+        requirements.require_swmm = true;
+        requirements.require_dflowfm = true;
+        const driver_ns::CheckpointCommitRecord commit_record =
+            driver_ns::coordinate_checkpoint_commit(prepared, requirements);
+        if (commit_record.status != driver_ns::CheckpointCommitStatus::committed) {
+            refuse_engine_rollback();
+            driver.require_review();
+            finish("review_required",
+                   "checkpoint commit aborted at epoch " + std::to_string(epoch) +
+                       " after engine advancement (rollback refused): " +
+                       commit_record.reason);
+            return result;
+        }
+
         const core::SystemMassAudit audit_after = coupling.compute_system_mass(config.h_wet);
         previous_coupling.emplace(std::move(coupling));
         driver.record_committed_coupling_step();
+
+        last_commit.state = state;
+        last_commit.coupling.emplace(coupling_snapshot);
+        last_commit.total_drained_volume = summary.total_drained_volume;
+        last_commit.total_returned_volume = summary.total_returned_volume;
+        last_commit.total_boundary_inflow_volume = summary.total_boundary_inflow_volume;
 
         EpochRecord record{};
         record.epoch = static_cast<std::uint64_t>(epoch);
@@ -239,6 +366,9 @@ RunLoopResult run_simulation(
         record.returned_volume = write_back.returned_volume;
         record.max_cell_cfl = epoch_max_cfl;
         record.wet_cell_count = report.surface_mass_after.wet_cell_count;
+        record.checkpoint_status = "committed";
+        record.surface_content_hash = prepared[0].content_hash;
+        record.coupling_content_hash = prepared[1].content_hash;
         summary.epochs.push_back(record);
         summary.final_time = logical_time;
     }

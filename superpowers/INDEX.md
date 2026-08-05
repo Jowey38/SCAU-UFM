@@ -157,6 +157,8 @@
 | `superpowers/specs/2026-07-30-m267-first-batch-runtime-contracts-evidence.md` | M267 首批运行契约证据；新增 SimDriver 生命周期骨架、三引擎 checkpoint commit 判定、SWMM node+link 全域储量 bridge、真实数据/mesh-quality 契约、CPU/CUDA backend fail-closed seam 与 CVC near-dry/斜向动量失败暴露边界。 |
 | `docs/superpowers/plans/2026-08-03-m268-sim-driver-tri-run-loop.md` | M268 计划；SimDriver 最小可执行三模型 run loop 架构：surface2d_coupling_map 适配层、epoch 次序不变量（surface 步全部接受后引擎才推进）、写回动量约定决策记录与 G19 non-gating 登记路线。 |
 | `superpowers/specs/2026-08-03-m268-sim-driver-tri-run-loop-evidence.md` | M268 证据；首个端到端三模型可执行闭环：RuntimeConfig v2 + 严格 key=value 配置、run_simulation epoch 循环、守恒写回（排水保速度/回流零动量）、G19 surface2d_tri_coupling_real 登记 non-gating 并入 self-hosted gateway；bug-186 记录 mixed-minimal phi_t 跳变需 opt-in CVC 才能 1e-9 闭合；147/147 全量测试。 |
+| `docs/superpowers/plans/2026-08-05-m269-checkpoint-commit-integration.md` | M269 计划；将 M267 checkpoint coordinator 接入 M268 run loop，定义五模块同 epoch 原子提交、单 epoch 内存 rolling window、引擎推进前精确恢复与推进后拒绝回滚的边界。 |
+| `superpowers/specs/2026-08-05-m269-checkpoint-commit-integration-evidence.md` | M269 证据；FNV-1a 确定性 Surface2D/CouplingSnapshot 哈希与五模块 PreparedModuleCheckpoint 构建器；committed verdict 才推进 SimDriver 计数；CFL 路径恢复到最后提交 hash bit-exact，SWMM 已推进路径 fail-closed 拒绝回滚；149/149 测试与真实网关 6/6。 |
 
 ## 历史记录规则
 

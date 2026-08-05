@@ -1,5 +1,6 @@
 add_library(scau_coupling_driver
     src/checkpoint_coordinator.cpp
+    src/checkpoint_payloads.cpp
     src/coupling_state_endpoint_provider.cpp
     src/dflowfm_checkpoint.cpp
     src/dflowfm_volume_provider.cpp

@@ -122,11 +122,15 @@ TEST(SimDriverRunLoop, CompletesTriModelRunWithConservativeWriteBack) {
                     result.summary.total_returned_volume,
                 initial_volume, 1.0e-9);
 
-    // Epoch records are monotone in time and finite in mass.
+    // Epoch records are monotone in time and finite in mass, and every
+    // committed epoch carries a committed checkpoint record (M269).
     double previous_time = 0.0;
     for (const sim::EpochRecord& record : result.summary.epochs) {
         EXPECT_GT(record.logical_time, previous_time);
         previous_time = record.logical_time;
+        EXPECT_EQ(record.checkpoint_status, "committed");
+        EXPECT_FALSE(record.surface_content_hash.empty());
+        EXPECT_FALSE(record.coupling_content_hash.empty());
         EXPECT_GE(record.coupling_surface_mass_before, 0.0);
         EXPECT_GE(record.coupling_surface_mass_after, 0.0);
         EXPECT_GE(record.coupling_deficit_mass_after, 0.0);
