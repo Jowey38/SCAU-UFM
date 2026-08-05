@@ -55,6 +55,12 @@ std::string to_json(const RunSummary& summary) {
         << ",\n";
     out << "  \"final_coupling_deficit_volume\": " << summary.final_coupling_deficit_volume
         << ",\n";
+    out << "  \"recovery_action\": \"" << escape_json_string(summary.recovery_action)
+        << "\",\n";
+    out << "  \"dflowfm_rollback_decision\": \""
+        << escape_json_string(summary.dflowfm_rollback_decision) << "\",\n";
+    out << "  \"final_surface_state_hash\": \""
+        << escape_json_string(summary.final_surface_state_hash) << "\",\n";
     out << "  \"epochs\": [";
     for (std::size_t index = 0U; index < summary.epochs.size(); ++index) {
         const EpochRecord& record = summary.epochs[index];
@@ -67,7 +73,12 @@ std::string to_json(const RunSummary& summary) {
             << ", \"drained_volume\": " << record.drained_volume
             << ", \"returned_volume\": " << record.returned_volume
             << ", \"max_cell_cfl\": " << record.max_cell_cfl
-            << ", \"wet_cell_count\": " << record.wet_cell_count << "}";
+            << ", \"wet_cell_count\": " << record.wet_cell_count
+            << ", \"checkpoint_status\": \"" << escape_json_string(record.checkpoint_status)
+            << "\", \"surface_content_hash\": \""
+            << escape_json_string(record.surface_content_hash)
+            << "\", \"coupling_content_hash\": \""
+            << escape_json_string(record.coupling_content_hash) << "\"}";
     }
     out << (summary.epochs.empty() ? "]\n" : "\n  ]\n");
     out << "}\n";

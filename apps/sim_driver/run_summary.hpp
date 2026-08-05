@@ -21,6 +21,11 @@ struct EpochRecord {
     double returned_volume{0.0};
     double max_cell_cfl{0.0};
     std::size_t wet_cell_count{0U};
+    // M269 epoch commit protocol: only "committed" epochs appear here; the
+    // hashes make the commit reproducible in evidence.
+    std::string checkpoint_status{};
+    std::string surface_content_hash{};
+    std::string coupling_content_hash{};
 };
 
 struct RunSummary {
@@ -33,6 +38,12 @@ struct RunSummary {
     double total_boundary_inflow_volume{0.0};
     double final_surface_physical_volume{0.0};
     double final_coupling_deficit_volume{0.0};
+    // M269 recovery evidence: empty on a clean run. recovery_action is
+    // "restored_to_last_commit" (failure before engines advanced) or
+    // "refused_engine_rollback" (failure at/after engine advancement).
+    std::string recovery_action{};
+    std::string dflowfm_rollback_decision{};
+    std::string final_surface_state_hash{};
     std::vector<EpochRecord> epochs{};
 };
 

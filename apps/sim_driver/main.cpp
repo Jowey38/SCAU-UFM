@@ -56,7 +56,10 @@ int main(int argc, char** argv) {
             scau::coupling::river::MockDFlowFMEngine dflowfm;
             swmm.initialize(config.swmm_inp_path);
             dflowfm.initialize(config.dflowfm_mdu_path);
-            const int code = run_with_engines(driver, swmm, dflowfm, sim::RunLoopHooks{});
+            sim::RunLoopHooks hooks{};
+            hooks.swmm_elapsed_time = [&swmm]() { return swmm.elapsed_time(); };
+            hooks.dflowfm_elapsed_time = [&dflowfm]() { return dflowfm.elapsed_time(); };
+            const int code = run_with_engines(driver, swmm, dflowfm, hooks);
             swmm.finalize();
             dflowfm.finalize();
             return code;
@@ -71,6 +74,8 @@ int main(int argc, char** argv) {
         hooks.resolve_swmm_node = [&swmm](const std::string& node_name) {
             return swmm.node_index(node_name);
         };
+        hooks.swmm_elapsed_time = [&swmm]() { return swmm.elapsed_time(); };
+        hooks.dflowfm_elapsed_time = [&dflowfm]() { return dflowfm.elapsed_time(); };
         const int code = run_with_engines(driver, swmm, dflowfm, hooks);
         swmm.finalize();
         dflowfm.finalize();

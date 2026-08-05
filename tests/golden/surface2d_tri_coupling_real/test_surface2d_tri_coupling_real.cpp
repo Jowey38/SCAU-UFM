@@ -149,11 +149,14 @@ TEST(GoldenSurface2DTriCouplingReal, RunLoopDrivesRealSolverAndBothRealEngines) 
     EXPECT_TRUE(std::isfinite(result.summary.final_coupling_deficit_volume));
     EXPECT_TRUE(std::isfinite(dflowfm.get_value("s1", 0)));
 
-    // Every committed epoch stayed inside the CFL contract.
+    // Every committed epoch stayed inside the CFL contract and carries a
+    // committed checkpoint record (M269 epoch commit protocol).
     for (const sim::EpochRecord& record : result.summary.epochs) {
         EXPECT_LE(record.max_cell_cfl, 1.0);
         EXPECT_GE(record.coupling_surface_mass_after, 0.0);
+        EXPECT_EQ(record.checkpoint_status, "committed");
     }
+    EXPECT_TRUE(result.summary.recovery_action.empty());
 
     swmm.finalize();
     dflowfm.finalize();

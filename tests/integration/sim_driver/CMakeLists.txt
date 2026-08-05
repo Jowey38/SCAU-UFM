@@ -24,3 +24,17 @@ set_tests_properties(test_sim_driver_run_loop PROPERTIES
     FIXTURES_REQUIRED sim_driver_run_loop_case
     ENVIRONMENT "SCAU_SIM_RUN_LOOP_CASE=${SIM_DRIVER_CASE}"
 )
+
+add_executable(test_sim_driver_checkpoint_rollback test_sim_driver_checkpoint_rollback.cpp)
+target_link_libraries(test_sim_driver_checkpoint_rollback
+    PRIVATE
+        scau::sim_driver
+        scau::warnings
+        GTest::gtest_main
+)
+add_dependencies(test_sim_driver_checkpoint_rollback scau_preproc)
+add_test(NAME test_sim_driver_checkpoint_rollback COMMAND test_sim_driver_checkpoint_rollback)
+set_tests_properties(test_sim_driver_checkpoint_rollback PROPERTIES
+    FIXTURES_REQUIRED sim_driver_run_loop_case
+    ENVIRONMENT "SCAU_SIM_RUN_LOOP_CASE=${SIM_DRIVER_CASE}"
+)
