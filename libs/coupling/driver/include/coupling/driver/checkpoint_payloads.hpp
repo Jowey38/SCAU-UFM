@@ -15,7 +15,7 @@ namespace scau::coupling::driver {
 // PreparedModuleCheckpoint builders for the SimDriver epoch commit protocol.
 //
 // Hashing is FNV-1a 64-bit over the exact bit patterns of every double
-// (std::bit_cast) plus container sizes and enum tags — no dependency, fully
+// (std::bit_cast) plus container sizes and enum tags - no dependency, fully
 // deterministic across runs on the same platform, and sensitive to one-ULP
 // perturbations. The hash string format is "fnv1a64:<16 hex digits>".
 
