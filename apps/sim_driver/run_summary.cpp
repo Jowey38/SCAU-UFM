@@ -61,6 +61,16 @@ std::string to_json(const RunSummary& summary) {
         << escape_json_string(summary.dflowfm_rollback_decision) << "\",\n";
     out << "  \"final_surface_state_hash\": \""
         << escape_json_string(summary.final_surface_state_hash) << "\",\n";
+    out << "  \"whole_system_mass_audit_enabled\": "
+        << (summary.whole_system_mass_audit_enabled ? "true" : "false") << ",\n";
+    out << "  \"whole_system_mass_verdict\": \""
+        << escape_json_string(summary.whole_system_mass_verdict) << "\",\n";
+    out << "  \"final_whole_system_mass_residual\": "
+        << summary.final_whole_system_mass_residual << ",\n";
+    out << "  \"max_abs_whole_system_mass_residual\": "
+        << summary.max_abs_whole_system_mass_residual << ",\n";
+    out << "  \"whole_system_mass_tolerance\": "
+        << summary.whole_system_mass_tolerance << ",\n";
     out << "  \"epochs\": [";
     for (std::size_t index = 0U; index < summary.epochs.size(); ++index) {
         const EpochRecord& record = summary.epochs[index];
@@ -78,7 +88,30 @@ std::string to_json(const RunSummary& summary) {
             << "\", \"surface_content_hash\": \""
             << escape_json_string(record.surface_content_hash)
             << "\", \"coupling_content_hash\": \""
-            << escape_json_string(record.coupling_content_hash) << "\"}";
+            << escape_json_string(record.coupling_content_hash)
+            << "\", \"whole_system_mass_audit_enabled\": "
+            << (record.whole_system_mass_audit_enabled ? "true" : "false")
+            << ", \"whole_system_storage_total\": "
+            << record.whole_system_storage_total
+            << ", \"whole_system_mass_residual\": "
+            << record.whole_system_mass_residual
+            << ", \"whole_system_mass_tolerance\": "
+            << record.whole_system_mass_tolerance
+            << ", \"whole_system_mass_verdict\": \""
+            << escape_json_string(record.whole_system_mass_verdict)
+            << "\", \"deficit_age_steps\": [";
+        for (std::size_t age_index = 0U; age_index < record.deficit_age_steps.size();
+             ++age_index) {
+            out << (age_index == 0U ? "" : ", ")
+                << record.deficit_age_steps[age_index];
+        }
+        out << "], \"deficit_account_volumes\": [";
+        for (std::size_t volume_index = 0U;
+             volume_index < record.deficit_account_volumes.size(); ++volume_index) {
+            out << (volume_index == 0U ? "" : ", ")
+                << record.deficit_account_volumes[volume_index];
+        }
+        out << "]}";
     }
     out << (summary.epochs.empty() ? "]\n" : "\n  ]\n");
     out << "}\n";

@@ -26,6 +26,14 @@ struct EpochRecord {
     std::string checkpoint_status{};
     std::string surface_content_hash{};
     std::string coupling_content_hash{};
+    // M270 whole-system physical-storage audit. Empty runs leave enabled=false.
+    bool whole_system_mass_audit_enabled{false};
+    double whole_system_storage_total{0.0};
+    double whole_system_mass_residual{0.0};
+    double whole_system_mass_tolerance{0.0};
+    std::string whole_system_mass_verdict{};
+    std::vector<std::size_t> deficit_age_steps{};
+    std::vector<double> deficit_account_volumes{};
 };
 
 struct RunSummary {
@@ -44,6 +52,11 @@ struct RunSummary {
     std::string recovery_action{};
     std::string dflowfm_rollback_decision{};
     std::string final_surface_state_hash{};
+    bool whole_system_mass_audit_enabled{false};
+    std::string whole_system_mass_verdict{};
+    double final_whole_system_mass_residual{0.0};
+    double max_abs_whole_system_mass_residual{0.0};
+    double whole_system_mass_tolerance{0.0};
     std::vector<EpochRecord> epochs{};
 };
 

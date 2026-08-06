@@ -38,3 +38,17 @@ set_tests_properties(test_sim_driver_checkpoint_rollback PROPERTIES
     FIXTURES_REQUIRED sim_driver_run_loop_case
     ENVIRONMENT "SCAU_SIM_RUN_LOOP_CASE=${SIM_DRIVER_CASE}"
 )
+
+add_executable(test_sim_driver_whole_system_mass_audit test_sim_driver_whole_system_mass_audit.cpp)
+target_link_libraries(test_sim_driver_whole_system_mass_audit
+    PRIVATE
+        scau::sim_driver
+        scau::warnings
+        GTest::gtest_main
+)
+add_dependencies(test_sim_driver_whole_system_mass_audit scau_preproc)
+add_test(NAME test_sim_driver_whole_system_mass_audit COMMAND test_sim_driver_whole_system_mass_audit)
+set_tests_properties(test_sim_driver_whole_system_mass_audit PROPERTIES
+    FIXTURES_REQUIRED sim_driver_run_loop_case
+    ENVIRONMENT "SCAU_SIM_RUN_LOOP_CASE=${SIM_DRIVER_CASE}"
+)

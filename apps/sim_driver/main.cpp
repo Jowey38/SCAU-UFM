@@ -59,6 +59,14 @@ int main(int argc, char** argv) {
             sim::RunLoopHooks hooks{};
             hooks.swmm_elapsed_time = [&swmm]() { return swmm.elapsed_time(); };
             hooks.dflowfm_elapsed_time = [&dflowfm]() { return dflowfm.elapsed_time(); };
+            // Mock mode has no governed hydraulic-storage observer; the CLI
+            // therefore rejects whole-system audit in mock mode. Integration
+            // tests inject a harness-owned physical ledger explicitly.
+            if (config.enable_whole_system_mass_audit) {
+                throw std::invalid_argument(
+                    "scau_sim mock mode requires a harness-owned SWMM storage "
+                    "provider; disable whole-system audit or use real mode");
+            }
             const int code = run_with_engines(driver, swmm, dflowfm, hooks);
             swmm.finalize();
             dflowfm.finalize();
@@ -76,6 +84,7 @@ int main(int argc, char** argv) {
         };
         hooks.swmm_elapsed_time = [&swmm]() { return swmm.elapsed_time(); };
         hooks.dflowfm_elapsed_time = [&dflowfm]() { return dflowfm.elapsed_time(); };
+        hooks.swmm_storage_volume = [&swmm]() { return swmm.total_stored_volume(); };
         const int code = run_with_engines(driver, swmm, dflowfm, hooks);
         swmm.finalize();
         dflowfm.finalize();

@@ -19,6 +19,15 @@ struct RunLoopHooks {
     std::function<int(const std::string&)> resolve_swmm_node{};
     std::function<double()> swmm_elapsed_time{};
     std::function<double()> dflowfm_elapsed_time{};
+    // Whole-system physical storage provider. Required when
+    // enable_whole_system_mass_audit is true; real mode binds the concrete
+    // SwmmEngine::total_stored_volume without widening ISwmmEngine.
+    std::function<double()> swmm_storage_volume{};
+    // Complete cumulative external engine net-volume providers (inflow
+    // positive, outflow/loss negative). Absence makes the real audit
+    // scope-incomplete / REVIEW_REQUIRED; it never falls back to tolerance.
+    std::function<double()> swmm_external_net_volume{};
+    std::function<double()> dflowfm_external_net_volume{};
 };
 
 struct RunLoopResult {

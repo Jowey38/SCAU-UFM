@@ -12,8 +12,11 @@
 #include "coupling/driver/checkpoint_coordinator.hpp"
 #include "coupling/driver/checkpoint_payloads.hpp"
 #include "coupling/driver/dflowfm_checkpoint.hpp"
+#include "coupling/driver/dflowfm_volume_provider.hpp"
 #include "coupling/driver/surface2d_coupling_map.hpp"
 #include "coupling/driver/tri_coupling.hpp"
+#include "coupling/driver/whole_system_mass_audit.hpp"
+#include "surface2d/audit/mass.hpp"
 #include "surface2d/boundary/conditions.hpp"
 #include "surface2d/geometry/cache.hpp"
 #include "surface2d/state/state.hpp"
@@ -54,14 +57,24 @@ std::size_t surface_substep_count(const RuntimeConfig& config) {
 
 double physical_surface_volume(const s2d::SurfaceState& state,
                                const s2d::DpmFields& dpm,
-                               const s2d::GeometryCache& geometry) {
-    double total = 0.0;
-    for (std::size_t cell = 0U; cell < state.cells.size(); ++cell) {
-        total += static_cast<double>(state.cells[cell].conserved.h) *
-                 static_cast<double>(dpm.cells[cell].phi_t) *
-                 static_cast<double>(geometry.cell_areas[cell]);
+                               const s2d::GeometryCache& geometry,
+                               double h_wet) {
+    return s2d::total_physical_surface_volume(state, dpm, geometry, h_wet);
+}
+
+std::vector<double> flatten_deficit_volumes(const core::CouplingState& coupling) {
+    std::vector<double> volumes;
+    for (const core::ExchangeCellState& cell : coupling.cells()) {
+        if (cell.shared_deficit_accounts.empty()) {
+            volumes.push_back(cell.mass_deficit_account.volume);
+        } else {
+            for (const core::SharedExchangeEndpointDeficit& deficit :
+                 cell.shared_deficit_accounts) {
+                volumes.push_back(deficit.mass_deficit_account.volume);
+            }
+        }
     }
-    return total;
+    return volumes;
 }
 
 const char* rollback_action_name(driver_ns::DFlowFMRollbackAction action) {
@@ -85,6 +98,11 @@ struct LastCommit {
     double total_drained_volume{0.0};
     double total_returned_volume{0.0};
     double total_boundary_inflow_volume{0.0};
+    double cumulative_rainfall_volume{0.0};
+    double cumulative_infiltration_volume{0.0};
+    double cumulative_abstraction_volume{0.0};
+    double cumulative_depression_delta_volume{0.0};
+    std::vector<driver_ns::DeficitAgeObservation> deficit_ages{};
 };
 
 }  // namespace
@@ -141,6 +159,48 @@ RunLoopResult run_simulation(
     const std::size_t n_epochs = epoch_count(config);
     const std::size_t n_surface = surface_substep_count(config);
     std::optional<core::CouplingState> previous_coupling{};
+    std::optional<driver_ns::WholeSystemMassSample> mass_baseline{};
+    std::vector<driver_ns::DeficitAgeObservation> deficit_ages{};
+    double cumulative_rainfall_volume = 0.0;
+    double cumulative_infiltration_volume = 0.0;
+    double cumulative_abstraction_volume = 0.0;
+    double cumulative_depression_delta_volume = 0.0;
+    summary.whole_system_mass_audit_enabled =
+        config.enable_whole_system_mass_audit;
+
+    if (config.enable_whole_system_mass_audit) {
+        if (!hooks.swmm_storage_volume) {
+            throw std::invalid_argument(
+                "whole-system mass audit requires a complete SWMM storage provider");
+        }
+        driver_ns::WholeSystemMassSample initial_sample{};
+        initial_sample.epoch = 0U;
+        initial_sample.logical_time = config.start_time;
+        // Whole-system physical storage counts all non-negative depths;
+        // h_wet is a reference/tolerance diagnostic threshold, not permission
+        // to discard near-dry physical water from a conservation equation.
+        initial_sample.surface_volume = physical_surface_volume(
+            state, loaded.dpm_fields, geometry, 0.0);
+        initial_sample.surface_reference_volume = physical_surface_volume(
+            state, loaded.dpm_fields, geometry, config.h_wet);
+        initial_sample.swmm_storage_volume = hooks.swmm_storage_volume();
+        const driver_ns::DFlowFMVolumeObservation dflow_observation =
+            driver_ns::observe_dflowfm_volume(dflowfm);
+        if (!dflow_observation.scope_complete) {
+            throw std::invalid_argument(
+                "whole-system mass audit requires complete D-Flow FM vol1 scope");
+        }
+        initial_sample.dflowfm_volume = dflow_observation.volume;
+        if (hooks.swmm_external_net_volume) {
+            initial_sample.swmm_external_net_volume =
+                hooks.swmm_external_net_volume();
+        }
+        if (hooks.dflowfm_external_net_volume) {
+            initial_sample.dflowfm_external_net_volume =
+                hooks.dflowfm_external_net_volume();
+        }
+        mass_baseline = initial_sample;
+    }
 
     // The initial state is the epoch-zero commit baseline.
     LastCommit last_commit{};
@@ -151,7 +211,7 @@ RunLoopResult run_simulation(
         summary.reason = reason;
         summary.committed_epochs = driver.completed_coupling_steps();
         summary.final_surface_physical_volume =
-            physical_surface_volume(state, loaded.dpm_fields, geometry);
+            physical_surface_volume(state, loaded.dpm_fields, geometry, 0.0);
         summary.final_coupling_deficit_volume =
             previous_coupling.has_value()
                 ? previous_coupling->compute_system_mass(config.h_wet).deficit_mass
@@ -174,6 +234,12 @@ RunLoopResult run_simulation(
         summary.total_drained_volume = last_commit.total_drained_volume;
         summary.total_returned_volume = last_commit.total_returned_volume;
         summary.total_boundary_inflow_volume = last_commit.total_boundary_inflow_volume;
+        cumulative_rainfall_volume = last_commit.cumulative_rainfall_volume;
+        cumulative_infiltration_volume = last_commit.cumulative_infiltration_volume;
+        cumulative_abstraction_volume = last_commit.cumulative_abstraction_volume;
+        cumulative_depression_delta_volume =
+            last_commit.cumulative_depression_delta_volume;
+        deficit_ages = last_commit.deficit_ages;
         driver_ns::DFlowFMRollbackRequest request{};
         request.engine_advanced = false;
         request.deterministic_replay_available = true;
@@ -213,6 +279,14 @@ RunLoopResult run_simulation(
                                      static_cast<double>(diagnostics.max_cell_cfl));
             summary.total_boundary_inflow_volume +=
                 static_cast<double>(diagnostics.boundary_inflow_volume);
+            cumulative_rainfall_volume +=
+                static_cast<double>(diagnostics.rainfall_volume);
+            cumulative_infiltration_volume +=
+                static_cast<double>(diagnostics.infiltration_volume);
+            cumulative_abstraction_volume +=
+                static_cast<double>(diagnostics.abstraction_volume);
+            cumulative_depression_delta_volume +=
+                static_cast<double>(diagnostics.depression_storage_delta_volume);
             if (diagnostics.rollback_required) {
                 restore_last_commit();
                 driver.require_review();
@@ -347,6 +421,87 @@ RunLoopResult run_simulation(
         }
 
         const core::SystemMassAudit audit_after = coupling.compute_system_mass(config.h_wet);
+
+        // M270 physical whole-system storage audit at the post-replay,
+        // post-write-back boundary. Deficit is parallel obligation evidence,
+        // not physical storage (v_unmet remains on the surface).
+        std::optional<driver_ns::WholeSystemMassAuditReport> whole_system_audit{};
+        if (config.enable_whole_system_mass_audit) {
+            driver_ns::WholeSystemMassSample current_sample{};
+            current_sample.epoch = epoch_id;
+            current_sample.logical_time = logical_time;
+            current_sample.surface_volume = physical_surface_volume(
+                state, loaded.dpm_fields, geometry, 0.0);
+            current_sample.surface_reference_volume = physical_surface_volume(
+                state, loaded.dpm_fields, geometry, config.h_wet);
+            current_sample.coupling_deficit_volume = audit_after.deficit_mass;
+            current_sample.swmm_storage_volume = hooks.swmm_storage_volume();
+            const driver_ns::DFlowFMVolumeObservation dflow_observation =
+                driver_ns::observe_dflowfm_volume(dflowfm);
+            if (!dflow_observation.scope_complete) {
+                refuse_engine_rollback();
+                driver.require_review();
+                finish("review_required",
+                       "whole-system mass audit D-Flow FM volume scope incomplete "
+                       "after engine advancement (rollback refused)");
+                return result;
+            }
+            current_sample.dflowfm_volume = dflow_observation.volume;
+            if (hooks.swmm_external_net_volume) {
+                current_sample.swmm_external_net_volume =
+                    hooks.swmm_external_net_volume();
+            }
+            if (hooks.dflowfm_external_net_volume) {
+                current_sample.dflowfm_external_net_volume =
+                    hooks.dflowfm_external_net_volume();
+            }
+            current_sample.cumulative_boundary_inflow_volume =
+                summary.total_boundary_inflow_volume;
+            current_sample.cumulative_rainfall_volume = cumulative_rainfall_volume;
+            current_sample.cumulative_infiltration_volume =
+                cumulative_infiltration_volume;
+            current_sample.cumulative_abstraction_volume =
+                cumulative_abstraction_volume;
+            current_sample.cumulative_depression_storage_delta_volume =
+                cumulative_depression_delta_volume;
+
+            driver_ns::WholeSystemMassTolerance mass_tolerance{};
+            mass_tolerance.strict = config.engine_mode == EngineMode::mock;
+            mass_tolerance.engine_residual_absolute =
+                config.mass_audit_engine_residual_absolute;
+            mass_tolerance.engine_residual_relative =
+                config.mass_audit_engine_residual_relative;
+            whole_system_audit = driver_ns::audit_whole_system_mass(
+                *mass_baseline, current_sample, mass_tolerance);
+            summary.final_whole_system_mass_residual =
+                whole_system_audit->residual;
+            summary.max_abs_whole_system_mass_residual = std::max(
+                summary.max_abs_whole_system_mass_residual,
+                std::abs(whole_system_audit->residual));
+            summary.whole_system_mass_tolerance =
+                whole_system_audit->applied_tolerance;
+            summary.whole_system_mass_verdict = whole_system_audit->conserved
+                                                    ? "conserved"
+                                                    : "review_required";
+            if (!whole_system_audit->conserved) {
+                refuse_engine_rollback();
+                driver.require_review();
+                const std::string failure_kind = whole_system_audit->scope_complete
+                                                     ? "drift"
+                                                     : "external flux scope incomplete";
+                finish("review_required",
+                       "whole-system mass audit " + failure_kind +
+                           " after engine advancement (rollback refused): residual=" +
+                           std::to_string(whole_system_audit->residual) +
+                           ", tolerance=" +
+                           std::to_string(whole_system_audit->applied_tolerance));
+                return result;
+            }
+        }
+
+        const std::vector<double> deficit_volumes = flatten_deficit_volumes(coupling);
+        deficit_ages = driver_ns::update_deficit_ages(deficit_volumes, deficit_ages);
+
         previous_coupling.emplace(std::move(coupling));
         driver.record_committed_coupling_step();
 
@@ -355,6 +510,12 @@ RunLoopResult run_simulation(
         last_commit.total_drained_volume = summary.total_drained_volume;
         last_commit.total_returned_volume = summary.total_returned_volume;
         last_commit.total_boundary_inflow_volume = summary.total_boundary_inflow_volume;
+        last_commit.cumulative_rainfall_volume = cumulative_rainfall_volume;
+        last_commit.cumulative_infiltration_volume = cumulative_infiltration_volume;
+        last_commit.cumulative_abstraction_volume = cumulative_abstraction_volume;
+        last_commit.cumulative_depression_delta_volume =
+            cumulative_depression_delta_volume;
+        last_commit.deficit_ages = deficit_ages;
 
         EpochRecord record{};
         record.epoch = static_cast<std::uint64_t>(epoch);
@@ -369,6 +530,20 @@ RunLoopResult run_simulation(
         record.checkpoint_status = "committed";
         record.surface_content_hash = prepared[0].content_hash;
         record.coupling_content_hash = prepared[1].content_hash;
+        record.whole_system_mass_audit_enabled =
+            config.enable_whole_system_mass_audit;
+        if (whole_system_audit.has_value()) {
+            record.whole_system_storage_total =
+                whole_system_audit->current_storage_total;
+            record.whole_system_mass_residual = whole_system_audit->residual;
+            record.whole_system_mass_tolerance =
+                whole_system_audit->applied_tolerance;
+            record.whole_system_mass_verdict = "conserved";
+        }
+        for (const driver_ns::DeficitAgeObservation& age : deficit_ages) {
+            record.deficit_age_steps.push_back(age.deficit_age_steps);
+            record.deficit_account_volumes.push_back(age.volume);
+        }
         summary.epochs.push_back(record);
         summary.final_time = logical_time;
     }
