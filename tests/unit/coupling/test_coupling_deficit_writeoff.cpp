@@ -88,8 +88,8 @@ TEST(DeficitWriteoff, ZeroOrFullyRepaidAccountResetsAge) {
 
 TEST(DeficitWriteoff, SharedEndpointsAgeAndWriteOffIndependently) {
     auto state = shared_state(3.0, 0.0);
-    state.apply_deficit_writeoff();
-    state.apply_deficit_writeoff();
+    static_cast<void>(state.apply_deficit_writeoff());
+    static_cast<void>(state.apply_deficit_writeoff());
 
     // Add a river deficit after the drainage account has already aged twice.
     auto snapshot = state.snapshot();
@@ -113,8 +113,8 @@ TEST(DeficitWriteoff, SharedEndpointsAgeAndWriteOffIndependently) {
 
 TEST(DeficitWriteoff, SnapshotRollbackReplaysBitExactly) {
     auto state = shared_state(3.0, 5.0);
-    state.apply_deficit_writeoff();
-    state.apply_deficit_writeoff();
+    static_cast<void>(state.apply_deficit_writeoff());
+    static_cast<void>(state.apply_deficit_writeoff());
     const auto before = state.snapshot();
 
     const auto first = state.apply_deficit_writeoff();
