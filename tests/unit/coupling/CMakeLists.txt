@@ -534,3 +534,8 @@ add_executable(test_coupling_whole_system_mass_audit test_coupling_whole_system_
 target_link_libraries(test_coupling_whole_system_mass_audit
     PRIVATE scau::coupling_driver scau::warnings GTest::gtest_main)
 add_test(NAME test_coupling_whole_system_mass_audit COMMAND test_coupling_whole_system_mass_audit)
+
+add_executable(test_coupling_deficit_writeoff test_coupling_deficit_writeoff.cpp)
+target_link_libraries(test_coupling_deficit_writeoff
+    PRIVATE scau::coupling_core scau::warnings GTest::gtest_main)
+add_test(NAME test_coupling_deficit_writeoff COMMAND test_coupling_deficit_writeoff)

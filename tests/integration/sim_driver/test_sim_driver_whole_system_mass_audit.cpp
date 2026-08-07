@@ -221,7 +221,7 @@ TEST(SimDriverWholeSystemMassAudit, ClosesEveryEpochAcrossThreePhysicalStores) {
     EXPECT_LE(result.summary.max_abs_whole_system_mass_residual, 1.0e-3);
 
     bool saw_nonzero_deficit = false;
-    bool saw_age_above_writeoff_threshold = false;
+    bool saw_writeoff = false;
     for (const sim::EpochRecord& epoch : result.summary.epochs) {
         EXPECT_TRUE(epoch.whole_system_mass_audit_enabled);
         EXPECT_EQ(epoch.whole_system_mass_verdict, "conserved");
@@ -233,14 +233,14 @@ TEST(SimDriverWholeSystemMassAudit, ClosesEveryEpochAcrossThreePhysicalStores) {
             total_deficit += volume;
         }
         if (total_deficit > 0.0) saw_nonzero_deficit = true;
+        if (epoch.writeoff_event_count > 0U) saw_writeoff = true;
         for (const std::size_t age : epoch.deficit_age_steps) {
-            if (age >= 3U) saw_age_above_writeoff_threshold = true;
+            EXPECT_LT(age, 3U);
         }
     }
     EXPECT_TRUE(saw_nonzero_deficit);
-    // M270 observes the N_writeoff_steps=3 trigger but intentionally does not
-    // write anything off; M271 owns the sovereign ledger mutation.
-    EXPECT_TRUE(saw_age_above_writeoff_threshold);
+    EXPECT_TRUE(saw_writeoff);
+    EXPECT_GT(result.summary.count_writeoff_volume_total, 0.0);
 
     EXPECT_DOUBLE_EQ(swmm.elapsed_time(), 20.0);
     EXPECT_DOUBLE_EQ(dflowfm.elapsed_time(), 20.0);

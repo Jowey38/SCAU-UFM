@@ -161,6 +161,8 @@
 | `superpowers/specs/2026-08-05-m269-checkpoint-commit-integration-evidence.md` | M269 证据；FNV-1a 确定性 Surface2D/CouplingSnapshot 哈希与五模块 PreparedModuleCheckpoint 构建器；committed verdict 才推进 SimDriver 计数；CFL 路径恢复到最后提交 hash bit-exact，SWMM 已推进路径 fail-closed 拒绝回滚；149/149 测试与真实网关 6/6。 |
 | `docs/superpowers/plans/2026-08-06-m270-whole-system-mass-audit.md` | M270 计划；定义 Surface2D+SWMM+D-Flow 物理储量闭合、deficit 作为并行义务而非储量、near-dry 物理水量与 M_ref 分离、完整外部净通量 scope 才能宣称 conserved 的 fail-closed 边界；G24 active gate 与 G19 real complement 路线。 |
 | `superpowers/specs/2026-08-06-m270-whole-system-mass-audit-evidence.md` | M270 证据；生产 Surface2D 储量助手与 WholeSystemMassAudit 接入 SimDriver committed epoch；G24 20 epoch 完整 scope 严格闭合；G19 实测 raw residual +141.801 m3 揭示真实引擎外部通量 API 缺口，明确 scope-incomplete REVIEW_REQUIRED、不放宽容差、不提升 G19；154/154、golden 25/25、真实网关 6/6。 |
+| `docs/superpowers/plans/2026-08-07-m271-deficit-writeoff-ledger.md` | M271 计划；实现 N_writeoff_steps=3 的 core-owned deficit age/write-off，aggregate/shared endpoint 独立计龄、显式 count_writeoff_volume_total、epoch-end API 与 checkpoint/summary 接线。 |
+| `superpowers/specs/2026-08-07-m271-deficit-writeoff-ledger-evidence.md` | M271 证据；第三个连续 committed epoch 显式核销、WARN endpoint 证据、snapshot rollback/replay 与 checkpoint hash strict identical；G25 active gate；156/156、golden 26/26、真实网关 6/6。 |
 
 ## 历史记录规则
 

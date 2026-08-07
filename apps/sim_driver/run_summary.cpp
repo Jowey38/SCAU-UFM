@@ -71,6 +71,16 @@ std::string to_json(const RunSummary& summary) {
         << summary.max_abs_whole_system_mass_residual << ",\n";
     out << "  \"whole_system_mass_tolerance\": "
         << summary.whole_system_mass_tolerance << ",\n";
+    out << "  \"count_writeoff_events\": " << summary.count_writeoff_events << ",\n";
+    out << "  \"count_writeoff_volume_total\": "
+        << summary.count_writeoff_volume_total << ",\n";
+    out << "  \"writeoff_endpoint_ids\": [";
+    for (std::size_t endpoint_index = 0U;
+         endpoint_index < summary.writeoff_endpoint_ids.size(); ++endpoint_index) {
+        out << (endpoint_index == 0U ? "" : ", ") << "\""
+            << escape_json_string(summary.writeoff_endpoint_ids[endpoint_index]) << "\"";
+    }
+    out << "],\n";
     out << "  \"epochs\": [";
     for (std::size_t index = 0U; index < summary.epochs.size(); ++index) {
         const EpochRecord& record = summary.epochs[index];
@@ -110,6 +120,15 @@ std::string to_json(const RunSummary& summary) {
              volume_index < record.deficit_account_volumes.size(); ++volume_index) {
             out << (volume_index == 0U ? "" : ", ")
                 << record.deficit_account_volumes[volume_index];
+        }
+        out << "], \"writeoff_event_count\": " << record.writeoff_event_count
+            << ", \"writeoff_volume_total\": " << record.writeoff_volume_total
+            << ", \"writeoff_endpoint_ids\": [";
+        for (std::size_t endpoint_index = 0U;
+             endpoint_index < record.writeoff_endpoint_ids.size(); ++endpoint_index) {
+            out << (endpoint_index == 0U ? "" : ", ") << "\""
+                << escape_json_string(record.writeoff_endpoint_ids[endpoint_index])
+                << "\"";
         }
         out << "]}";
     }

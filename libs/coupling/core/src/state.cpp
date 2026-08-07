@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <utility>
 
@@ -57,6 +58,10 @@ void validate_exchange_cell_state(const ExchangeCellState& cell) {
     if (!std::isfinite(cell.mass_deficit_account.volume) || cell.mass_deficit_account.volume < 0.0) {
         throw std::invalid_argument("deficit volume must be finite and non-negative");
     }
+    if (cell.mass_deficit_account.volume == 0.0 &&
+        cell.mass_deficit_account.age_steps != 0U) {
+        throw std::invalid_argument("zero aggregate deficit must have zero age_steps");
+    }
     if (cell.mass_deficit_account.volume > 0.0 && !cell.shared_deficit_accounts.empty()) {
         throw std::invalid_argument("aggregate and shared endpoint deficits must not be mixed");
     }
@@ -65,6 +70,10 @@ void validate_exchange_cell_state(const ExchangeCellState& cell) {
         if (!std::isfinite(shared_deficit.mass_deficit_account.volume) ||
             shared_deficit.mass_deficit_account.volume < 0.0) {
             throw std::invalid_argument("shared deficit volume must be finite and non-negative");
+        }
+        if (shared_deficit.mass_deficit_account.volume == 0.0 &&
+            shared_deficit.mass_deficit_account.age_steps != 0U) {
+            throw std::invalid_argument("zero shared deficit must have zero age_steps");
         }
         for (std::size_t j = i + 1; j < cell.shared_deficit_accounts.size(); ++j) {
             if (same_endpoint(shared_deficit.endpoint, cell.shared_deficit_accounts[j].endpoint)) {
@@ -2822,7 +2831,10 @@ MassDeficitAccount roll_deficit(const MassDeficitAccount& account, double unmet_
     if (!std::isfinite(updated_volume)) {
         throw std::invalid_argument("updated deficit volume must be finite");
     }
-    return MassDeficitAccount{.volume = updated_volume};
+    return MassDeficitAccount{
+        .volume = updated_volume,
+        .age_steps = updated_volume > 0.0 ? account.age_steps : 0U,
+    };
 }
 
 MassDeficitAccount apply_repayment(const MassDeficitAccount& account, double applied_volume) {
@@ -2833,7 +2845,11 @@ MassDeficitAccount apply_repayment(const MassDeficitAccount& account, double app
         throw std::invalid_argument("applied volume must be finite and non-negative");
     }
 
-    return MassDeficitAccount{.volume = std::max(0.0, account.volume - applied_volume)};
+    const double updated_volume = std::max(0.0, account.volume - applied_volume);
+    return MassDeficitAccount{
+        .volume = updated_volume,
+        .age_steps = updated_volume > 0.0 ? account.age_steps : 0U,
+    };
 }
 
 CouplingSnapshot::CouplingSnapshot(
@@ -2860,7 +2876,16 @@ SystemMassAudit CouplingSnapshot::compute_system_mass(double h_wet) const {
     return core::compute_system_mass(cells_, h_wet);
 }
 
-CouplingState::CouplingState(std::vector<ExchangeCellState> cells) : cells_(std::move(cells)) {
+CouplingState::CouplingState(
+    std::vector<ExchangeCellState> cells,
+    RuntimeCounters counters)
+    : cells_(std::move(cells)),
+      runtime_counters_(counters) {
+    if (!std::isfinite(runtime_counters_.count_writeoff_volume_total) ||
+        runtime_counters_.count_writeoff_volume_total < 0.0) {
+        throw std::invalid_argument(
+            "count_writeoff_volume_total must be finite and non-negative");
+    }
     for (const auto& cell : cells_) {
         validate_exchange_cell_state(cell);
     }
@@ -3045,6 +3070,84 @@ void CouplingState::replay_pending() {
 
     cells_ = std::move(replayed_cells);
     pending_events_.clear();
+}
+
+DeficitWriteoffReport CouplingState::apply_deficit_writeoff(
+    const DeficitWriteoffConfig& config) {
+    if (config.writeoff_threshold_steps == 0U) {
+        throw std::invalid_argument("writeoff_threshold_steps must be positive");
+    }
+    if (!pending_events_.empty()) {
+        throw std::logic_error(
+            "deficit write-off requires an empty pending-event queue");
+    }
+
+    auto updated_cells = cells_;
+    RuntimeCounters updated_counters = runtime_counters_;
+    DeficitWriteoffReport report{};
+
+    const auto age_or_writeoff = [&](MassDeficitAccount& account,
+                                     std::size_t cell_index,
+                                     bool has_shared_endpoint,
+                                     SharedExchangeEndpoint endpoint) {
+        if (!std::isfinite(account.volume) || account.volume < 0.0) {
+            throw std::invalid_argument(
+                "deficit write-off account volume must be finite and non-negative");
+        }
+        if (account.volume == 0.0) {
+            account.age_steps = 0U;
+            return;
+        }
+        if (account.age_steps == std::numeric_limits<std::size_t>::max()) {
+            throw std::overflow_error("deficit age_steps overflow");
+        }
+        ++account.age_steps;
+        if (account.age_steps < config.writeoff_threshold_steps) {
+            return;
+        }
+
+        DeficitWriteoffRecord record{};
+        record.cell_index = cell_index;
+        record.has_shared_endpoint = has_shared_endpoint;
+        record.endpoint = endpoint;
+        record.volume_written_off = account.volume;
+        record.age_steps_before_writeoff = account.age_steps;
+        report.records.push_back(record);
+        report.volume_written_off_total += account.volume;
+        if (!std::isfinite(report.volume_written_off_total)) {
+            throw std::overflow_error("deficit write-off report volume overflow");
+        }
+        account.volume = 0.0;
+        account.age_steps = 0U;
+    };
+
+    for (std::size_t cell_index = 0U; cell_index < updated_cells.size(); ++cell_index) {
+        auto& cell = updated_cells[cell_index];
+        if (cell.shared_deficit_accounts.empty()) {
+            age_or_writeoff(cell.mass_deficit_account, cell_index, false, {});
+        } else {
+            for (auto& shared : cell.shared_deficit_accounts) {
+                age_or_writeoff(shared.mass_deficit_account, cell_index, true,
+                                shared.endpoint);
+            }
+        }
+        validate_exchange_cell_state(cell);
+    }
+
+    report.event_count = report.records.size();
+    if (updated_counters.count_writeoff_events >
+        std::numeric_limits<std::size_t>::max() - report.event_count) {
+        throw std::overflow_error("count_writeoff_events overflow");
+    }
+    updated_counters.count_writeoff_events += report.event_count;
+    updated_counters.count_writeoff_volume_total += report.volume_written_off_total;
+    if (!std::isfinite(updated_counters.count_writeoff_volume_total)) {
+        throw std::overflow_error("count_writeoff_volume_total overflow");
+    }
+
+    cells_ = std::move(updated_cells);
+    runtime_counters_ = updated_counters;
+    return report;
 }
 
 void CouplingState::record_pipeline_decision(const ExchangePipelineDecision& decision) {

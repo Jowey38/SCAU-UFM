@@ -205,5 +205,14 @@
     "reference_path": "tests/golden/reference/tolerances.md",
     "ci_gate": true,
     "status": "implemented"
+  },
+  {
+    "test_id": "G25",
+    "name": "deficit_writeoff_replay",
+    "test_path": "tests/golden/deficit_writeoff_replay/",
+    "applicable_phase": "Phase 1+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": true,
+    "status": "implemented"
   }
 ]

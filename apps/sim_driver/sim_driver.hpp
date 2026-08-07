@@ -81,6 +81,8 @@ struct RuntimeConfig {
     // M270 whole-system audit. Disabled by default for backward compatibility;
     // when enabled the run requires complete SWMM and D-Flow storage providers.
     bool enable_whole_system_mass_audit{false};
+    // Main Spec default N_writeoff_steps = 3 committed coupling epochs.
+    std::size_t n_writeoff_steps{3U};
     // Real third-party path tolerance. Strict mock/correctness mode ignores
     // these and uses epsilon_deficit only.
     double mass_audit_engine_residual_absolute{1.0e-4};
