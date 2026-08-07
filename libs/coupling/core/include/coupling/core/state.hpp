@@ -8,6 +8,9 @@ namespace scau::coupling::core {
 
 struct MassDeficitAccount {
     double volume{0.0};
+    // Consecutive committed coupling epochs with a non-zero obligation.
+    // Updated only by CouplingState::apply_deficit_writeoff at epoch end.
+    std::size_t age_steps{0U};
 };
 
 enum class SharedExchangeEngine {
@@ -2179,6 +2182,29 @@ struct CouplingEvent {
 struct RuntimeCounters {
     std::size_t count_drain_split{0};
     std::size_t count_negative_depth_fix{0};
+    std::size_t count_writeoff_events{0};
+    double count_writeoff_volume_total{0.0};
+};
+
+struct DeficitWriteoffConfig {
+    // Main Spec default N_writeoff_steps = 3 committed coupling epochs.
+    std::size_t writeoff_threshold_steps{3U};
+};
+
+struct DeficitWriteoffRecord {
+    std::size_t cell_index{0U};
+    // Aggregate accounts have no endpoint. Shared accounts carry the exact
+    // engine/node identity for WARN/operator evidence.
+    bool has_shared_endpoint{false};
+    SharedExchangeEndpoint endpoint{};
+    double volume_written_off{0.0};
+    std::size_t age_steps_before_writeoff{0U};
+};
+
+struct DeficitWriteoffReport {
+    std::vector<DeficitWriteoffRecord> records{};
+    double volume_written_off_total{0.0};
+    std::size_t event_count{0U};
 };
 
 // 1D -> 2D return flow (engine_to_surface): manhole surcharge/overflow or
@@ -2217,7 +2243,9 @@ private:
 
 class CouplingState {
 public:
-    explicit CouplingState(std::vector<ExchangeCellState> cells);
+    explicit CouplingState(
+        std::vector<ExchangeCellState> cells,
+        RuntimeCounters counters = {});
 
     [[nodiscard]] const std::vector<ExchangeCellState>& cells() const noexcept;
     [[nodiscard]] const RuntimeCounters& runtime_counters() const noexcept;
@@ -2269,6 +2297,12 @@ public:
     void enqueue_event(CouplingEvent event);
     void rollback(const CouplingSnapshot& snapshot);
     void replay_pending();
+    // Epoch-end governance action. Requires an empty pending-event queue.
+    // Ages aggregate/shared endpoint obligations independently and explicitly
+    // writes off accounts reaching N_writeoff_steps. Physical surface storage
+    // is unchanged: this mutates only the obligation ledger and audit counters.
+    [[nodiscard]] DeficitWriteoffReport apply_deficit_writeoff(
+        const DeficitWriteoffConfig& config = {});
     void record_pipeline_decision(const ExchangePipelineDecision& decision);
     ExchangePipelineDecision apply_exchange(std::size_t cell_index, const ExchangeRequest& request);
     ReturnExchangeDecision apply_return_exchange(

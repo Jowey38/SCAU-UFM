@@ -34,6 +34,7 @@ h_wet = 1.0e-6
 cfl_safety = 0.45
 c_rollback = 1.0
 enable_whole_system_mass_audit = true
+n_writeoff_steps = 3
 mass_audit_engine_residual_absolute = 0.0001
 mass_audit_engine_residual_relative = 0.000001
 engine_mode = mock
@@ -57,6 +58,7 @@ TEST(RuntimeConfigIo, ParsesFullConfigAndPassesValidation) {
     EXPECT_EQ(config.stcf_case_path, "case.stcf.nc");
     EXPECT_DOUBLE_EQ(config.initial_eta, 1.25);
     EXPECT_TRUE(config.enable_whole_system_mass_audit);
+    EXPECT_EQ(config.n_writeoff_steps, 3U);
     EXPECT_DOUBLE_EQ(config.mass_audit_engine_residual_absolute, 1.0e-4);
     EXPECT_DOUBLE_EQ(config.mass_audit_engine_residual_relative, 1.0e-6);
     EXPECT_EQ(config.engine_mode, EngineMode::mock);

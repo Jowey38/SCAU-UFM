@@ -34,6 +34,10 @@ struct EpochRecord {
     std::string whole_system_mass_verdict{};
     std::vector<std::size_t> deficit_age_steps{};
     std::vector<double> deficit_account_volumes{};
+    // M271 write-off WARN/operator evidence for this committed epoch.
+    std::size_t writeoff_event_count{0U};
+    double writeoff_volume_total{0.0};
+    std::vector<std::string> writeoff_endpoint_ids{};
 };
 
 struct RunSummary {
@@ -57,6 +61,9 @@ struct RunSummary {
     double final_whole_system_mass_residual{0.0};
     double max_abs_whole_system_mass_residual{0.0};
     double whole_system_mass_tolerance{0.0};
+    std::size_t count_writeoff_events{0U};
+    double count_writeoff_volume_total{0.0};
+    std::vector<std::string> writeoff_endpoint_ids{};
     std::vector<EpochRecord> epochs{};
 };
 

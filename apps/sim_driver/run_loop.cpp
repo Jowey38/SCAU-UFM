@@ -62,19 +62,29 @@ double physical_surface_volume(const s2d::SurfaceState& state,
     return s2d::total_physical_surface_volume(state, dpm, geometry, h_wet);
 }
 
-std::vector<double> flatten_deficit_volumes(const core::CouplingState& coupling) {
-    std::vector<double> volumes;
+std::vector<driver_ns::DeficitAgeObservation> observe_deficit_ages(
+    const core::CouplingState& coupling) {
+    std::vector<driver_ns::DeficitAgeObservation> observations;
+    std::size_t account_index = 0U;
     for (const core::ExchangeCellState& cell : coupling.cells()) {
         if (cell.shared_deficit_accounts.empty()) {
-            volumes.push_back(cell.mass_deficit_account.volume);
+            observations.push_back({
+                .account_index = account_index++,
+                .deficit_age_steps = cell.mass_deficit_account.age_steps,
+                .volume = cell.mass_deficit_account.volume,
+            });
         } else {
             for (const core::SharedExchangeEndpointDeficit& deficit :
                  cell.shared_deficit_accounts) {
-                volumes.push_back(deficit.mass_deficit_account.volume);
+                observations.push_back({
+                    .account_index = account_index++,
+                    .deficit_age_steps = deficit.mass_deficit_account.age_steps,
+                    .volume = deficit.mass_deficit_account.volume,
+                });
             }
         }
     }
-    return volumes;
+    return observations;
 }
 
 const char* rollback_action_name(driver_ns::DFlowFMRollbackAction action) {
@@ -102,7 +112,6 @@ struct LastCommit {
     double cumulative_infiltration_volume{0.0};
     double cumulative_abstraction_volume{0.0};
     double cumulative_depression_delta_volume{0.0};
-    std::vector<driver_ns::DeficitAgeObservation> deficit_ages{};
 };
 
 }  // namespace
@@ -160,7 +169,6 @@ RunLoopResult run_simulation(
     const std::size_t n_surface = surface_substep_count(config);
     std::optional<core::CouplingState> previous_coupling{};
     std::optional<driver_ns::WholeSystemMassSample> mass_baseline{};
-    std::vector<driver_ns::DeficitAgeObservation> deficit_ages{};
     double cumulative_rainfall_volume = 0.0;
     double cumulative_infiltration_volume = 0.0;
     double cumulative_abstraction_volume = 0.0;
@@ -226,8 +234,9 @@ RunLoopResult run_simulation(
     const auto restore_last_commit = [&]() {
         state = last_commit.state;
         if (last_commit.coupling.has_value()) {
-            previous_coupling.emplace(
-                core::CouplingState{last_commit.coupling->cells()});
+            previous_coupling.emplace(core::CouplingState{
+                last_commit.coupling->cells(),
+                last_commit.coupling->runtime_counters()});
         } else {
             previous_coupling.reset();
         }
@@ -239,7 +248,6 @@ RunLoopResult run_simulation(
         cumulative_abstraction_volume = last_commit.cumulative_abstraction_volume;
         cumulative_depression_delta_volume =
             last_commit.cumulative_depression_delta_volume;
-        deficit_ages = last_commit.deficit_ages;
         driver_ns::DFlowFMRollbackRequest request{};
         request.engine_advanced = false;
         request.deterministic_replay_available = true;
@@ -306,7 +314,11 @@ RunLoopResult run_simulation(
             cells_before = driver_ns::build_exchange_cells(
                 state, loaded.dpm_fields, geometry, map,
                 previous_coupling.has_value() ? &*previous_coupling : nullptr);
-            coupling_opt.emplace(cells_before);
+            coupling_opt.emplace(
+                cells_before,
+                previous_coupling.has_value()
+                    ? previous_coupling->runtime_counters()
+                    : core::RuntimeCounters{});
         } catch (const std::exception& error) {
             restore_last_commit();
             driver.require_review();
@@ -386,6 +398,14 @@ RunLoopResult run_simulation(
         }
         summary.total_drained_volume += write_back.drained_volume;
         summary.total_returned_volume += write_back.returned_volume;
+
+        // M271 epoch-end obligation governance. replay_pending and write-back
+        // already completed; age/write-off must become part of the atomic
+        // checkpoint snapshot committed below.
+        core::DeficitWriteoffConfig writeoff_config{};
+        writeoff_config.writeoff_threshold_steps = config.n_writeoff_steps;
+        const core::DeficitWriteoffReport writeoff_report =
+            coupling.apply_deficit_writeoff(writeoff_config);
 
         // 5. Epoch commit protocol: only a committed coordinator verdict
         // advances the committed-step counter and the rolling window.
@@ -499,8 +519,22 @@ RunLoopResult run_simulation(
             }
         }
 
-        const std::vector<double> deficit_volumes = flatten_deficit_volumes(coupling);
-        deficit_ages = driver_ns::update_deficit_ages(deficit_volumes, deficit_ages);
+        const std::vector<driver_ns::DeficitAgeObservation> deficit_ages =
+            observe_deficit_ages(coupling);
+        summary.count_writeoff_events += writeoff_report.event_count;
+        summary.count_writeoff_volume_total += writeoff_report.volume_written_off_total;
+        for (const core::DeficitWriteoffRecord& writeoff : writeoff_report.records) {
+            if (writeoff.has_shared_endpoint) {
+                summary.writeoff_endpoint_ids.push_back(
+                    (writeoff.endpoint.engine == core::SharedExchangeEngine::drainage
+                         ? "drainage:"
+                         : "river:") +
+                    std::to_string(writeoff.endpoint.node_id));
+            } else {
+                summary.writeoff_endpoint_ids.push_back(
+                    "aggregate:cell=" + std::to_string(writeoff.cell_index));
+            }
+        }
 
         previous_coupling.emplace(std::move(coupling));
         driver.record_committed_coupling_step();
@@ -515,7 +549,6 @@ RunLoopResult run_simulation(
         last_commit.cumulative_abstraction_volume = cumulative_abstraction_volume;
         last_commit.cumulative_depression_delta_volume =
             cumulative_depression_delta_volume;
-        last_commit.deficit_ages = deficit_ages;
 
         EpochRecord record{};
         record.epoch = static_cast<std::uint64_t>(epoch);
@@ -543,6 +576,17 @@ RunLoopResult run_simulation(
         for (const driver_ns::DeficitAgeObservation& age : deficit_ages) {
             record.deficit_age_steps.push_back(age.deficit_age_steps);
             record.deficit_account_volumes.push_back(age.volume);
+        }
+        record.writeoff_event_count = writeoff_report.event_count;
+        record.writeoff_volume_total = writeoff_report.volume_written_off_total;
+        for (const core::DeficitWriteoffRecord& writeoff : writeoff_report.records) {
+            record.writeoff_endpoint_ids.push_back(
+                writeoff.has_shared_endpoint
+                    ? ((writeoff.endpoint.engine == core::SharedExchangeEngine::drainage
+                            ? "drainage:"
+                            : "river:") +
+                       std::to_string(writeoff.endpoint.node_id))
+                    : ("aggregate:cell=" + std::to_string(writeoff.cell_index)));
         }
         summary.epochs.push_back(record);
         summary.final_time = logical_time;

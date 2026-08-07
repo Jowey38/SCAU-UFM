@@ -62,6 +62,16 @@ TEST(CheckpointPayloads, HashesAreDeterministicAndUlpSensitive) {
     const std::string snapshot_hash = hash_coupling_snapshot(coupling.snapshot());
     EXPECT_EQ(snapshot_hash, hash_coupling_snapshot(coupling.snapshot()));
 
+    auto aged = make_coupling_state();
+    // Add a deficit, then age it once; age_steps is part of the checkpoint hash.
+    scau::coupling::core::CouplingEvent unmet{};
+    unmet.exchange_cell_index = 0U;
+    unmet.unmet_volume = 1.0;
+    aged.enqueue_event(unmet);
+    aged.replay_pending();
+    static_cast<void>(aged.apply_deficit_writeoff());
+    EXPECT_NE(hash_coupling_snapshot(aged.snapshot()), snapshot_hash);
+
     // Pending events are part of the snapshot identity.
     auto with_event = make_coupling_state();
     scau::coupling::core::CouplingEvent event{};

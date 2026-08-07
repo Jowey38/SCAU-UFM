@@ -100,6 +100,11 @@ TEST(SimDriver, ValidatesRunLoopFieldsFailClosed) {
     EXPECT_THROW(scau::apps::sim_driver::validate_runtime_config(duplicated),
                  std::invalid_argument);
 
+    auto bad_writeoff = minimal_config();
+    bad_writeoff.n_writeoff_steps = 0U;
+    EXPECT_THROW(scau::apps::sim_driver::validate_runtime_config(bad_writeoff),
+                 std::invalid_argument);
+
     auto bad_cfl = minimal_config();
     bad_cfl.cfl_safety = 1.5;
     EXPECT_THROW(scau::apps::sim_driver::validate_runtime_config(bad_cfl), std::invalid_argument);

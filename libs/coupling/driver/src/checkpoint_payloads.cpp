@@ -76,6 +76,7 @@ std::string hash_coupling_snapshot(const core::CouplingSnapshot& snapshot) {
     for (const core::ExchangeCellState& cell : snapshot.cells()) {
         hasher.mix_double(cell.volume);
         hasher.mix_double(cell.mass_deficit_account.volume);
+        hasher.mix_size(cell.mass_deficit_account.age_steps);
         hasher.mix_double(cell.phi_t);
         hasher.mix_double(cell.h);
         hasher.mix_double(cell.area);
@@ -83,10 +84,13 @@ std::string hash_coupling_snapshot(const core::CouplingSnapshot& snapshot) {
         for (const core::SharedExchangeEndpointDeficit& deficit : cell.shared_deficit_accounts) {
             mix_endpoint(hasher, deficit.endpoint);
             hasher.mix_double(deficit.mass_deficit_account.volume);
+            hasher.mix_size(deficit.mass_deficit_account.age_steps);
         }
     }
     hasher.mix_size(snapshot.runtime_counters().count_drain_split);
     hasher.mix_size(snapshot.runtime_counters().count_negative_depth_fix);
+    hasher.mix_size(snapshot.runtime_counters().count_writeoff_events);
+    hasher.mix_double(snapshot.runtime_counters().count_writeoff_volume_total);
     hasher.mix_size(snapshot.pending_events().size());
     for (const core::CouplingEvent& event : snapshot.pending_events()) {
         hasher.mix_size(event.exchange_cell_index);
