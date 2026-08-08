@@ -448,6 +448,7 @@ void addExternalInflows(DateTime currentDate)
     {
         // --- get flow inflow
         q = Node[j].apiExtInflow;
+        massbal_addApiInflow(q);
         inflow = Node[j].extInflow;
         while ( inflow )
         {

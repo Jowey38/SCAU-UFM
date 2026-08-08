@@ -8,6 +8,7 @@
 // Third-party firewall: the vendored SWMM public API is consumed only inside
 // this translation unit (project-layout-design.md section 4 ABI firewall).
 #include "swmm5.h"
+#include "swmm5_massbal_bridge.h"
 
 // Governed SWMM 5.2.4 internal ABI bridge. massbal_getStorage(FALSE) is the
 // upstream node+link storage calculation used by SWMM's own flow balance. It
@@ -231,6 +232,57 @@ double SwmmEngine::total_stored_volume() const {
             "SWMM total stored volume is invalid", "SWMM", "swmm_storage_invalid");
     }
     return storage_m3;
+}
+
+SwmmExternalNetObservation SwmmEngine::observe_external_net_volume() const {
+    require_initialized();
+    SwmmRoutingTotalsSnapshot raw{};
+    if (massbal_getRoutingTotals(&raw) != 0) {
+        throw SwmmEngineError(
+            "SWMM routing totals bridge failed", "SWMM", "swmm_routing_totals_unavailable");
+    }
+
+    constexpr double kCubicMetresPerCubicFoot = 0.02832;
+    const auto volume = [](double value) {
+        return value * kCubicMetresPerCubicFoot;
+    };
+    SwmmExternalNetObservation observation{};
+    const double api_lateral_m3 = volume(raw.apiInflow);
+    observation.api_lateral_inflow_m3 = api_lateral_m3;
+    observation.dw_inflow_m3 = volume(raw.dwInflow);
+    observation.ww_inflow_m3 = volume(raw.wwInflow);
+    observation.gw_inflow_m3 = volume(raw.gwInflow);
+    observation.ii_inflow_m3 = volume(raw.iiInflow);
+    observation.ex_inflow_m3 = volume(raw.exInflow);
+    observation.flooding_m3 = volume(raw.flooding);
+    observation.outflow_m3 = volume(raw.outflow);
+    observation.evap_loss_m3 = volume(raw.evapLoss);
+    observation.seep_loss_m3 = volume(raw.seepLoss);
+    observation.initial_storage_m3 = volume(raw.initStorage);
+    observation.final_storage_m3 = volume(raw.finalStorage);
+    // Preserve SWMM's raw continuity scope for provenance, then expose the
+    // audit scope with the CouplingLib-owned API lateral volume removed once.
+    observation.routing_external_net_volume_m3 = observation.dw_inflow_m3 +
+        observation.ww_inflow_m3 + observation.gw_inflow_m3 + observation.ii_inflow_m3 +
+        observation.ex_inflow_m3 - observation.outflow_m3 - observation.flooding_m3 -
+        observation.evap_loss_m3 - observation.seep_loss_m3;
+    observation.external_net_volume_m3 =
+        observation.routing_external_net_volume_m3 - observation.api_lateral_inflow_m3;
+    observation.scope_complete = true;
+    for (const double value : {
+             observation.dw_inflow_m3, observation.ww_inflow_m3,
+             observation.gw_inflow_m3, observation.ii_inflow_m3,
+             observation.ex_inflow_m3, observation.flooding_m3,
+             observation.outflow_m3, observation.evap_loss_m3,
+             observation.seep_loss_m3, observation.initial_storage_m3,
+             observation.final_storage_m3, observation.routing_external_net_volume_m3,
+             observation.api_lateral_inflow_m3, observation.external_net_volume_m3}) {
+        if (!std::isfinite(value)) {
+            observation.scope_complete = false;
+            break;
+        }
+    }
+    return observation;
 }
 
 void SwmmEngine::require_initialized() const {
