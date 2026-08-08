@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "bugs": [
+    {
+      "id": "bug-199",
+      "timestamp": "2026-08-08T18:30:00Z",
+      "error_message": "M273 completion review agent could not run because the API reported insufficient credits (402).",
+      "file": "M273 review workflow",
+      "root_cause": "The configured subagent credit budget was exhausted after earlier repository exploration and review work.",
+      "fix": "Completed the spike-only scope audit and reproducibility checks inline; no production code was added.",
+      "tags": ["m273", "review", "process", "credits"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-08-08T18:30:00Z"
+    },
+    {
+      "id": "bug-197",
+      "timestamp": "2026-08-08T17:30:00Z",
+      "error_message": "dflowfm_spike_host.exe: error while loading shared libraries: dflowfm.dll: cannot open shared object file",
+      "file": "spikes/dflowfm/cases/single_reach_open_boundary (runtime command)",
+      "root_cause": "Git Bash did not pass the prefixed POSIX PATH to the Windows loader used by the linked spike executable.",
+      "fix": "Run the spike through cmd.exe with the D-Flow FM release bin directory explicitly prepended to Windows PATH.",
+      "tags": ["m273", "dflowfm", "spike", "dll", "environment"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-08-08T17:30:00Z"
+    },
+    {
+      "id": "bug-198",
+      "timestamp": "2026-08-08T18:00:00Z",
+      "error_message": "Standalone M273 spike build failed with LNK1181 because install_fm-suite_release/lib/dflowfm.lib does not exist.",
+      "file": "spikes/dflowfm/CMakeLists.txt (verification configuration)",
+      "root_cause": "The release install provides dflowfm.dll while the existing import library is located at the Delft3D source root lib/dflowfm.lib.",
+      "fix": "Configure the standalone spike with the verified import library H:/githubcode/SCAU-UFM/Delft3D-main/lib/dflowfm.lib; no production build configuration was changed.",
+      "tags": ["m273", "dflowfm", "spike", "build", "dll-import"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-08-08T18:00:00Z"
+    }
+  ]
+}
