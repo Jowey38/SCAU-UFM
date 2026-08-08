@@ -1,0 +1,19 @@
+[General]
+FileVersion = 1.01
+FileType = boundConds
+
+[forcing]
+name = upstream
+function = constant
+time-interpolation = linear
+quantity = dischargebnd
+unit = m3/s
+0.125
+
+[forcing]
+name = downstream
+function = constant
+time-interpolation = linear
+quantity = waterlevelbnd
+unit = m
+1.0

@@ -46,6 +46,9 @@ struct SpikeOptions {
     // Comma-separated list of rank-1 double variables to sum-probe after
     // initialize and after every update (volume contract spike, M258).
     std::vector<std::string> probe_sum_vars;
+    // Comma-separated rank-1 double variables whose full indexed values are
+    // emitted after each probe point (external-boundary diagnostic, M273).
+    std::vector<std::string> probe_values_vars;
     // When both set: write inject_lateral_q to
     // laterals/<inject_lateral_id>/water_discharge before every update.
     const char *inject_lateral_id{nullptr};
@@ -135,21 +138,25 @@ bool parse_options(int argc, char **argv, SpikeOptions *options) {
             options->verify_lateral_id = argv[++i];
             continue;
         }
-        if (arg == "--probe-sum-vars" && i + 1 < argc) {
+        if ((arg == "--probe-sum-vars" || arg == "--probe-values-vars") &&
+            i + 1 < argc) {
+            std::vector<std::string>& target = arg == "--probe-sum-vars"
+                ? options->probe_sum_vars
+                : options->probe_values_vars;
             const std::string list = argv[++i];
             std::size_t start = 0;
             while (start <= list.size()) {
                 const std::size_t comma = list.find(',', start);
                 const std::size_t end = comma == std::string::npos ? list.size() : comma;
                 if (end > start) {
-                    options->probe_sum_vars.emplace_back(list.substr(start, end - start));
+                    target.emplace_back(list.substr(start, end - start));
                 }
                 if (comma == std::string::npos) {
                     break;
                 }
                 start = comma + 1;
             }
-            if (options->probe_sum_vars.empty()) {
+            if (target.empty()) {
                 return false;
             }
             continue;
@@ -270,6 +277,24 @@ void probe_sum_vars(const SpikeOptions &options, int step, std::FILE *trace_out)
             std::fprintf(trace_out, "probe,%d,sum_hs_ba,%.15g\n", step, sum_hs_ba);
         }
     }
+    for (const std::string &var : options.probe_values_vars) {
+        const std::vector<double> values = copy_rank1_double_var(var.c_str());
+        if (values.empty()) {
+            std::printf("values,%d,%s,unavailable\n", step, var.c_str());
+            if (trace_out != nullptr) {
+                std::fprintf(trace_out, "values,%d,%s,unavailable\n", step, var.c_str());
+            }
+            continue;
+        }
+        for (std::size_t index = 0; index < values.size(); ++index) {
+            std::printf("value,%d,%s,%zu,%.15g\n",
+                        step, var.c_str(), index, values[index]);
+            if (trace_out != nullptr) {
+                std::fprintf(trace_out, "value,%d,%s,%zu,%.15g\n",
+                             step, var.c_str(), index, values[index]);
+            }
+        }
+    }
 }
 
 }  // namespace
@@ -282,7 +307,7 @@ int main(int argc, char **argv) {
                      "[--boundary-var name] [--stage-var name] "
                      "[--inventory-out file] [--trace-out file] [--inventory-only] "
                      "[--skip-boundary-write] [--verify-lateral-id id] "
-                     "[--probe-sum-vars v1,v2,...] "
+                     "[--probe-sum-vars v1,v2,...] [--probe-values-vars v1,v2,...] "
                      "[--inject-lateral-id id --inject-lateral-q q]\n",
                      argv[0]);
         return 2;
@@ -454,7 +479,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    if (!options.probe_sum_vars.empty()) {
+    if (!options.probe_sum_vars.empty() || !options.probe_values_vars.empty()) {
         probe_sum_vars(options, 0, trace_out);
     }
 
@@ -527,7 +552,7 @@ int main(int argc, char **argv) {
             }
         }
 
-        if (!options.probe_sum_vars.empty()) {
+        if (!options.probe_sum_vars.empty() || !options.probe_values_vars.empty()) {
             probe_sum_vars(options, step + 1, trace_out);
         }
     }

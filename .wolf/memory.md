@@ -1,5 +1,7 @@
 # Memory
 
+| 18:20 | M273 real D-Flow external-boundary spike completed as failure evidence; no production provider implemented | spikes/dflowfm, docs/superpowers/plans/2026-08-08-m273-dflowfm-external-boundary-spike.md, superpowers/INDEX.md | Open boundary A/B ran 10x60s; qext/qextreal/vextcum unavailable, q1 unmapped for governed audit; FAILED/BLOCKED recorded | ~12k |
+
 > Chronological action log. Hooks and AI append to this file automatically.
 > Old sessions are consolidated by the daemon weekly.
 
