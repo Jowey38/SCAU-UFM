@@ -35,9 +35,10 @@
 #include <stdlib.h>
 #include <math.h>
 #include "headers.h"
+#include "swmm5_massbal_bridge.h"
 
 //-----------------------------------------------------------------------------
-//  Constants   
+//  Constants
 //-----------------------------------------------------------------------------
 static const double MAX_RUNOFF_BALANCE_ERR = 10.0;
 static const double MAX_FLOW_BALANCE_ERR   = 10.0;
@@ -53,6 +54,8 @@ TRoutingTotals*  QualTotals;      // overall routed WQ continuity totals
 TRoutingTotals   StepFlowTotals;  // routed flow totals over time step
 TRoutingTotals   OldStepFlowTotals;
 TRoutingTotals*  StepQualTotals;  // routed WQ totals over time step
+static double    ApiInflowVolume; // cumulative API external inflow (ft3)
+static double    StepApiInflow;   // API external inflow rate for current step (cfs)
 
 //-----------------------------------------------------------------------------
 //  Exportable variables
@@ -160,6 +163,8 @@ int massbal_open()
     for (j = 0; j < Nobjects[LINK]; j++)
         FlowTotals.initStorage += Link[j].newVolume;
     StepFlowTotals = FlowTotals;
+    ApiInflowVolume = 0.0;
+    StepApiInflow = 0.0;
 
     // --- initialize arrays to null
     LoadingTotals = NULL;
@@ -392,6 +397,7 @@ void massbal_initTimeStepTotals()
     StepFlowTotals.gwInflow  = 0.0;
     StepFlowTotals.iiInflow  = 0.0;
     StepFlowTotals.exInflow  = 0.0;
+    StepApiInflow = 0.0;
     StepFlowTotals.flooding  = 0.0;
     StepFlowTotals.outflow   = 0.0;
     StepFlowTotals.evapLoss  = 0.0;
@@ -431,6 +437,18 @@ void massbal_addInflowFlow(int type, double q)
       case RDII_INFLOW:        StepFlowTotals.iiInflow += q; break;
       case EXTERNAL_INFLOW:    StepFlowTotals.exInflow += q; break;
     }
+}
+
+//=============================================================================
+
+void massbal_addApiInflow(double q)
+//
+//  Input:   q = inflow written through the SWMM API (cfs)
+//  Output:  none
+//  Purpose: tracks the API-owned flow rate for coupling audit
+//
+{
+    StepApiInflow += q;
 }
 
 //=============================================================================
@@ -594,6 +612,7 @@ void massbal_updateRoutingTotals(double tStep)
     int j;
     FlowTotals.dwInflow += StepFlowTotals.dwInflow * tStep;
     FlowTotals.wwInflow += StepFlowTotals.wwInflow * tStep;
+    ApiInflowVolume += StepApiInflow * tStep;
     FlowTotals.gwInflow += StepFlowTotals.gwInflow * tStep;
     FlowTotals.iiInflow += StepFlowTotals.iiInflow * tStep;
     FlowTotals.exInflow += StepFlowTotals.exInflow * tStep;
@@ -631,6 +650,32 @@ void massbal_updateRoutingTotals(double tStep)
                 NodeOutflow[j] += Node[j].overflow * tStep;
         }
     }
+}
+
+//=============================================================================
+
+int massbal_getRoutingTotals(SwmmRoutingTotalsSnapshot* totals)
+//
+//  Input:   totals = destination for the current routing totals
+//  Output:  returns 0 on success, non-zero for an invalid destination
+//  Purpose: copies the governed routing continuity totals without exposing
+//           SWMM's internal TRoutingTotals type across the ABI boundary
+//
+{
+    if (totals == NULL) return 1;
+    totals->dwInflow = FlowTotals.dwInflow;
+    totals->wwInflow = FlowTotals.wwInflow;
+    totals->gwInflow = FlowTotals.gwInflow;
+    totals->iiInflow = FlowTotals.iiInflow;
+    totals->exInflow = FlowTotals.exInflow;
+    totals->apiInflow = ApiInflowVolume;
+    totals->flooding = FlowTotals.flooding;
+    totals->outflow = FlowTotals.outflow;
+    totals->evapLoss = FlowTotals.evapLoss;
+    totals->seepLoss = FlowTotals.seepLoss;
+    totals->initStorage = FlowTotals.initStorage;
+    totals->finalStorage = massbal_getStorage(FALSE);
+    return 0;
 }
 
 //=============================================================================

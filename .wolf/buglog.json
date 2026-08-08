@@ -1,0 +1,62 @@
+[
+  {
+    "id": "bug-192",
+    "timestamp": "2026-08-07T09:00:00Z",
+    "error_message": "M272 initial full CTest failed in whole-system mass audit with residual=0.057020 m3 after SWMM API-lateral bridge wiring.",
+    "file": "apps/sim_driver/run_loop.cpp",
+    "root_cause": "The concrete SWMM provider's raw external-net observation was passed to the audit without removing the API lateral component already represented by CouplingLib surface exchange.",
+    "fix": "Added a separate SWMM API-lateral provider hook and subtract it from the audit observation before whole-system closure; existing mock audit remains unchanged.",
+    "tags": ["m272", "swmm", "mass-audit", "double-counting"],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-08-07T09:00:00Z"
+  },
+  {
+    "id": "bug-193",
+    "timestamp": "2026-08-07T09:05:00Z",
+    "error_message": "M272 first bridge build failed because routingStep was not available in addExternalInflows(DateTime).",
+    "file": "extern/swmm5/src/solver/routing.c",
+    "root_cause": "The bridge initially attempted to accumulate API lateral volume at the inflow call site, although the existing routing-total integration already supplies the time interval.",
+    "fix": "Kept API lateral as a step flow component integrated by massbal_updateRoutingTotals and restored addExternalInflows to its upstream currentDate-only signature.",
+    "tags": ["m272", "swmm", "build"],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-08-08T16:35:00Z"
+  },
+  {
+    "id": "bug-194",
+    "timestamp": "2026-08-08T16:35:00Z",
+    "error_message": "G26 declared ci_gate:false in goldensuite.json but CTest labeled test_swmm_external_net as golden, so CI -L golden treated it as gating.",
+    "file": "tests/golden/swmm_external_net/CMakeLists.txt",
+    "root_cause": "The manifest checker enforced the golden label only for active gates and did not reject the label on non-gating entries.",
+    "fix": "Changed G26 to candidate_non_gating and added a manifest invariant rejecting LABELS golden on implemented ci_gate:false tests.",
+    "tags": ["m272", "g26", "goldensuite", "ci", "non-gating"],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-08-08T16:35:00Z"
+  },
+  {
+    "id": "bug-195",
+    "timestamp": "2026-08-08T16:35:00Z",
+    "error_message": "SimDriver baseline sampled raw SWMM external net while epoch samples subtracted API lateral using a second observation.",
+    "file": "apps/sim_driver/run_loop.cpp",
+    "root_cause": "API lateral deduplication was split across two hooks and only applied to current epoch samples, making warm-start baselines inconsistent and observations non-atomic.",
+    "fix": "SwmmEngine now exposes raw routing net plus a deduplicated audit net; SimDriver uses one deduplicated hook for both baseline and epoch samples.",
+    "tags": ["m272", "swmm", "mass-audit", "api-lateral", "baseline"],
+    "related_bugs": ["bug-192"],
+    "occurrences": 1,
+    "last_seen": "2026-08-08T16:35:00Z"
+  },
+  {
+    "id": "bug-196",
+    "timestamp": "2026-08-08T16:55:00Z",
+    "error_message": "MSBUILD error MSB1009: test_goldensuite_manifest.vcxproj does not exist.",
+    "file": "H:/b272 (verification command)",
+    "root_cause": "test_goldensuite_manifest is a CTest-only add_test registration, not a build target, but the verification command passed it to cmake --build --target.",
+    "fix": "Build only executable targets and invoke test_goldensuite_manifest through ctest -R.",
+    "tags": ["m272", "verification", "cmake", "ctest", "msbuild"],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-08-08T16:55:00Z"
+  }
+]

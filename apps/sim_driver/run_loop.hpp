@@ -26,6 +26,8 @@ struct RunLoopHooks {
     // Complete cumulative external engine net-volume providers (inflow
     // positive, outflow/loss negative). Absence makes the real audit
     // scope-incomplete / REVIEW_REQUIRED; it never falls back to tolerance.
+    // Provider returns the complete SWMM external-net observation after the
+    // CouplingLib-owned API lateral component has been removed exactly once.
     std::function<double()> swmm_external_net_volume{};
     std::function<double()> dflowfm_external_net_volume{};
 };

@@ -6,6 +6,24 @@
 
 namespace scau::coupling::drainage {
 
+struct SwmmExternalNetObservation {
+    double dw_inflow_m3{0.0};
+    double ww_inflow_m3{0.0};
+    double gw_inflow_m3{0.0};
+    double ii_inflow_m3{0.0};
+    double ex_inflow_m3{0.0};
+    double flooding_m3{0.0};
+    double outflow_m3{0.0};
+    double evap_loss_m3{0.0};
+    double seep_loss_m3{0.0};
+    double initial_storage_m3{0.0};
+    double final_storage_m3{0.0};
+    double routing_external_net_volume_m3{0.0};
+    double api_lateral_inflow_m3{0.0};
+    double external_net_volume_m3{0.0};
+    bool scope_complete{false};
+};
+
 // Real embedded SWMM 5.2.4 engine (extern/swmm5, statically linked).
 //
 // Boundary contract (architecture spec + project-layout-design.md firewall):
@@ -53,6 +71,12 @@ public:
     // Whole-domain current hydraulic storage (nodes + links) in m3. This is a
     // concrete embedded-SWMM observation, not part of the generic engine ABI.
     [[nodiscard]] double total_stored_volume() const;
+
+    // Governed routing continuity totals sampled atomically at the current
+    // engine boundary. routing_external_net_volume_m3 preserves SWMM's raw
+    // continuity scope. external_net_volume_m3 excludes API lateral inflow
+    // because CouplingLib already accounts for that accepted surface volume.
+    [[nodiscard]] SwmmExternalNetObservation observe_external_net_volume() const;
 
 private:
     void require_initialized() const;
