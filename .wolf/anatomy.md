@@ -8,3 +8,4 @@
 - `spikes/dflowfm/evidence/m273_external_boundary_contract.md` — FAILED/BLOCKED external-boundary contract evidence; no production provider.
 - `docs/superpowers/plans/2026-08-08-g19-promotion-decision.md` — G19 promotion entry-gate decision after M272/M273.
 - `superpowers/specs/2026-08-08-g19-promotion-decision-evidence.md` — formal G19 BLOCKED decision and future G27 prerequisites.
+- `docs/superpowers/plans/2026-08-08-phase2-capability-parallelization.md` — Phase 2 workstream map gated on G19 scope closure; planning-only.
