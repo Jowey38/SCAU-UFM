@@ -24,6 +24,9 @@ Committed traces:
 
 - `spikes/dflowfm/cases/single_reach_open_boundary/m273_external_boundary_control.trace.txt`
 - `spikes/dflowfm/cases/single_reach_open_boundary/m273_external_boundary_indexed.trace.txt`
+- `spikes/dflowfm/cases/single_reach_open_boundary/m273_boundary_map.trace.txt`
+- `spikes/dflowfm/cases/single_reach_open_boundary/m273_boundary_dt30.trace.txt`
+- `spikes/dflowfm/cases/single_reach_open_boundary/m273_boundary_dt120.trace.txt`
 
 ### Storage response
 
@@ -48,13 +51,20 @@ The prescribed upstream input is `0.125 * 600 = 75 m3`. The final storage gain i
 - `q1[10]` evolves from approximately `-2.24e-5` to `-0.236817`;
 - indices 0 through 9 are internal-link flows.
 
-This observation is not a governed boundary contract:
+A follow-up indexed topology trace also reads `kcu` and `ln`:
 
-1. BMI does not expose a verified mapping from `q1[10]`/`q1[11]` to the authored boundary IDs `downstream`/`upstream`.
-2. `q1` positive direction is link-topology-relative, not an external-inflow-positive audit convention; the required adjacency/orientation map is absent from the current adapter contract.
-3. End-of-step `q1` samples do not integrate the first-step storage change. At step 1, the boundary-like endpoint values are `+0.125` and approximately `-2.24e-5 m3/s`, while `delta sum(vol1)=11.030547 m3`, so a rectangular 60 s integration of sampled endpoint values does not close storage.
-4. No restart/reload proof exists for cumulative boundary volume or integration state.
-5. BMI 1.0 exposes no units query; SI units here come from the authored forcing file and case evidence, not a general runtime contract.
+- `kcu[0..9] = 1` for internal 1D links;
+- `kcu[10] = kcu[11] = -1` for 1D boundary links;
+- `ln[10] = (12, 11)` and `ln[11] = (13, 1)` in this runtime's 1-based native node administration.
+
+This is useful case-local evidence, but not yet a governed production contract:
+
+1. The case-local `kcu/ln` mapping identifies native boundary links, but no production adapter contract maps those native pairs back to every authored boundary ID and boundary quantity across arbitrary networks.
+2. `q1` positive direction is topology-relative, not an external-inflow-positive audit convention; the adapter still needs a version-governed orientation rule for each boundary quantity.
+3. The runtime does not honor every caller timestep. With `--dt 30`, the engine advances by its internal 60 s and the host reports `time_trace_valid=false`; with `--dt 120`, it advances by 120 s. A provider cannot integrate using requested dt without first auditing the actual engine dt.
+4. End-of-step `q1` samples do not integrate the first-step storage change. At step 1, the boundary-like endpoint values are `+0.125` and approximately `-2.24e-5 m3/s`, while `delta sum(vol1)=11.030547 m3`, so a rectangular 60 s integration of sampled endpoint values does not close storage.
+5. No restart/reload proof exists for cumulative boundary volume or integration state.
+6. BMI 1.0 exposes no units query; SI units here come from the authored forcing file and case evidence, not a general runtime contract.
 
 ## Decision
 

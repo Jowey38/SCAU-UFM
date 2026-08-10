@@ -15,7 +15,16 @@ H:/scau-vb273/Release/dflowfm_spike_host.exe single_reach_open.mdu \
   --steps 10 --dt 60 --skip-boundary-write --stage-var s1 \
   --probe-sum-vars vol1,qext,qextreal,vextcum,q1 \
   --probe-values-vars q1 \
+  --probe-int-values-vars kcu \
+  --probe-int-matrix-vars ln \
   --trace-out m273_external_boundary_indexed.trace.txt
 ```
+
+The boundary topology diagnostic identifies `kcu=-1` at q1 indices 10 and 11 and
+reports their `ln` node pairs. This mapping is evidence for this authored case,
+not a production-wide boundary-ID contract. Caller `dt=30` is intentionally
+failure-revealing: the runtime advances by its internal 60 s and the host marks
+`time_trace_valid=false`; caller `dt=120` advances by 120 s. A provider must
+therefore govern engine dt before integrating boundary fluxes.
 
 The committed traces are the raw compact BMI observations. Generated D-Flow FM map/history/restart output and cache files are ignored.

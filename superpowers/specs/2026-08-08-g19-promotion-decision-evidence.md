@@ -7,7 +7,7 @@ Decision: **BLOCKED — no promotion and no real-audit rerun**
 
 M272 provides a complete SWMM external-net observation at the concrete adapter boundary. Its raw routing components and cumulative API lateral are converted to SI units, and the audit value removes the CouplingLib-owned API lateral exactly once.
 
-M273 is a real D-Flow FM open-boundary spike, not a production provider. The authored case uses an upstream `dischargebnd=0.125 m3/s` and downstream `waterlevelbnd=1.0 m` over 10 x 60 s, with a zero-discharge control. Both cases advance with exact 60 s time traces.
+M273 is a real D-Flow FM open-boundary spike, not a production provider. The authored case uses an upstream `dischargebnd=0.125 m3/s` and downstream `waterlevelbnd=1.0 m` over 10 x 60 s, with a zero-discharge control. Both cases advance with exact 60 s time traces. Follow-up probes identify `kcu=-1` boundary links and their `ln` node pairs in this case, but caller `dt=30` is ignored in favor of the engine's internal 60 s, so requested-dt integration is not a valid production assumption.
 
 The candidate D-Flow external variables are insufficient:
 

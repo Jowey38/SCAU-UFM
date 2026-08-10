@@ -4,7 +4,7 @@
 
 Status: **BLOCKED — do not rerun for promotion**
 
-The real three-model whole-system audit may be rerun as promotion evidence only after both one-dimensional engines expose complete, governed cumulative external-net scope. M272 satisfies the SWMM side. M273 explicitly does not satisfy the D-Flow FM side.
+The real three-model whole-system audit may be rerun as promotion evidence only after both one-dimensional engines expose complete, governed cumulative external-net scope. M272 satisfies the SWMM side. M273 explicitly does not satisfy the D-Flow FM side; follow-up topology probes identify case-local `kcu/ln` boundary links but also reveal caller-dt mismatch and still lack a general ID/orientation/integration contract.
 
 ## Entry-gate evaluation
 
