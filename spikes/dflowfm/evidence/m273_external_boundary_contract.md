@@ -27,6 +27,7 @@ Committed traces:
 - `spikes/dflowfm/cases/single_reach_open_boundary/m273_boundary_map.trace.txt`
 - `spikes/dflowfm/cases/single_reach_open_boundary/m273_boundary_dt30.trace.txt`
 - `spikes/dflowfm/cases/single_reach_open_boundary/m273_boundary_dt120.trace.txt`
+- `spikes/dflowfm/cases/single_reach_open_boundary/m273_boundary_forcing_points.trace.txt`
 
 ### Storage response
 
@@ -65,6 +66,20 @@ This is useful case-local evidence, but not yet a governed production contract:
 4. End-of-step `q1` samples do not integrate the first-step storage change. At step 1, the boundary-like endpoint values are `+0.125` and approximately `-2.24e-5 m3/s`, while `delta sum(vol1)=11.030547 m3`, so a rectangular 60 s integration of sampled endpoint values does not close storage.
 5. No restart/reload proof exists for cumulative boundary volume or integration state.
 6. BMI 1.0 exposes no units query; SI units here come from the authored forcing file and case evidence, not a general runtime contract.
+
+A final boundary-point probe read the engine forcing arrays directly
+(`m273_boundary_forcing_points.trace.txt`):
+
+- `zbndz[0] = 1.0` matches the downstream stage forcing;
+- `zbndu[0] = 7.36e+223` is uninitialized memory: reading these arrays without
+  engine-side administration is unsafe;
+- `zbndq[0] = 0.025`, not the prescribed `0.125 m3/s`. The value equals the
+  prescribed discharge divided by the 5 m width; the internal normalization is
+  not documented at the BMI surface, so a naive reader would mis-scale flux by
+  the channel width.
+- The boundary-point administration arrays (`kbndz`-family) are not in the BMI
+  variable surface at all, so the boundary-point to flow-link mapping cannot be
+  engine-derived through BMI 1.0.
 
 ## Decision
 
