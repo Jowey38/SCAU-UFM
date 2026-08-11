@@ -1,0 +1,10 @@
+# t0=0.000000 t1=6000.000000 engine_dt=60.000000 steps=1 dt=60.000000 boundary_var=boundary_discharge stage_var=s1
+# columns: step current_time stage0
+value,0,zbndz,0,1
+value,0,zbndu,0,7.36102358100359e+223
+value,0,zbndq,0,0.025
+0 60.000000 1.007063
+value,1,zbndz,0,1
+value,1,zbndu,0,7.36102358100359e+223
+value,1,zbndq,0,0.025
+# summary completed_steps=1 requested_steps=1 last_time=60.000000 expected_last_time=60.000000 max_dt_abs_error=0 time_trace_valid=true
