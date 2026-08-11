@@ -111,6 +111,7 @@ struct LastCommit {
     double cumulative_rainfall_volume{0.0};
     double cumulative_infiltration_volume{0.0};
     double cumulative_abstraction_volume{0.0};
+    double cumulative_swmm_lateral_volume{0.0};
     double cumulative_depression_delta_volume{0.0};
 };
 
@@ -172,6 +173,7 @@ RunLoopResult run_simulation(
     double cumulative_rainfall_volume = 0.0;
     double cumulative_infiltration_volume = 0.0;
     double cumulative_abstraction_volume = 0.0;
+    double cumulative_swmm_lateral_volume = 0.0;
     double cumulative_depression_delta_volume = 0.0;
     summary.whole_system_mass_audit_enabled =
         config.enable_whole_system_mass_audit;
@@ -246,6 +248,7 @@ RunLoopResult run_simulation(
         cumulative_rainfall_volume = last_commit.cumulative_rainfall_volume;
         cumulative_infiltration_volume = last_commit.cumulative_infiltration_volume;
         cumulative_abstraction_volume = last_commit.cumulative_abstraction_volume;
+        cumulative_swmm_lateral_volume = last_commit.cumulative_swmm_lateral_volume;
         cumulative_depression_delta_volume =
             last_commit.cumulative_depression_delta_volume;
         driver_ns::DFlowFMRollbackRequest request{};
@@ -398,6 +401,12 @@ RunLoopResult run_simulation(
         }
         summary.total_drained_volume += write_back.drained_volume;
         summary.total_returned_volume += write_back.returned_volume;
+        for (const auto& decision : report.surface_decisions) {
+            if (decision.endpoint.engine == core::SharedExchangeEngine::drainage) {
+                cumulative_swmm_lateral_volume += decision.exchange.v_granted +
+                    decision.exchange.v_repay;
+            }
+        }
 
         // M271 epoch-end obligation governance. replay_pending and write-back
         // already completed; age/write-off must become part of the atomic
@@ -547,6 +556,7 @@ RunLoopResult run_simulation(
         last_commit.cumulative_rainfall_volume = cumulative_rainfall_volume;
         last_commit.cumulative_infiltration_volume = cumulative_infiltration_volume;
         last_commit.cumulative_abstraction_volume = cumulative_abstraction_volume;
+        last_commit.cumulative_swmm_lateral_volume = cumulative_swmm_lateral_volume;
         last_commit.cumulative_depression_delta_volume =
             cumulative_depression_delta_volume;
 

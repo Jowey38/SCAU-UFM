@@ -262,6 +262,7 @@ void    massbal_updateRoutingTotals(double tStep);
 
 void    massbal_initTimeStepTotals(void);
 void    massbal_addInflowFlow(int type, double q);
+void    massbal_addApiInflow(double q);
 void    massbal_addInflowQual(int type, int pollut, double w);
 void    massbal_addOutflowFlow(double q, int isFlooded);
 void    massbal_addOutflowQual(int pollut, double mass, int isFlooded);

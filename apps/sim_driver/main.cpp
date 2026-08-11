@@ -85,6 +85,13 @@ int main(int argc, char** argv) {
         hooks.swmm_elapsed_time = [&swmm]() { return swmm.elapsed_time(); };
         hooks.dflowfm_elapsed_time = [&dflowfm]() { return dflowfm.elapsed_time(); };
         hooks.swmm_storage_volume = [&swmm]() { return swmm.total_stored_volume(); };
+        hooks.swmm_external_net_volume = [&swmm]() {
+            const auto observation = swmm.observe_external_net_volume();
+            if (!observation.scope_complete) {
+                throw std::runtime_error("SWMM external-net observation is incomplete");
+            }
+            return observation.external_net_volume_m3;
+        };
         const int code = run_with_engines(driver, swmm, dflowfm, hooks);
         swmm.finalize();
         dflowfm.finalize();

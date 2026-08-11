@@ -163,6 +163,8 @@
 | `superpowers/specs/2026-08-06-m270-whole-system-mass-audit-evidence.md` | M270 证据；生产 Surface2D 储量助手与 WholeSystemMassAudit 接入 SimDriver committed epoch；G24 20 epoch 完整 scope 严格闭合；G19 实测 raw residual +141.801 m3 揭示真实引擎外部通量 API 缺口，明确 scope-incomplete REVIEW_REQUIRED、不放宽容差、不提升 G19；154/154、golden 25/25、真实网关 6/6。 |
 | `docs/superpowers/plans/2026-08-07-m271-deficit-writeoff-ledger.md` | M271 计划；实现 N_writeoff_steps=3 的 core-owned deficit age/write-off，aggregate/shared endpoint 独立计龄、显式 count_writeoff_volume_total、epoch-end API 与 checkpoint/summary 接线。 |
 | `superpowers/specs/2026-08-07-m271-deficit-writeoff-ledger-evidence.md` | M271 证据；第三个连续 committed epoch 显式核销、WARN endpoint 证据、snapshot rollback/replay 与 checkpoint hash strict identical；G25 active gate；156/156、golden 26/26、真实网关 6/6。 |
+| `docs/superpowers/plans/2026-08-07-m272-swmm-external-net.md` | M272 计划；治理 SWMM 5.2.4 routing totals bridge、concrete external-net DTO、API lateral 去重与 G26 non-gating evidence。 |
+| `superpowers/specs/2026-08-07-m272-swmm-external-net-evidence.md` | M272 证据；SWMM routing totals bridge、m3 component provenance、API lateral 去重与 G26 non-gating 注册；不提升 G19，D-Flow external scope 仍独立阻塞。 |
 | `spikes/dflowfm/evidence/m273_external_boundary_contract.md` | M273 D-Flow FM external-boundary spike 失败证据；真实开放边界 A/B 运行确认 `qext/qextreal/vextcum` 对 `[boundary]` 不可读，`q1` 缺少治理后的 boundary ID/方向/积分/重启合同，因此禁止猜测性 external-net provider，G19 保持 non-gating / scope-incomplete。 |
 | `superpowers/specs/2026-08-08-g19-promotion-decision-evidence.md` | M272/M273 后 G19 promotion 决策；SWMM scope 完整但 D-Flow external scope 失败，故 residual 不具 tolerance 可比资格、G19 不提升、G27 仅作为未来真实合同前置项且暂不注册，稳定性协议与 manifest 当前不修改。 |
 

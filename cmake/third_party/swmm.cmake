@@ -3,7 +3,8 @@
 # Target: scau_extern_swmm5 (alias scau::extern_swmm5)
 #
 # Governance (project-layout-design.md §4.12, third_party/manifest/swmm5.version):
-# - extern/swmm5/ holds unmodified upstream source; never edit it in place.
+# - extern/swmm5/ is version-pinned upstream source plus governed patches listed
+#   under third_party/patches/; every patch must be revalidated on upgrade.
 # - This module intentionally does NOT use the upstream src/solver/CMakeLists.txt
 #   (which builds a shared lib and hard-requires OpenMP).
 # - Third-party code is compiled without scau::warnings and without
