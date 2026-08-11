@@ -1,5 +1,8 @@
 # Memory
 
+| 16:35 | M272 external-net audit contract consolidated at SwmmEngine; baseline/epoch dedup unified; G26 made truly non-gating and manifest guard strengthened | drainage SwmmEngine, SimDriver, G26 CMake/tests, manifest checker, M272 docs | MSVC warnings-as-errors build passed; full 158/158; golden 26/26; candidate_non_gating 4/4 | ~15k |
+| 09:10 | M272 SWMM external-net bridge implemented; API lateral component is separately observed and removed before M270 audit; G26 non-gating registered | extern/swmm5, drainage SwmmEngine, SimDriver, tests/golden, third_party, M272 plan/evidence | MSVC Debug build passed; full CTest 158/158; Golden/manifest 27/27 | ~18k |
+
 > Chronological action log. Hooks and AI append to this file automatically.
 > Old sessions are consolidated by the daemon weekly.
 

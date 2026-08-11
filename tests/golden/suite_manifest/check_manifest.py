@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import pathlib
+import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
@@ -35,12 +36,29 @@ REQUIRED = {
     "G23": ("cvc_spatial_phi_t_dynamic", "implemented", True),
     "G24": ("whole_system_mass_audit", "implemented", True),
     "G25": ("deficit_writeoff_replay", "implemented", True),
+    "G26": ("swmm_external_net", "implemented", False),
 }
 
 
 def fail(msg: str) -> None:
     print(f"::error::{msg}")
     sys.exit(1)
+
+
+def cmake_labels(cmake_text: str, test_name: str) -> set[str]:
+    labels = set()
+    call_pattern = re.compile(
+        rf"set_tests_properties\s*\(\s*{re.escape(test_name)}\b(.*?)\)",
+        re.IGNORECASE | re.DOTALL,
+    )
+    label_pattern = re.compile(r'\bLABELS\s+(?:"([^"]*)"|([^\s)]+))', re.IGNORECASE)
+    for call in call_pattern.finditer(cmake_text):
+        label_value = label_pattern.search(call.group(1))
+        if label_value is None:
+            continue
+        value = label_value.group(1) or label_value.group(2)
+        labels = {label for label in value.split(";") if label}
+    return labels
 
 
 def main() -> None:
@@ -103,10 +121,14 @@ def main() -> None:
             token = f"add_test(NAME test_{name}"
             if token not in combined_cmake:
                 fail(f"{test_id}: implemented test missing add_test token {token}")
-        if status == "implemented" and ci_gate:
-            per_test_cmake = golden_cmake_by_name.get(name, "")
-            if "LABELS golden" not in per_test_cmake:
+        if status == "implemented":
+            labels = cmake_labels(
+                golden_cmake_by_name.get(name, ""), f"test_{name}"
+            )
+            if ci_gate and "golden" not in labels:
                 fail(f"{test_id}: active gate test CMakeLists must set LABELS golden")
+            if not ci_gate and "golden" in labels:
+                fail(f"{test_id}: non-gating test CMakeLists must not set LABELS golden")
 
     print("OK goldensuite manifest completeness passes")
 

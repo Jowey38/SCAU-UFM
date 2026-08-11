@@ -396,6 +396,19 @@ if(SCAU_EMBED_SWMM)
     )
     add_test(NAME test_coupling_swmm_engine COMMAND test_coupling_swmm_engine)
 
+    add_executable(test_coupling_swmm_external_net test_coupling_swmm_external_net.cpp)
+    target_link_libraries(test_coupling_swmm_external_net
+        PRIVATE
+            scau::coupling_drainage
+            scau::warnings
+            GTest::gtest_main
+    )
+    target_compile_definitions(test_coupling_swmm_external_net
+        PRIVATE
+            SCAU_SWMM_TEST_CASE_DIR="${CMAKE_CURRENT_BINARY_DIR}/cases"
+    )
+    add_test(NAME test_coupling_swmm_external_net COMMAND test_coupling_swmm_external_net)
+
     add_executable(test_coupling_roof_swmm_real test_coupling_roof_swmm_real.cpp)
     target_link_libraries(test_coupling_roof_swmm_real
         PRIVATE

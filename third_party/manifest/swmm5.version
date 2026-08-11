@@ -8,7 +8,7 @@ extracted-on: 2026-06-12
 extracted-scope: src/solver/ (complete solver library incl. include/swmm5.h public API)
 vendored-to: extern/swmm5/src/solver/
 license: Public Domain (US EPA work; see third_party/licenses/swmm5-LICENSE-NOTE.md)
-patches: none (see third_party/patches/)
+patches: massbal routing-totals bridge (see third_party/patches/swmm5-routing-totals.md)
 build: cmake/third_party/swmm.cmake builds static lib target scau_extern_swmm5;
        upstream src/solver/CMakeLists.txt is retained for reference only and is NOT used.
 abi-boundary: only libs/coupling/drainage/src/*.cpp may include swmm5.h; no public
