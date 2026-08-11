@@ -1,5 +1,6 @@
 # Memory
 
+| 18:10 | M274 bridge feasibility closed BLOCKED: ABI and Fortran object compile, but bridge must be inside dflowfm.dll and governed rebuild failed at PETSc/Cygwin external toolchain | spikes/dflowfm/contract, bridge, evidence; superpowers/INDEX.md | No provider/G27/G19 promotion; exact unblock requirements recorded | ~12k |
 | 02:10 | M272 merged to master; M273 synchronized over it with semantic conflict resolution for OpenWolf/index records | PR #69, PR #70 sync branch | SWMM scope retained and D-Flow BLOCKED evidence preserved | ~5k |
 | 10:40 | Phase A closed: zbndz/zbndu/zbndq probe shows uninitialized memory and undocumented width normalization; kbndz-family absent from BMI; contract unavailable verdict finalized, G19/G27 remain blocked | spikes/dflowfm evidence + traces | FAILED/BLOCKED verdict now upstream-actionable | ~4k |
 | 20:30 | M273 follow-up probed kcu/ln boundary topology and caller dt; case-local boundary mapping exists but dt=30 is ignored by engine, so G19 remains blocked and no provider is added | spikes/dflowfm/host, single_reach_open_boundary traces, M273/G19 evidence | Boundary links kcu=-1 and native pairs captured; dt governance gap failure-revealing | ~5k |

@@ -108,6 +108,30 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-08-11T02:10:00Z"
+    },
+    {
+      "id": "bug-201",
+      "timestamp": "2026-08-11T03:45:00Z",
+      "error_message": "Initial M274 ifx invocation mangled /c, /O2 and /I through MSYS path conversion and could not open m_flow.mod.",
+      "file": "spikes/dflowfm/bridge/dflowfm_water_balance_bridge.F90 build command",
+      "root_cause": "Git Bash rewrote native Intel compiler switches as POSIX paths.",
+      "fix": "Set MSYS2_ARG_CONV_EXCL='*' and use /I:<path>; the bridge object then compiled successfully.",
+      "tags": ["m274", "dflowfm", "ifx", "msys", "build"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-08-11T03:45:00Z"
+    },
+    {
+      "id": "bug-202",
+      "timestamp": "2026-08-11T04:05:00Z",
+      "error_message": "Clean external D-Flow configure stopped because Conan was not installed and the required delft3d_windows_msvc_194_v2 profile was absent.",
+      "file": "Delft3D-main/build.py external build setup",
+      "root_cause": "The local D-Flow source snapshot used the new Conan 2 build flow, but this machine only retained older build artifacts and no current Conan user configuration.",
+      "fix": "Installed Conan 2.31.2 and ran run_conan.py initialize external to install governed profiles/settings without Deltares Nexus remotes.",
+      "tags": ["m274", "dflowfm", "conan", "toolchain"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-08-11T04:05:00Z"
     }
   ]
 }
