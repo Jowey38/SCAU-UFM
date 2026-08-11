@@ -23,6 +23,9 @@
 - `host/dflowfm_spike_host.cpp` — standalone BMI diagnostic host.
 - `cases/single_reach_open_boundary/` — authored open-boundary cases and traces.
 - `evidence/m273_external_boundary_contract.md` — FAILED/BLOCKED external-boundary evidence.
+- `contract/dflowfm_water_balance_v1.h` — M274 fixed-width native water-balance C ABI.
+- `bridge/dflowfm_water_balance_bridge.F90` — M274 external-build Fortran bind(C) bridge source.
+- `evidence/m274_native_water_balance_feasibility.md` — M274 bridge feasibility and governed-runtime blocker evidence.
 
 ## superpowers/specs/
 

@@ -167,6 +167,7 @@
 | `superpowers/specs/2026-08-07-m272-swmm-external-net-evidence.md` | M272 证据；SWMM routing totals bridge、m3 component provenance、API lateral 去重与 G26 non-gating 注册；不提升 G19，D-Flow external scope 仍独立阻塞。 |
 | `spikes/dflowfm/evidence/m273_external_boundary_contract.md` | M273 D-Flow FM external-boundary spike 失败证据；真实开放边界 A/B 运行确认 `qext/qextreal/vextcum` 对 `[boundary]` 不可读，`q1` 缺少治理后的 boundary ID/方向/积分/重启合同，因此禁止猜测性 external-net provider，G19 保持 non-gating / scope-incomplete。 |
 | `superpowers/specs/2026-08-08-g19-promotion-decision-evidence.md` | M272/M273 后 G19 promotion 决策；SWMM scope 完整但 D-Flow external scope 失败，故 residual 不具 tolerance 可比资格、G19 不提升、G27 仅作为未来真实合同前置项且暂不注册，稳定性协议与 manifest 当前不修改。 |
+| `spikes/dflowfm/evidence/m274_native_water_balance_feasibility.md` | M274 native water-balance bridge 可行性证据；固定宽度 C ABI 与 Fortran bind(C) bridge 编译成功，确认必须编入外部 dflowfm.dll；当前 Conan/PETSc/Cygwin 构建环境不能产出 governed runtime，故 case matrix 未执行、G19/G27 保持 BLOCKED。 |
 
 ## 历史记录规则
 
