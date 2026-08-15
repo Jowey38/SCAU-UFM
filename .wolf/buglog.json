@@ -8,7 +8,12 @@
       "file": "apps/sim_driver/run_loop.cpp",
       "root_cause": "The concrete SWMM provider's raw external-net observation was passed to the audit without removing the API lateral component already represented by CouplingLib surface exchange.",
       "fix": "Added a deduplicated SWMM audit observation that removes the API lateral component exactly once.",
-      "tags": ["m272", "swmm", "mass-audit", "double-counting"],
+      "tags": [
+        "m272",
+        "swmm",
+        "mass-audit",
+        "double-counting"
+      ],
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-08-07T09:00:00Z"
@@ -20,7 +25,11 @@
       "file": "extern/swmm5/src/solver/routing.c",
       "root_cause": "The bridge initially attempted to accumulate API lateral volume at the inflow call site, although routing-total integration already supplies the interval.",
       "fix": "Kept API lateral as a step flow component integrated by massbal_updateRoutingTotals.",
-      "tags": ["m272", "swmm", "build"],
+      "tags": [
+        "m272",
+        "swmm",
+        "build"
+      ],
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-08-08T16:35:00Z"
@@ -32,7 +41,12 @@
       "file": "tests/golden/swmm_external_net/CMakeLists.txt",
       "root_cause": "The manifest checker did not reject the golden label on non-gating entries.",
       "fix": "Changed G26 to candidate_non_gating and added the matching manifest invariant.",
-      "tags": ["m272", "g26", "goldensuite", "ci"],
+      "tags": [
+        "m272",
+        "g26",
+        "goldensuite",
+        "ci"
+      ],
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-08-08T16:35:00Z"
@@ -44,8 +58,15 @@
       "file": "apps/sim_driver/run_loop.cpp",
       "root_cause": "API lateral deduplication was split across two hooks and only applied to current epoch samples.",
       "fix": "SwmmEngine now exposes one deduplicated audit observation used for baseline and epoch samples.",
-      "tags": ["m272", "swmm", "mass-audit", "baseline"],
-      "related_bugs": ["bug-192"],
+      "tags": [
+        "m272",
+        "swmm",
+        "mass-audit",
+        "baseline"
+      ],
+      "related_bugs": [
+        "bug-192"
+      ],
       "occurrences": 1,
       "last_seen": "2026-08-08T16:35:00Z"
     },
@@ -56,7 +77,12 @@
       "file": "H:/b272 verification command",
       "root_cause": "test_goldensuite_manifest is a CTest registration, not a build target.",
       "fix": "Build executable targets and invoke the manifest check through ctest.",
-      "tags": ["m272", "verification", "cmake", "ctest"],
+      "tags": [
+        "m272",
+        "verification",
+        "cmake",
+        "ctest"
+      ],
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-08-08T16:55:00Z"
@@ -68,7 +94,12 @@
       "file": "spikes/dflowfm/cases/single_reach_open_boundary runtime command",
       "root_cause": "Git Bash did not pass the prefixed POSIX PATH to the Windows loader.",
       "fix": "Run the spike through cmd.exe with the D-Flow release bin prepended to Windows PATH.",
-      "tags": ["m273", "dflowfm", "spike", "dll"],
+      "tags": [
+        "m273",
+        "dflowfm",
+        "spike",
+        "dll"
+      ],
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-08-08T17:30:00Z"
@@ -80,7 +111,12 @@
       "file": "spikes/dflowfm/CMakeLists.txt verification configuration",
       "root_cause": "The release install provides the DLL while the import library is at the Delft3D source root.",
       "fix": "Configure with H:/githubcode/SCAU-UFM/Delft3D-main/lib/dflowfm.lib.",
-      "tags": ["m273", "dflowfm", "spike", "build"],
+      "tags": [
+        "m273",
+        "dflowfm",
+        "spike",
+        "build"
+      ],
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-08-08T18:00:00Z"
@@ -92,7 +128,11 @@
       "file": "M273 review workflow",
       "root_cause": "The subagent credit budget was exhausted.",
       "fix": "Completed spike-only scope and reproducibility checks inline.",
-      "tags": ["m273", "review", "process"],
+      "tags": [
+        "m273",
+        "review",
+        "process"
+      ],
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-08-08T18:30:00Z"
@@ -104,7 +144,12 @@
       "file": "PR #70 merge update",
       "root_cause": "Parallel M272/M273 branches had add/add conflicts in generated context files and overlapping INDEX/memory additions.",
       "fix": "Merged latest master in a clean sync worktree and semantically combined M272 and M273 records.",
-      "tags": ["m272", "m273", "merge", "openwolf"],
+      "tags": [
+        "m272",
+        "m273",
+        "merge",
+        "openwolf"
+      ],
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-08-11T02:10:00Z"
@@ -116,7 +161,13 @@
       "file": "spikes/dflowfm/bridge/dflowfm_water_balance_bridge.F90 build command",
       "root_cause": "Git Bash rewrote native Intel compiler switches as POSIX paths.",
       "fix": "Set MSYS2_ARG_CONV_EXCL='*' and use /I:<path>; the bridge object then compiled successfully.",
-      "tags": ["m274", "dflowfm", "ifx", "msys", "build"],
+      "tags": [
+        "m274",
+        "dflowfm",
+        "ifx",
+        "msys",
+        "build"
+      ],
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-08-11T03:45:00Z"
@@ -128,10 +179,38 @@
       "file": "Delft3D-main/build.py external build setup",
       "root_cause": "The local D-Flow source snapshot used the new Conan 2 build flow, but this machine only retained older build artifacts and no current Conan user configuration.",
       "fix": "Installed Conan 2.31.2 and ran run_conan.py initialize external to install governed profiles/settings without Deltares Nexus remotes.",
-      "tags": ["m274", "dflowfm", "conan", "toolchain"],
+      "tags": [
+        "m274",
+        "dflowfm",
+        "conan",
+        "toolchain"
+      ],
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-08-11T04:05:00Z"
+    },
+    {
+      "id": "bug-207",
+      "timestamp": "2026-08-14T00:00:00",
+      "error_message": "G27 leg1 failed: sum(vol1)=6500 != native vol1tot=5500 at initialize on the open-boundary case; storage delta over 10 steps disagreed with boundary flux by 3.14 m3",
+      "file": "libs/coupling/driver/src/dflowfm_volume_provider.cpp",
+      "root_cause": "BMI vol1 array stores internal cells first, then boundary ghost nodes (ndxi..ndx). M258/M259 confirmed sum(vol1)==storage on a CLOSED case only; on open-boundary models the full sum overcounts physical storage by the ghost volumes, whose dynamics also pollute deltas.",
+      "fix": "Added DFlowFMEngine::internal_cell_count() (BMI scalar ndxi, fail-closed) and observe_dflowfm_internal_volume (sums vol1[0:ndxi]); RunLoopHooks.dflowfm_storage_volume override binds native vol1tot in real mode; G27 locks the discovery with an explicit full>internal+100 assertion on the open case and full==internal on the closed case.",
+      "tags": [
+        "dflowfm",
+        "bmi",
+        "vol1",
+        "ndxi",
+        "ghost-nodes",
+        "whole-system-audit",
+        "g27"
+      ],
+      "related_bugs": [
+        "bug-190",
+        "bug-191"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-08-14T00:00:00"
     }
   ]
 }

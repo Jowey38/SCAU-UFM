@@ -3,6 +3,7 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
@@ -379,6 +380,148 @@ std::vector<std::string> DFlowFMEngine::variable_names() const {
         names.emplace_back(name.data());
     }
     return names;
+}
+
+namespace {
+
+// Private mirror of the project-authored bridge ABI contract snapshot at
+// extern/dflowfm/include/scau_dflowfm_water_balance_v1.h. The header is
+// intentionally NOT included here, matching the bmi.h typedef policy above:
+// the adapter resolves the symbol by name at runtime and keeps every external
+// layout mirrored in this translation unit. Re-verify on contract refresh.
+struct NativeWaterBalanceV1 {
+    std::uint32_t abi_version;
+    std::uint32_t struct_size;
+    std::uint64_t valid_components;
+    double current_time_seconds;
+    double storage_m3;
+    double volume_error_cumulative_m3;
+    double boundary_in_m3;
+    double boundary_out_m3;
+    double lateral_1d_in_m3;
+    double lateral_1d_out_m3;
+    double lateral_2d_in_m3;
+    double lateral_2d_out_m3;
+    double source_in_m3;
+    double source_out_m3;
+    double qext_1d_in_m3;
+    double qext_1d_out_m3;
+    double qext_2d_in_m3;
+    double qext_2d_out_m3;
+    double rain_in_m3;
+    double evaporation_out_m3;
+    double groundwater_in_m3;
+    double groundwater_out_m3;
+};
+
+using GetWaterBalanceV1Fn = int (*)(NativeWaterBalanceV1*, std::uint32_t);
+
+constexpr std::uint32_t kWaterBalanceAbiVersion = 1U;
+constexpr std::uint64_t kWaterBalanceAllComponents = 0xFFULL;
+
+bool is_valid_cumulative(double value) {
+    return std::isfinite(value) && value >= 0.0;
+}
+
+}  // namespace
+
+int DFlowFMEngine::internal_cell_count() const {
+    require_initialized();
+    constexpr const char* kVariable = "ndxi";
+    std::array<char, kMaxBmiStringLength> type{};
+    api_->get_var_type(kVariable, type.data());
+    int rank = -1;
+    api_->get_var_rank(kVariable, &rank);
+    if (rank != 0 || std::strcmp(type.data(), "int") != 0) {
+        throw DFlowFMEngineError(
+            "D-Flow FM ndxi must be a scalar int variable",
+            "DFlowFM",
+            "dflowfm_ndxi_contract_mismatch");
+    }
+    void* engine_ptr = nullptr;
+    api_->get_var(kVariable, &engine_ptr);
+    if (engine_ptr == nullptr) {
+        throw DFlowFMEngineError(
+            "D-Flow FM ndxi is unavailable through BMI",
+            "DFlowFM",
+            "dflowfm_ndxi_unavailable");
+    }
+    const int count = *static_cast<const int*>(engine_ptr);
+    if (count <= 0) {
+        throw DFlowFMEngineError(
+            "D-Flow FM ndxi must be positive",
+            "DFlowFM",
+            "dflowfm_ndxi_invalid");
+    }
+    return count;
+}
+
+DFlowFMNativeWaterBalance DFlowFMEngine::observe_native_water_balance() const {
+    require_initialized();
+    const auto fn = load_symbol<GetWaterBalanceV1Fn>(
+        library_handle_, "dflowfm_get_water_balance_v1");
+
+    NativeWaterBalanceV1 raw{};
+    const int rc = fn(&raw, static_cast<std::uint32_t>(sizeof(raw)));
+    if (rc != 0) {
+        throw DFlowFMEngineError(
+            "D-Flow FM native water-balance read failed with code " + std::to_string(rc),
+            "DFlowFM",
+            "dflowfm_water_balance_read_failed");
+    }
+    if (raw.abi_version != kWaterBalanceAbiVersion ||
+        raw.struct_size != static_cast<std::uint32_t>(sizeof(raw)) ||
+        raw.valid_components != kWaterBalanceAllComponents) {
+        throw DFlowFMEngineError(
+            "D-Flow FM native water-balance ABI mismatch",
+            "DFlowFM",
+            "dflowfm_water_balance_abi_mismatch");
+    }
+
+    DFlowFMNativeWaterBalance observation{};
+    observation.current_time_seconds = raw.current_time_seconds;
+    observation.storage_m3 = raw.storage_m3;
+    observation.volume_error_cumulative_m3 = raw.volume_error_cumulative_m3;
+    observation.boundary_in_m3 = raw.boundary_in_m3;
+    observation.boundary_out_m3 = raw.boundary_out_m3;
+    observation.lateral_1d_in_m3 = raw.lateral_1d_in_m3;
+    observation.lateral_1d_out_m3 = raw.lateral_1d_out_m3;
+    observation.lateral_2d_in_m3 = raw.lateral_2d_in_m3;
+    observation.lateral_2d_out_m3 = raw.lateral_2d_out_m3;
+    observation.source_in_m3 = raw.source_in_m3;
+    observation.source_out_m3 = raw.source_out_m3;
+    observation.qext_1d_in_m3 = raw.qext_1d_in_m3;
+    observation.qext_1d_out_m3 = raw.qext_1d_out_m3;
+    observation.qext_2d_in_m3 = raw.qext_2d_in_m3;
+    observation.qext_2d_out_m3 = raw.qext_2d_out_m3;
+    observation.rain_in_m3 = raw.rain_in_m3;
+    observation.evaporation_out_m3 = raw.evaporation_out_m3;
+    observation.groundwater_in_m3 = raw.groundwater_in_m3;
+    observation.groundwater_out_m3 = raw.groundwater_out_m3;
+
+    constexpr double kTimeToleranceSeconds = 1.0e-6;
+    observation.scope_complete =
+        std::isfinite(raw.current_time_seconds) &&
+        std::abs(raw.current_time_seconds - current_time_) <= kTimeToleranceSeconds &&
+        is_valid_cumulative(raw.storage_m3) &&
+        std::isfinite(raw.volume_error_cumulative_m3) &&
+        is_valid_cumulative(raw.boundary_in_m3) &&
+        is_valid_cumulative(raw.boundary_out_m3) &&
+        is_valid_cumulative(raw.lateral_1d_in_m3) &&
+        is_valid_cumulative(raw.lateral_1d_out_m3) &&
+        is_valid_cumulative(raw.lateral_2d_in_m3) &&
+        is_valid_cumulative(raw.lateral_2d_out_m3) &&
+        is_valid_cumulative(raw.source_in_m3) &&
+        is_valid_cumulative(raw.source_out_m3) &&
+        is_valid_cumulative(raw.qext_1d_in_m3) &&
+        is_valid_cumulative(raw.qext_1d_out_m3) &&
+        is_valid_cumulative(raw.qext_2d_in_m3) &&
+        is_valid_cumulative(raw.qext_2d_out_m3) &&
+        is_valid_cumulative(raw.rain_in_m3) &&
+        is_valid_cumulative(raw.evaporation_out_m3) &&
+        is_valid_cumulative(raw.groundwater_in_m3) &&
+        is_valid_cumulative(raw.groundwater_out_m3);
+    return observation;
 }
 
 void DFlowFMEngine::load_library() {

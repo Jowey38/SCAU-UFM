@@ -19,6 +19,8 @@
 - CouplingLib core mutation model: `apply_*` only enqueue `CouplingEvent`s; cell volume/h change only on `replay_pending()`. Mirror this for any new exchange path.
 - MockDFlowFMEngine whitelists variables: `water_level`, `discharge`, `lateral_discharge`, `gate_opening` (project-standard names; the real BMI kernel may use `s1` etc. — keep variable names configurable at the driver/config level).
 
+- [2026-08-14] M276/G27 LANDED + bug-207: BMI vol1 array = internal cells first THEN boundary ghost nodes (ndxi..ndx); full sum(vol1) overcounts storage on open-boundary models (6500 vs vol1tot 5500 on the authored open case) and its deltas are polluted by ghost dynamics. M258/M259 closed-case evidence does NOT generalize. Production: real mode binds native vol1tot via RunLoopHooks.dflowfm_storage_volume; independent verification uses observe_dflowfm_internal_volume (vol1[0:ndxi], ndxi fail-closed). D-Flow audit external net = boundary only; ALL laterals are CouplingLib API exchange deduped once; source/qext/rain/evap/gw guarded observed-zero fail-closed. G27 3-leg real golden PASS locally; candidate_non_gating until gateway green on master.
+
 ## Do-Not-Repeat
 
 <!-- Mistakes made and corrected. Each entry prevents the same mistake recurring. -->

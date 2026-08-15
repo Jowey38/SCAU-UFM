@@ -4,6 +4,7 @@
 #include <string>
 
 #include "coupling/river/dflowfm_boundary.hpp"
+#include "coupling/river/dflowfm_engine.hpp"
 
 namespace scau::coupling::driver {
 
@@ -30,5 +31,14 @@ struct DFlowFMVolumeObservation {
 // complete.
 [[nodiscard]] DFlowFMVolumeObservation observe_dflowfm_volume(
     const river::IDFlowFMEngine& engine);
+
+// Internal-domain storage: sums only the first `ndxi` entries of `vol1`.
+// M276/bug-207 evidence: on open-boundary models the BMI vol1 array carries
+// boundary ghost-node volumes after the internal cells, so the full sum
+// overcounts physical storage; on closed models ndxi covers every entry and
+// this equals observe_dflowfm_volume. Concrete-engine-only because reading
+// the scalar int `ndxi` is not part of the IDFlowFMEngine state surface.
+[[nodiscard]] DFlowFMVolumeObservation observe_dflowfm_internal_volume(
+    const river::DFlowFMEngine& engine);
 
 }  // namespace scau::coupling::driver

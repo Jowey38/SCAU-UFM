@@ -616,3 +616,11 @@
 | 2026-06-25 | GoldenSuite manifest (Task 1-5) landed in worktree feat/goldensuite-manifest: full G1-G12 JSON registry, G1-G6 active golden tests, manifest checker, CI jobs, and evidence/records | tests/golden, .github/workflows/ci.yml, superpowers/specs/2026-06-25-goldensuite-manifest-evidence.md | 6/6 golden tests pass, manifest check passes | ~20k |
 | 2026-07-16 | M254 vendor extraction audit: swmm5 snapshot verified complete vs upstream (diff clean, CRLF only); vendored extern/dflowfm/include/bmi.h contract snapshot + README (contract-snapshot-only, no Fortran kernel); added third_party/manifest/dflowfm.version + licenses/dflowfm-LICENSE; spike bmi.h fallback hint; adapter contract-linkage comment | extern/dflowfm, third_party, spikes/dflowfm/CMakeLists.txt, dflowfm_engine.cpp | build 0 errors, ctest 88/88, manifest OK, CI isolation greps all pass | ~25k |
 | 2026-07-28 | M258 spike: probe-sum-vars + lateral inject in dflowfm spike host; A/B runs confirm sum(vol1) contract | spikes/dflowfm/host/dflowfm_spike_host.cpp, spikes/dflowfm/evidence/vol1_volume_contract.md | CONFIRMED, delta=7.5 m3/step exact | ~30k |
+
+## Session: 2026-08-14 M276 implementation
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| -- | Implemented native water-balance observation + external-net provider | dflowfm_engine.*, dflowfm_external_net_provider.* | concrete-only + driver-owned | ~1500 |
+| -- | G27 first run FAILED -> bug-207 ghost-node discovery -> ndxi fix | dflowfm_volume_provider.*, run_loop.*, main.cpp | real G27 PASS | ~1200 |
+| -- | Registered G27 candidate_non_gating; gateway 7 goldens | manifest, ci.yml, run_real_goldens.sh | manifest OK, 160/160 | ~600 |

@@ -168,6 +168,7 @@
 | `spikes/dflowfm/evidence/m273_external_boundary_contract.md` | M273 D-Flow FM external-boundary spike 失败证据；真实开放边界 A/B 运行确认 `qext/qextreal/vextcum` 对 `[boundary]` 不可读，`q1` 缺少治理后的 boundary ID/方向/积分/重启合同，因此禁止猜测性 external-net provider，G19 保持 non-gating / scope-incomplete。 |
 | `superpowers/specs/2026-08-08-g19-promotion-decision-evidence.md` | M272/M273 后 G19 promotion 决策；SWMM scope 完整但 D-Flow external scope 失败，故 residual 不具 tolerance 可比资格、G19 不提升、G27 仅作为未来真实合同前置项且暂不注册，稳定性协议与 manifest 当前不修改。 |
 | `spikes/dflowfm/evidence/m274_native_water_balance_feasibility.md` | M274 native water-balance bridge 可行性证据；固定宽度 C ABI 与 Fortran bind(C) bridge 编译成功，确认必须编入外部 dflowfm.dll；当前 Conan/PETSc/Cygwin 构建环境不能产出 governed runtime，故 case matrix 未执行、G19/G27 保持 BLOCKED。 |
+| `superpowers/specs/2026-08-14-m276-dflowfm-external-net-evidence.md` | M276 D-Flow FM external-net provider + G27 实施证据；concrete-only 原生水量平衡观测、driver 审计派生（boundary 净通量 + API lateral 去重 + 未证明强迫类 fail-closed）、real 路径 audit scope 首次补全、G27 candidate_non_gating 注册与真实网关执行；含 bug-207（开边界模型 full sum(vol1) 含 ghost 节点多计储量）发现与 ndxi 内部截断修复。G19 提升仍需 Phase C 独立决策。 |
 
 ## 历史记录规则
 

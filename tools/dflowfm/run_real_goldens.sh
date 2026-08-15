@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # SCAU-UFM real D-Flow FM Phase Gateway.
 #
-# Runs the six real-runtime Goldens (G11, G16, G17, checkpoint reload, G18,
-# G19)
+# Runs the seven real-runtime Goldens (G11, G16, G17, checkpoint reload,
+# G27, G18, G19)
 # against the authored single_reach_1d case in one reproducible command.
 # This is the local/release gateway and the exact sequence the future
 # self-hosted CI job executes.
@@ -45,6 +45,15 @@ export SCAU_DFLOWFM_G11_MDU="single_reach.mdu"
 # RefDate is fixed in the authored MDU, so the 600 s native checkpoint name is
 # deterministic. The river-steady run below regenerates it before reload runs.
 export SCAU_DFLOWFM_G11_CHECKPOINT_600="$CASE_DIR/DFM_OUTPUT_single_reach/single_reach_20260723_001000_rst.nc"
+# G27 external-net contract golden: the open-boundary case exercises both
+# boundary directions; the closed case exercises the API-lateral dedup leg.
+# MDU names stay relative because the test chdirs into each case dir (long
+# absolute MDU paths silently disable native output in this build).
+OPEN_CASE_DIR="$REPO_ROOT/spikes/dflowfm/cases/single_reach_open_boundary"
+export SCAU_DFLOWFM_G27_OPEN_CASE_DIR="$OPEN_CASE_DIR"
+export SCAU_DFLOWFM_G27_OPEN_MDU="single_reach_open.mdu"
+export SCAU_DFLOWFM_G27_CLOSED_CASE_DIR="$CASE_DIR"
+export SCAU_DFLOWFM_G27_CLOSED_MDU="single_reach.mdu"
 
 find_test() {
     local name=$1
@@ -72,6 +81,7 @@ run_test() {
 }
 
 rm -rf "$CASE_DIR"/DFM_OUTPUT_* "$CASE_DIR"/*.cache
+rm -rf "$OPEN_CASE_DIR"/DFM_OUTPUT_* "$OPEN_CASE_DIR"/*.cache
 
 # Order matters: the first run regenerates the deterministic 600 s checkpoint
 # consumed by the checkpoint-reload Golden.
@@ -86,6 +96,9 @@ if [ ! -f "$SCAU_DFLOWFM_G11_CHECKPOINT_600" ]; then
 fi
 run_test dflowfm_checkpoint_reload
 
+# G27 manages its own case-directory cwd via the SCAU_DFLOWFM_G27_* env vars.
+run_test dflowfm_external_net
+
 # G19 is the first golden whose executable statically imports the vcpkg
 # netcdf.dll (STCF I/O) AND loads the D-Flow FM runtime. The Windows loader
 # resolves netcdff.dll's netcdf dependency against the already-loaded module
@@ -97,4 +110,4 @@ G19_EXE=$(find_test surface2d_tri_coupling_real)
 cp "$RUNTIME_BIN/netcdf.dll" "$(dirname "$G19_EXE")/netcdf.dll"
 run_test surface2d_tri_coupling_real
 
-echo "OK real D-Flow FM phase gateway: 6/6 goldens passed"
+echo "OK real D-Flow FM phase gateway: 7/7 goldens passed"

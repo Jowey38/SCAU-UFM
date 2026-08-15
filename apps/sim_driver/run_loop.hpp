@@ -23,6 +23,13 @@ struct RunLoopHooks {
     // enable_whole_system_mass_audit is true; real mode binds the concrete
     // SwmmEngine::total_stored_volume without widening ISwmmEngine.
     std::function<double()> swmm_storage_volume{};
+    // Optional D-Flow FM physical-storage override. When absent the loop
+    // falls back to observe_dflowfm_volume (full vol1 sum), which is only
+    // correct for closed models: on open-boundary models the BMI vol1 array
+    // includes boundary ghost-node volumes outside the physical domain
+    // (bug-207). Real mode binds the native internal-domain storage
+    // (vol1tot) through the concrete engine's water-balance bridge.
+    std::function<double()> dflowfm_storage_volume{};
     // Complete cumulative external engine net-volume providers (inflow
     // positive, outflow/loss negative). Absence makes the real audit
     // scope-incomplete / REVIEW_REQUIRED; it never falls back to tolerance.

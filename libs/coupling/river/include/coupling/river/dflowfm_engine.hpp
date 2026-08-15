@@ -7,6 +7,39 @@
 
 namespace scau::coupling::river {
 
+// Engine-native cumulative water-balance snapshot read through the
+// project-authored bridge ABI `dflowfm_get_water_balance_v1` compiled into
+// the governed external dflowfm.dll (contract snapshot:
+// extern/dflowfm/include/scau_dflowfm_water_balance_v1.h).
+//
+// Cumulative semantics (M274 contract evidence): every *_m3 component is a
+// cumulative volume since the LAST engine initialize and resets to zero on
+// every initialize, including a restart reload. Consumers must re-baseline
+// across an initialize boundary and must never compare raw counters across
+// one. This is a raw observation DTO; audit/dedup policy is driver-owned.
+struct DFlowFMNativeWaterBalance {
+    double current_time_seconds{0.0};
+    double storage_m3{0.0};
+    double volume_error_cumulative_m3{0.0};
+    double boundary_in_m3{0.0};
+    double boundary_out_m3{0.0};
+    double lateral_1d_in_m3{0.0};
+    double lateral_1d_out_m3{0.0};
+    double lateral_2d_in_m3{0.0};
+    double lateral_2d_out_m3{0.0};
+    double source_in_m3{0.0};
+    double source_out_m3{0.0};
+    double qext_1d_in_m3{0.0};
+    double qext_1d_out_m3{0.0};
+    double qext_2d_in_m3{0.0};
+    double qext_2d_out_m3{0.0};
+    double rain_in_m3{0.0};
+    double evaporation_out_m3{0.0};
+    double groundwater_in_m3{0.0};
+    double groundwater_out_m3{0.0};
+    bool scope_complete{false};
+};
+
 // Runtime-loaded D-Flow FM BMI 1.0 engine.
 //
 // Boundary contract (architecture spec + project-layout-design.md firewall):
@@ -43,6 +76,23 @@ public:
     [[nodiscard]] double elapsed_time() const noexcept;
     [[nodiscard]] int variable_count() const;
     [[nodiscard]] std::vector<std::string> variable_names() const;
+
+    // Concrete-engine-only native observation (NOT on IDFlowFMEngine, which
+    // wraps lifecycle and state read/write only): reads the cumulative
+    // water-balance snapshot through the bridge ABI. Fails closed when the
+    // symbol is missing (un-bridged DLL), the ABI version/size/component set
+    // mismatches, or the read reports an error. Value-level validity
+    // (finite, non-negative cumulatives, time consistency) is reported via
+    // scope_complete rather than thrown, mirroring
+    // SwmmEngine::observe_external_net_volume.
+    [[nodiscard]] DFlowFMNativeWaterBalance observe_native_water_balance() const;
+
+    // Concrete-engine-only: number of internal flow nodes (BMI scalar `ndxi`).
+    // BMI rank-1 arrays over flow nodes store internal cells first; entries
+    // beyond ndxi are boundary ghost nodes outside the physical domain
+    // (bug-207: summing full `vol1` overcounts storage on open-boundary
+    // models). Fails closed on missing/mistyped/non-positive values.
+    [[nodiscard]] int internal_cell_count() const;
 
 private:
     struct BmiApi;
