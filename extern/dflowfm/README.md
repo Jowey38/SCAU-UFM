@@ -47,3 +47,16 @@ the spike host (`spikes/dflowfm/host/dflowfm_spike_host.cpp`) against it.
   `find_path` hint for `bmi.h` when no external `DFLOWFM_SOURCE_DIR` checkout
   provides it. The spike still requires the caller to supply a built D-Flow FM
   library; only the header contract is vendored here.
+
+## Project-authored native water-balance contract (M274/M276)
+
+`include/scau_dflowfm_water_balance_v1.h` is the SCAU-UFM-authored contract
+snapshot for the `dflowfm_get_water_balance_v1` bridge symbol. The exporting
+Fortran bridge (`spikes/dflowfm/bridge/dflowfm_water_balance_bridge.F90`) is
+compiled INTO the governed external dflowfm.dll build (M275); a stock
+Deltares DLL does not export it. Like `bmi.h`, the production adapter does
+not include the header: `libs/coupling/river/src/dflowfm_adapter/
+dflowfm_engine.cpp` mirrors the layout privately and resolves the symbol at
+runtime, failing closed when it is absent. Every cumulative component resets
+on engine initialize (including restart reload); consumers must re-baseline
+across an initialize boundary (M274 contract evidence).

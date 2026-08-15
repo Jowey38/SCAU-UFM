@@ -552,3 +552,8 @@ add_executable(test_coupling_deficit_writeoff test_coupling_deficit_writeoff.cpp
 target_link_libraries(test_coupling_deficit_writeoff
     PRIVATE scau::coupling_core scau::warnings GTest::gtest_main)
 add_test(NAME test_coupling_deficit_writeoff COMMAND test_coupling_deficit_writeoff)
+
+add_executable(test_dflowfm_external_net_provider test_dflowfm_external_net_provider.cpp)
+target_link_libraries(test_dflowfm_external_net_provider
+    PRIVATE scau::coupling_driver scau::warnings GTest::gtest_main)
+add_test(NAME test_dflowfm_external_net_provider COMMAND test_dflowfm_external_net_provider)

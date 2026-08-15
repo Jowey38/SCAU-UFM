@@ -628,3 +628,11 @@
 | -- | Authored outflow/mixed-lateral/restart600 cases | spikes/dflowfm/cases/single_reach_open_boundary/*.mdu/.ext | 4 new files | ~400 |
 | -- | Ran M274 completion matrix (qext probe, outflow, mixed, restart A/B) | m274_*.trace.txt | ALL PASS; qext BLOCKED | ~600 |
 | -- | Updated contract evidence + INDEX + README | m274_native_water_balance_contract.md, INDEX.md | Phase A closed | ~500 |
+
+## Session: 2026-08-14 M276 implementation
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| -- | Implemented native water-balance observation + external-net provider | dflowfm_engine.*, dflowfm_external_net_provider.* | concrete-only + driver-owned | ~1500 |
+| -- | G27 first run FAILED -> bug-207 ghost-node discovery -> ndxi fix | dflowfm_volume_provider.*, run_loop.*, main.cpp | real G27 PASS | ~1200 |
+| -- | Registered G27 candidate_non_gating; gateway 7 goldens | manifest, ci.yml, run_real_goldens.sh | manifest OK, 160/160 | ~600 |

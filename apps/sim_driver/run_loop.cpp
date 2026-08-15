@@ -194,13 +194,17 @@ RunLoopResult run_simulation(
         initial_sample.surface_reference_volume = physical_surface_volume(
             state, loaded.dpm_fields, geometry, config.h_wet);
         initial_sample.swmm_storage_volume = hooks.swmm_storage_volume();
-        const driver_ns::DFlowFMVolumeObservation dflow_observation =
-            driver_ns::observe_dflowfm_volume(dflowfm);
-        if (!dflow_observation.scope_complete) {
-            throw std::invalid_argument(
-                "whole-system mass audit requires complete D-Flow FM vol1 scope");
+        if (hooks.dflowfm_storage_volume) {
+            initial_sample.dflowfm_volume = hooks.dflowfm_storage_volume();
+        } else {
+            const driver_ns::DFlowFMVolumeObservation dflow_observation =
+                driver_ns::observe_dflowfm_volume(dflowfm);
+            if (!dflow_observation.scope_complete) {
+                throw std::invalid_argument(
+                    "whole-system mass audit requires complete D-Flow FM vol1 scope");
+            }
+            initial_sample.dflowfm_volume = dflow_observation.volume;
         }
-        initial_sample.dflowfm_volume = dflow_observation.volume;
         if (hooks.swmm_external_net_volume) {
             initial_sample.swmm_external_net_volume =
                 hooks.swmm_external_net_volume();
@@ -465,17 +469,21 @@ RunLoopResult run_simulation(
                 state, loaded.dpm_fields, geometry, config.h_wet);
             current_sample.coupling_deficit_volume = audit_after.deficit_mass;
             current_sample.swmm_storage_volume = hooks.swmm_storage_volume();
-            const driver_ns::DFlowFMVolumeObservation dflow_observation =
-                driver_ns::observe_dflowfm_volume(dflowfm);
-            if (!dflow_observation.scope_complete) {
-                refuse_engine_rollback();
-                driver.require_review();
-                finish("review_required",
-                       "whole-system mass audit D-Flow FM volume scope incomplete "
-                       "after engine advancement (rollback refused)");
-                return result;
+            if (hooks.dflowfm_storage_volume) {
+                current_sample.dflowfm_volume = hooks.dflowfm_storage_volume();
+            } else {
+                const driver_ns::DFlowFMVolumeObservation dflow_observation =
+                    driver_ns::observe_dflowfm_volume(dflowfm);
+                if (!dflow_observation.scope_complete) {
+                    refuse_engine_rollback();
+                    driver.require_review();
+                    finish("review_required",
+                           "whole-system mass audit D-Flow FM volume scope incomplete "
+                           "after engine advancement (rollback refused)");
+                    return result;
+                }
+                current_sample.dflowfm_volume = dflow_observation.volume;
             }
-            current_sample.dflowfm_volume = dflow_observation.volume;
             if (hooks.swmm_external_net_volume) {
                 current_sample.swmm_external_net_volume =
                     hooks.swmm_external_net_volume();

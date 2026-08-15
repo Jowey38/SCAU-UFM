@@ -3,6 +3,7 @@ add_library(scau_coupling_driver
     src/checkpoint_payloads.cpp
     src/coupling_state_endpoint_provider.cpp
     src/dflowfm_checkpoint.cpp
+    src/dflowfm_external_net_provider.cpp
     src/dflowfm_volume_provider.cpp
     src/roof_exchange_gate.cpp
     src/roof_swmm_step_driver.cpp

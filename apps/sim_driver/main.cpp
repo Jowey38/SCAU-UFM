@@ -13,6 +13,7 @@
 #include "coupling/drainage/swmm_engine.hpp"
 #endif
 #if defined(SCAU_HAS_DFLOWFM_BMI_RUNTIME)
+#include "coupling/driver/dflowfm_external_net_provider.hpp"
 #include "coupling/river/dflowfm_engine.hpp"
 #endif
 
@@ -91,6 +92,24 @@ int main(int argc, char** argv) {
                 throw std::runtime_error("SWMM external-net observation is incomplete");
             }
             return observation.external_net_volume_m3;
+        };
+        hooks.dflowfm_external_net_volume = [&dflowfm]() {
+            const auto observation =
+                scau::coupling::driver::observe_dflowfm_external_net(dflowfm);
+            if (!observation.scope_complete) {
+                throw std::runtime_error("D-Flow FM external-net observation is incomplete");
+            }
+            return observation.external_net_volume_m3;
+        };
+        hooks.dflowfm_storage_volume = [&dflowfm]() {
+            // Native internal-domain storage (vol1tot): the full BMI vol1 sum
+            // overcounts on open-boundary models (bug-207 ghost nodes).
+            const auto observation =
+                scau::coupling::driver::observe_dflowfm_external_net(dflowfm);
+            if (!observation.scope_complete) {
+                throw std::runtime_error("D-Flow FM storage observation is incomplete");
+            }
+            return observation.storage_m3;
         };
         const int code = run_with_engines(driver, swmm, dflowfm, hooks);
         swmm.finalize();

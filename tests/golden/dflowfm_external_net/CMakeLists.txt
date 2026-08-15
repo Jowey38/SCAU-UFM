@@ -1,0 +1,5 @@
+add_executable(test_dflowfm_external_net test_dflowfm_external_net.cpp)
+target_link_libraries(test_dflowfm_external_net
+    PRIVATE scau::coupling_driver scau::coupling_river scau::warnings GTest::gtest_main)
+add_test(NAME test_dflowfm_external_net COMMAND test_dflowfm_external_net)
+set_tests_properties(test_dflowfm_external_net PROPERTIES LABELS candidate_non_gating)

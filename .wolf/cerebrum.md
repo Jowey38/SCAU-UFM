@@ -22,6 +22,8 @@
 
 - [2026-08-14] M274 Phase A COMPLETE: bridged-DLL native water-balance matrix now covers outflow-only (boundary_in stays exactly 0), boundary+lateral mixed (75/75/114.19 exact closure, class separation), and restart A/B (state restore BIT-IDENTICAL; per-window flux deltas replay to fp accumulation ~1e-12; native cumulative counters RESET TO ZERO on every initialize incl. restart -> provider must re-baseline at reload, never compare raw counters across initialize). qext re-confirmed engine-BLOCKED on bridged DLL (BMI get_var null; cannot allocate) -> G27 contract guards qext/rain/gw as observed-zero. Combined fileVersion 2.02 ext with [Boundary]+[Lateral] sections works. G27 implementation unlocked; G19 still blocked until G27 evidence.
 
+- [2026-08-14] M276/G27 LANDED + bug-207: BMI vol1 array = internal cells first THEN boundary ghost nodes (ndxi..ndx); full sum(vol1) overcounts storage on open-boundary models (6500 vs vol1tot 5500 on the authored open case) and its deltas are polluted by ghost dynamics. M258/M259 closed-case evidence does NOT generalize. Production: real mode binds native vol1tot via RunLoopHooks.dflowfm_storage_volume; independent verification uses observe_dflowfm_internal_volume (vol1[0:ndxi], ndxi fail-closed). D-Flow audit external net = boundary only; ALL laterals are CouplingLib API exchange deduped once; source/qext/rain/evap/gw guarded observed-zero fail-closed. G27 3-leg real golden PASS locally; candidate_non_gating until gateway green on master.
+
 ## Do-Not-Repeat
 
 <!-- Mistakes made and corrected. Each entry prevents the same mistake recurring. -->
@@ -37,6 +39,8 @@
 - [2026-06-13] After killing a ctest run, ALWAYS kill leftover test_* processes and grep build output for LNK1168 before trusting test results — MSBuild link failures leave stale exes and ctest runs them silently (false hangs/false passes). Verify with `grep -c LNK1168 == 0`.
 - [2026-06-13] `grep -oE "H:[^ ]*"` on MSVC output eats backslashes from Windows paths; piping into `rm` silently no-ops (rm -f on nonexistent path exits 0). Delete by basename with `find -name X -exec rm` instead.
 - [2026-06-13] bug-014: when adding validation to a shared validator (validate_dpm_fields_match_mesh), validate ONLY the field your task introduces. Adding phi_t in (0,1] broke existing fixtures using phi_t=1.25 to drive pressure-pairing math. Pre-existing scalars had no range checks; do not retrofit constraints as scope creep — enforce domain at the specific call sites that need it (source terms already do).
+
+- [2026-08-14] Heredoc python failure does NOT stop newline-separated follow-up git commands in the same Bash call: a dead merge-resolution script let `git add && git commit` record files WITH conflict markers. Always && -chain the resolver script with the git commands (or verify `grep -c '<<<<<<<' == 0`) before committing a merge resolution. Caught pre-PR by re-grep + amend + force-with-lease.
 
 ## Decision Log
 

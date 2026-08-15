@@ -223,5 +223,14 @@
     "reference_path": "tests/golden/reference/tolerances.md",
     "ci_gate": false,
     "status": "implemented"
+  },
+  {
+    "test_id": "G27",
+    "name": "dflowfm_external_net",
+    "test_path": "tests/golden/dflowfm_external_net/",
+    "applicable_phase": "Phase 2+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": false,
+    "status": "implemented"
   }
 ]
