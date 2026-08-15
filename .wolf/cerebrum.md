@@ -40,6 +40,8 @@
 - [2026-06-13] `grep -oE "H:[^ ]*"` on MSVC output eats backslashes from Windows paths; piping into `rm` silently no-ops (rm -f on nonexistent path exits 0). Delete by basename with `find -name X -exec rm` instead.
 - [2026-06-13] bug-014: when adding validation to a shared validator (validate_dpm_fields_match_mesh), validate ONLY the field your task introduces. Adding phi_t in (0,1] broke existing fixtures using phi_t=1.25 to drive pressure-pairing math. Pre-existing scalars had no range checks; do not retrofit constraints as scope creep — enforce domain at the specific call sites that need it (source terms already do).
 
+- [2026-08-14] Heredoc python failure does NOT stop newline-separated follow-up git commands in the same Bash call: a dead merge-resolution script let `git add && git commit` record files WITH conflict markers. Always && -chain the resolver script with the git commands (or verify `grep -c '<<<<<<<' == 0`) before committing a merge resolution. Caught pre-PR by re-grep + amend + force-with-lease.
+
 ## Decision Log
 
 <!-- Significant technical decisions with rationale. Why X was chosen over Y. -->
