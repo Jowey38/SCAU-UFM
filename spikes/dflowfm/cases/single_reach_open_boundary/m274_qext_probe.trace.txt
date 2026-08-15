@@ -1,0 +1,24 @@
+# t0=0.000000 t1=6000.000000 engine_dt=60.000000 steps=3 dt=60.000000 boundary_var=boundary_discharge stage_var=s1 native_probe=true
+# columns: step current_time stage0
+# probe columns: probe,step,varname,sum,min,max,finite_count/total (step 0 = after initialize, k = after k-th update)
+# wb columns: wb,label,time,storage,volerr,boundary_in,boundary_out,lat1_in,lat1_out,lat2_in,lat2_out,src_in,src_out,qext1_in,qext1_out,qext2_in,qext2_out,rain,evap,gw_in,gw_out,symbol,abi,complete,finite,monotonic,time_valid
+probe,0,qext,unavailable
+probe,0,qextreal,unavailable
+probe,0,vextcum,unavailable
+wb,after-initialize,0.000000,5500,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+0 60.000000 1.007063
+probe,1,qext,unavailable
+probe,1,qextreal,unavailable
+probe,1,vextcum,unavailable
+wb,after-update,60.000000,5507.49865305571,-1.81898940354586e-12,7.5,0.00134694428740709,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+1 120.000000 1.009125
+probe,2,qext,unavailable
+probe,2,qextreal,unavailable
+probe,2,vextcum,unavailable
+wb,after-update,120.000000,5514.97771418313,-1.81898940354586e-12,15,0.0222858168689327,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+2 180.000000 1.008881
+probe,3,qext,unavailable
+probe,3,qextreal,unavailable
+probe,3,vextcum,unavailable
+wb,after-update,180.000000,5522.32529694771,-1.81898940354586e-12,22.5,0.174703052292593,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+# summary completed_steps=3 requested_steps=3 last_time=180.000000 expected_last_time=180.000000 max_dt_abs_error=0 time_trace_valid=true

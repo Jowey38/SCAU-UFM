@@ -38,5 +38,10 @@ find_library(DFLOWFM_LIB
 )
 
 add_executable(dflowfm_spike_host host/dflowfm_spike_host.cpp)
-target_include_directories(dflowfm_spike_host PRIVATE ${DFLOWFM_BMI_INCLUDE_DIR})
+target_include_directories(
+    dflowfm_spike_host
+    PRIVATE
+        ${DFLOWFM_BMI_INCLUDE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/contract
+)
 target_link_libraries(dflowfm_spike_host PRIVATE ${DFLOWFM_LIB})

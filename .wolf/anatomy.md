@@ -26,6 +26,7 @@
 - `contract/dflowfm_water_balance_v1.h` — M274 fixed-width native water-balance C ABI.
 - `bridge/dflowfm_water_balance_bridge.F90` — M274 external-build Fortran bind(C) bridge source.
 - `evidence/m274_native_water_balance_feasibility.md` — M274 bridge feasibility and governed-runtime blocker evidence.
+- `docs/superpowers/plans/2026-08-12-m275-dflowfm-governed-build-environment.md` — M275 governed build environment first-pass blocker record.
 
 ## superpowers/specs/
 

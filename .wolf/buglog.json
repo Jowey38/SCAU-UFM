@@ -132,6 +132,54 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-08-11T04:05:00Z"
+    },
+    {
+      "id": "bug-203",
+      "timestamp": "2026-08-12T13:40:00Z",
+      "error_message": "Governed D-Flow source build reached PETSc but failed because conanbuild.sh sourced a generated conanbuildenv script with Windows backslash paths under Cygwin bash.",
+      "file": "local-recipes petsc/3.25.3 Conan build environment",
+      "root_cause": "The current Windows+Cygwin Conan generator/recipe combination emits `script_folder` with raw `C:\\...` backslash paths in `conanbuildenv-release-x86_64.sh`, which PETSc's Cygwin shell cannot consume reproducibly.",
+      "fix": "Changed the local PETSc recipe to avoid Conan's broken win_bash environment scripts, invoke configured Cygwin bash explicitly, derive shell paths through that installation's cygpath.exe, prioritize Cygwin Python, and regenerate conan.lock before the governed build. PETSc now enters its real configure/build stage.",
+      "tags": ["m275", "dflowfm", "petsc", "conan", "cygwin", "build"],
+      "related_bugs": ["bug-202"],
+      "occurrences": 4,
+      "last_seen": "2026-08-12T21:20:00Z"
+    },
+    {
+      "id": "bug-204",
+      "timestamp": "2026-08-13T01:10:00Z",
+      "error_message": "PETSc package() failed with 'make: command not found' under explicit Cygwin bash, and later expat/2.8.0 failed with C1020 unexpected #endif in random_rand_s.c line 47.",
+      "file": "Delft3D-main/conan/recipes/petsc/all/conanfile.py; conan/config/profiles/delft3d_windows_msvc_194_v2",
+      "root_cause": "Two independent residues after the shell-path fix: (1) the package() stage runs in a fresh process whose entry PATH lacked Cygwin /usr/bin, unlike the build stage; (2) under codepage 936 MSVC decodes expat's UTF-8 curly quotes in a comment as GBK, swallowing the newline so the following '#if defined(__MINGW32__)' merges into the comment and the '#endif' becomes unmatched.",
+      "fix": "Appended C:\\cygwin64\\bin to the governed build entry PATH (after native Python/oneAPI so PowerShell still resolves Windows python.exe), and added tools.build:cflags/cxxflags=[\"/utf-8\"] to the delft3d_windows_msvc_194_v2 profile (repo copy and installed CONAN_HOME copy). PETSc 3.25.3 binary 31ee0027 is now packaged in the Conan cache.",
+      "tags": ["m275", "dflowfm", "petsc", "expat", "codepage-936", "utf-8", "conan", "build"],
+      "related_bugs": ["bug-203"],
+      "occurrences": 1,
+      "last_seen": "2026-08-13T01:10:00Z"
+    },
+    {
+      "id": "bug-205",
+      "timestamp": "2026-08-15T10:05:00Z",
+      "error_message": "M274 native water-balance probe could initialize and run the rebuilt D-Flow DLL but dflowfm_get_water_balance_v1 was missing from the Windows export table.",
+      "file": "spikes/dflowfm/bridge/dflowfm_water_balance_bridge.F90",
+      "root_cause": "The bind(C) bridge function had no Intel Fortran DLLEXPORT directive, while the upstream D-Flow DLL API uses explicit !DEC$ ATTRIBUTES DLLEXPORT declarations for Windows exports.",
+      "fix": "Added !DEC$ ATTRIBUTES DLLEXPORT :: dflowfm_get_water_balance_v1 to the bridge function before rebuilding the dflowfm_dll target.",
+      "tags": ["m274", "dflowfm", "bridge", "windows", "export", "abi"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-08-15T10:05:00Z"
+    },
+    {
+      "id": "bug-206",
+      "timestamp": "2026-08-15T10:25:00Z",
+      "error_message": "M274 lateral matrix case could not start because spikes/dflowfm/cases/single_reach_lateral/Flow1D.mdu was absent in the local checkout.",
+      "file": "spikes/dflowfm/cases/single_reach_lateral",
+      "root_cause": "The local runtime asset directory for the authored lateral case was not present, so the probe host failed before model initialization.",
+      "fix": "Use the existing single_reach_1d case with its verified lat1 lateral registration for the lateral probe instead of relying on the missing directory.",
+      "tags": ["m274", "dflowfm", "case-asset", "lateral", "missing-file"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-08-15T10:25:00Z"
     }
   ]
 }
