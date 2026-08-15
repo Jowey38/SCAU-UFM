@@ -1,0 +1,8 @@
+[General]
+FileVersion = 1.00
+FileType = ExtForceFileNew
+
+[boundary]
+quantity = waterlevelbnd
+nodeId = downstream
+forcingfile = single_reach_open.bc

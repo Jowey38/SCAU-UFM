@@ -1,5 +1,9 @@
 # Memory
 
+| 10:30 | M274 native ABI bridge made runnable inside governed dflowfm.dll: explicit linker export, staged runtime DLL, and authored spike host native probe now verify closed/open/lateral and observed-dt cases | dflowfm_lib CMake, bridge F90, spike host, traces, M274 evidence | Native ABI/export confirmed; closed/open/lateral/120s pass; 30s fails as expected; qext/mixed/restart still blocked by missing authored cases | ~18k |
+| 01:15 | PETSc 3.25.3 built AND packaged into Conan cache (rev 1dd0c77b, pkg 31ee0027) after adding Cygwin bin to entry PATH for package(); expat C1020 traced to codepage-936 UTF-8 comment decoding and fixed via /utf-8 in governed profile; build resumed from expat | petsc recipe, delft3d profile (repo + CONAN_HOME), M275 driver | M275 PETSc blocker fully cleared; dependency chain continues | ~6k |
+| 21:20 | Fixed PETSc local recipe shell boundary: explicit configured Cygwin bash, installation-derived cygpath paths, Cygwin Python precedence, and governed lockfile refresh; full upstream build now advances into dependency compilation | Delft3D-main/conan/recipes/petsc/all/conanfile.py, conan.lock, M275 build driver | Original Conan mixed Windows/Cygwin path failure removed; governed build still running | ~8k |
+| 19:05 | M275 governed external build environment reached real PETSc source build under Cygwin, then failed on generated Conan shell path semantics; blocker narrowed from missing tools to recipe/generator defect | Delft3D-main external build, Cygwin, Conan, PETSc, M275 plan, superpowers/INDEX.md | Rebuild path remains blocked but root cause is now explicit and reproducible | ~14k |
 | 18:10 | M274 bridge feasibility closed BLOCKED: ABI and Fortran object compile, but bridge must be inside dflowfm.dll and governed rebuild failed at PETSc/Cygwin external toolchain | spikes/dflowfm/contract, bridge, evidence; superpowers/INDEX.md | No provider/G27/G19 promotion; exact unblock requirements recorded | ~12k |
 | 02:10 | M272 merged to master; M273 synchronized over it with semantic conflict resolution for OpenWolf/index records | PR #69, PR #70 sync branch | SWMM scope retained and D-Flow BLOCKED evidence preserved | ~5k |
 | 10:40 | Phase A closed: zbndz/zbndu/zbndq probe shows uninitialized memory and undocumented width normalization; kbndz-family absent from BMI; contract unavailable verdict finalized, G19/G27 remain blocked | spikes/dflowfm evidence + traces | FAILED/BLOCKED verdict now upstream-actionable | ~4k |
@@ -616,6 +620,14 @@
 | 2026-06-25 | GoldenSuite manifest (Task 1-5) landed in worktree feat/goldensuite-manifest: full G1-G12 JSON registry, G1-G6 active golden tests, manifest checker, CI jobs, and evidence/records | tests/golden, .github/workflows/ci.yml, superpowers/specs/2026-06-25-goldensuite-manifest-evidence.md | 6/6 golden tests pass, manifest check passes | ~20k |
 | 2026-07-16 | M254 vendor extraction audit: swmm5 snapshot verified complete vs upstream (diff clean, CRLF only); vendored extern/dflowfm/include/bmi.h contract snapshot + README (contract-snapshot-only, no Fortran kernel); added third_party/manifest/dflowfm.version + licenses/dflowfm-LICENSE; spike bmi.h fallback hint; adapter contract-linkage comment | extern/dflowfm, third_party, spikes/dflowfm/CMakeLists.txt, dflowfm_engine.cpp | build 0 errors, ctest 88/88, manifest OK, CI isolation greps all pass | ~25k |
 | 2026-07-28 | M258 spike: probe-sum-vars + lateral inject in dflowfm spike host; A/B runs confirm sum(vol1) contract | spikes/dflowfm/host/dflowfm_spike_host.cpp, spikes/dflowfm/evidence/vol1_volume_contract.md | CONFIRMED, delta=7.5 m3/step exact | ~30k |
+
+## Session: 2026-08-14 completion-run
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| -- | Authored outflow/mixed-lateral/restart600 cases | spikes/dflowfm/cases/single_reach_open_boundary/*.mdu/.ext | 4 new files | ~400 |
+| -- | Ran M274 completion matrix (qext probe, outflow, mixed, restart A/B) | m274_*.trace.txt | ALL PASS; qext BLOCKED | ~600 |
+| -- | Updated contract evidence + INDEX + README | m274_native_water_balance_contract.md, INDEX.md | Phase A closed | ~500 |
 
 ## Session: 2026-08-14 M276 implementation
 

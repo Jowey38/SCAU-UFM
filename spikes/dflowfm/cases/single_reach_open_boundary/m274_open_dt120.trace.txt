@@ -1,0 +1,15 @@
+# t0=0.000000 t1=6000.000000 engine_dt=60.000000 steps=5 dt=120.000000 boundary_var=boundary_discharge stage_var=s1 native_probe=true
+# columns: step current_time stage0
+# wb columns: wb,label,time,storage,volerr,boundary_in,boundary_out,lat1_in,lat1_out,lat2_in,lat2_out,src_in,src_out,qext1_in,qext1_out,qext2_in,qext2_out,rain,evap,gw_in,gw_out,symbol,abi,complete,finite,monotonic,time_valid
+wb,after-initialize,0.000000,5500,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+0 120.000000 1.009125
+wb,after-update,120.000000,5514.97771418313,-1.81898940354586e-12,15,0.0222858168689327,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+1 240.000000 1.008391
+wb,after-update,240.000000,5529.13660755388,-1.81898940354586e-12,30,0.863392446122934,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+2 360.000000 1.008074
+wb,after-update,360.000000,5536.99927299831,-3.63797880709171e-12,45,8.00072700168644,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+3 480.000000 1.007772
+wb,after-update,480.000000,5531.07958697603,-5.45696821063757e-12,60,28.9204130239685,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+4 600.000000 1.005977
+wb,after-update,600.000000,5517.91960182841,-4.54747350886464e-12,75,57.0803981715844,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+# summary completed_steps=5 requested_steps=5 last_time=600.000000 expected_last_time=600.000000 max_dt_abs_error=0 time_trace_valid=true

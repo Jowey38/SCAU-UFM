@@ -1,0 +1,25 @@
+# t0=0.000000 t1=6000.000000 engine_dt=60.000000 steps=10 dt=60.000000 boundary_var=boundary_discharge stage_var=s1 native_probe=true
+# columns: step current_time stage0
+# wb columns: wb,label,time,storage,volerr,boundary_in,boundary_out,lat1_in,lat1_out,lat2_in,lat2_out,src_in,src_out,qext1_in,qext1_out,qext2_in,qext2_out,rain,evap,gw_in,gw_out,symbol,abi,complete,finite,monotonic,time_valid
+wb,after-initialize,0.000000,8250,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+0 60.000000 1.499637
+wb,after-update,60.000000,7839.78196755368,1.81898940354586e-12,0,410.218032446321,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+1 120.000000 1.497171
+wb,after-update,120.000000,7493.8424535853,9.09494701772928e-13,0,756.157546414699,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+2 180.000000 1.476774
+wb,after-update,180.000000,7164.32612815078,2.72848410531878e-12,0,1085.67387184922,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+3 240.000000 1.409981
+wb,after-update,240.000000,6854.41813450133,0,0,1395.58186549867,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+4 300.000000 1.289213
+wb,after-update,300.000000,6563.88260296654,0,0,1686.11739703346,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+5 360.000000 1.158598
+wb,after-update,360.000000,6291.34325555059,-9.09494701772928e-13,0,1958.65674444941,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+6 420.000000 1.067407
+wb,after-update,420.000000,6035.98938867466,-1.81898940354586e-12,0,2214.01061132534,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+7 480.000000 1.021651
+wb,after-update,480.000000,5801.08024078041,-2.72848410531878e-12,0,2448.91975921958,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+8 540.000000 0.998121
+wb,after-update,540.000000,5593.79232584293,0,0,2656.20767415707,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+9 600.000000 0.975629
+wb,after-update,600.000000,5422.24159300342,-9.09494701772928e-13,0,2827.75840699658,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+# summary completed_steps=10 requested_steps=10 last_time=600.000000 expected_last_time=600.000000 max_dt_abs_error=0 time_trace_valid=true
