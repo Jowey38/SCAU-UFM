@@ -1,0 +1,25 @@
+# t0=0.000000 t1=60000.000000 engine_dt=60.000000 steps=10 dt=60.000000 boundary_var=boundary_discharge stage_var=s1 native_probe=true
+# columns: step current_time stage0
+# wb columns: wb,label,time,storage,volerr,boundary_in,boundary_out,lat1_in,lat1_out,lat2_in,lat2_out,src_in,src_out,qext1_in,qext1_out,qext2_in,qext2_out,rain,evap,gw_in,gw_out,symbol,abi,complete,finite,monotonic,time_valid
+wb,after-initialize,0.000000,5500,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+0 60.000000 1.000000
+wb,after-update,60.000000,5500,-9.09494701772928e-13,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+1 120.000000 1.000000
+wb,after-update,120.000000,5500,-9.09494701772928e-13,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+2 180.000000 1.000000
+wb,after-update,180.000000,5500,-1.81898940354586e-12,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+3 240.000000 1.000000
+wb,after-update,240.000000,5500,-1.81898940354586e-12,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+4 300.000000 1.000000
+wb,after-update,300.000000,5500,-1.81898940354586e-12,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+5 360.000000 1.000000
+wb,after-update,360.000000,5500,-3.63797880709171e-12,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+6 420.000000 1.000000
+wb,after-update,420.000000,5500,-3.63797880709171e-12,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+7 480.000000 1.000000
+wb,after-update,480.000000,5500,-4.54747350886464e-12,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+8 540.000000 1.000000
+wb,after-update,540.000000,5499.99999999999,-6.3664629124105e-12,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+9 600.000000 1.000000
+wb,after-update,600.000000,5499.99999999999,-5.45696821063757e-12,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+# summary completed_steps=10 requested_steps=10 last_time=600.000000 expected_last_time=600.000000 max_dt_abs_error=0 time_trace_valid=true

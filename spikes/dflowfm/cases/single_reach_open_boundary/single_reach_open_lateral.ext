@@ -1,0 +1,20 @@
+[General]
+fileVersion = 2.02
+fileType = extForce
+
+[Boundary]
+quantity = dischargebnd
+nodeId = upstream
+forcingfile = single_reach_open.bc
+
+[Boundary]
+quantity = waterlevelbnd
+nodeId = downstream
+forcingfile = single_reach_open.bc
+
+[Lateral]
+id = lat1
+locationType = 1d
+branchId = branch_main
+chainage = 500.0
+discharge = 0.0

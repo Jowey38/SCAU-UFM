@@ -1,0 +1,7 @@
+# t0=0.000000 t1=6000.000000 engine_dt=60.000000 steps=1 dt=30.000000 boundary_var=boundary_discharge stage_var=s1 native_probe=true
+# columns: step current_time stage0
+# wb columns: wb,label,time,storage,volerr,boundary_in,boundary_out,lat1_in,lat1_out,lat2_in,lat2_out,src_in,src_out,qext1_in,qext1_out,qext2_in,qext2_out,rain,evap,gw_in,gw_out,symbol,abi,complete,finite,monotonic,time_valid
+wb,after-initialize,0.000000,5500,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+0 60.000000 1.007063
+wb,after-update,60.000000,5507.49865305571,-1.81898940354586e-12,7.5,0.00134694428740709,0,0,0,0,0,0,0,0,0,0,0,0,0,0,true,true,true,true,true,true
+# summary completed_steps=1 requested_steps=1 last_time=60.000000 expected_last_time=30.000000 max_dt_abs_error=30 time_trace_valid=false

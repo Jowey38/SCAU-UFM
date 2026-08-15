@@ -37,6 +37,7 @@ contains
 
    integer(c_int32_t) function dflowfm_get_water_balance_v1(out, out_size) &
       bind(C, name='dflowfm_get_water_balance_v1') result(status)
+      !DEC$ ATTRIBUTES DLLEXPORT :: dflowfm_get_water_balance_v1
       use m_flow, only: vol1tot, volerrcum, vinbndcum, voutbndcum, &
                         vinlatcum, voutlatcum, vinsrccum, voutsrccum, &
                         vinextcum, voutextcum, vinraincum, voutevacum, &
