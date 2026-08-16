@@ -35,6 +35,25 @@ struct WholeSystemMassSample {
     double cumulative_infiltration_volume{0.0};
     double cumulative_abstraction_volume{0.0};
     double cumulative_depression_storage_delta_volume{0.0};
+    // Cumulative volume that an engine-native mass balance counts as external
+    // OUTFLOW but that the driver returned INTO the tri-model system (M277):
+    // SWMM outfall discharge accepted by the river interface exchange
+    // (v_granted) and SWMM node overflow returned onto the 2D surface. Both
+    // legs are CouplingLib-ledger truth. River spill is intentionally NOT
+    // included: the driver does not debit D-Flow for spill, so any nonzero
+    // spill mismatch must surface in the residual instead of being corrected.
+    double cumulative_engine_internal_return_volume{0.0};
+    // CouplingLib-ledger cumulative lateral volumes written INTO each engine
+    // (granted + repay) since the baseline. When present together with the
+    // engine's storage and external-net scope, the audit can decompose the
+    // engine's own internal continuity gap out of the residual (M277):
+    //   engine_gap = delta storage - ledger_lateral - external_net_delta
+    //                - internal_return_delta_attributed
+    // Real third-party engines carry percent-scale internal continuity error
+    // that is THEIR documented property; the coupling residual must not
+    // absorb or be masked by it.
+    std::optional<double> swmm_coupling_lateral_volume{};
+    std::optional<double> dflowfm_coupling_lateral_volume{};
 };
 
 enum class WholeSystemMassVerdict {
@@ -49,6 +68,11 @@ struct WholeSystemMassTolerance {
     // as max(epsilon_deficit, absolute + relative * max(1, baseline storage)).
     double engine_residual_absolute{0.0};
     double engine_residual_relative{0.0};
+    // Documented bound for a real engine's own internal continuity gap
+    // (M277). Applied only to gaps the audit can actually decompose (ledger
+    // lateral terms present); the coupling residual is still compared against
+    // the applied_tolerance above and never absorbs engine-internal error.
+    double engine_internal_gap_absolute{0.0};
 };
 
 struct WholeSystemMassAuditReport {
@@ -58,10 +82,20 @@ struct WholeSystemMassAuditReport {
     double current_storage_total{0.0};
     double external_net_volume{0.0};
     double residual{0.0};
+    // M277 engine-internal continuity gap decomposition. Each gap is the
+    // engine's own storage change not explained by its ledger lateral input
+    // plus its external net (its internal continuity error). Present only
+    // when the sample carries the ledger lateral term for that engine.
+    std::optional<double> swmm_internal_gap_volume{};
+    std::optional<double> dflowfm_internal_gap_volume{};
+    // residual minus every decomposable engine-internal gap: the part of the
+    // drift the COUPLING is responsible for.
+    double coupling_residual{0.0};
     // Canonical symbols-reference tolerance:
     // max(1e-10, 1e-12 * M_ref), M_ref = baseline surface volume.
     double epsilon_deficit{0.0};
     double applied_tolerance{0.0};
+    double applied_engine_gap_tolerance{0.0};
     bool scope_complete{false};
     bool conserved{false};
     WholeSystemMassVerdict verdict{WholeSystemMassVerdict::review_required};
@@ -71,6 +105,8 @@ struct WholeSystemMassAuditReport {
 //   S(t) = surface + swmm + dflowfm + depression_delta
 //   External(t) = boundary_inflow + rainfall - infiltration - abstraction
 //                 + swmm_external_net + dflowfm_external_net
+//                 + engine_internal_return (driver-returned in-system volume
+//                   that engine-native balances counted as external outflow)
 //   residual = [S(t) - S(t0)] - External(t)
 // A residual is verdict-eligible only when both engine external-net terms are
 // present at baseline and current; otherwise scope_complete=false and the

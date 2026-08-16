@@ -87,6 +87,9 @@ struct RuntimeConfig {
     // these and uses epsilon_deficit only.
     double mass_audit_engine_residual_absolute{1.0e-4};
     double mass_audit_engine_residual_relative{1.0e-6};
+    // Documented bound for a real engine's own internal continuity gap
+    // (M277 audit decomposition); 0 disables any allowance.
+    double mass_audit_engine_internal_gap_absolute{0.0};
     EngineMode engine_mode{EngineMode::mock};
     // Project-standard variable name; real BMI kernels expose "s1".
     std::string river_water_level_variable{"water_level"};

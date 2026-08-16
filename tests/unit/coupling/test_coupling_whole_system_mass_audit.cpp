@@ -168,3 +168,113 @@ TEST(WholeSystemMassAudit, TracksDeficitAgeWithoutWritingOff) {
     EXPECT_THROW(static_cast<void>(update_deficit_ages({1.0}, ages)),
                  std::invalid_argument);
 }
+
+// --- M277 engine-internal gap decomposition ---
+
+namespace {
+
+WholeSystemMassSample ledger_baseline_sample() {
+    auto sample = baseline_sample();
+    sample.swmm_coupling_lateral_volume = 0.0;
+    sample.dflowfm_coupling_lateral_volume = 0.0;
+    return sample;
+}
+
+}  // namespace
+
+TEST(WholeSystemMassAudit, DecomposesEngineInternalGapOutOfResidual) {
+    const auto baseline = ledger_baseline_sample();
+    auto current = baseline;
+    current.epoch = 1U;
+    current.logical_time = 60.0;
+    // Surface drained 10 into SWMM (ledger lateral); SWMM stored only 9.97:
+    // 0.03 vanished INSIDE the engine (its own continuity error).
+    current.surface_volume = 90.0;
+    current.swmm_storage_volume = 29.97;
+    current.swmm_coupling_lateral_volume = 10.0;
+
+    WholeSystemMassTolerance tolerance{};
+    tolerance.strict = false;
+    tolerance.engine_residual_absolute = 1.0e-4;
+    tolerance.engine_internal_gap_absolute = 0.05;
+    const auto report = audit_whole_system_mass(baseline, current, tolerance);
+
+    ASSERT_TRUE(report.swmm_internal_gap_volume.has_value());
+    EXPECT_NEAR(*report.swmm_internal_gap_volume, -0.03, 1.0e-12);
+    ASSERT_TRUE(report.dflowfm_internal_gap_volume.has_value());
+    EXPECT_NEAR(*report.dflowfm_internal_gap_volume, 0.0, 1.0e-12);
+    EXPECT_NEAR(report.residual, -0.03, 1.0e-12);
+    EXPECT_NEAR(report.coupling_residual, 0.0, 1.0e-12);
+    EXPECT_TRUE(report.conserved);
+    EXPECT_EQ(report.verdict, WholeSystemMassVerdict::conserved);
+}
+
+TEST(WholeSystemMassAudit, EngineGapBeyondDocumentedBoundIsReviewRequired) {
+    const auto baseline = ledger_baseline_sample();
+    auto current = baseline;
+    current.epoch = 1U;
+    current.logical_time = 60.0;
+    current.surface_volume = 90.0;
+    current.swmm_storage_volume = 29.9;  // engine lost 0.1 internally
+    current.swmm_coupling_lateral_volume = 10.0;
+
+    WholeSystemMassTolerance tolerance{};
+    tolerance.strict = false;
+    tolerance.engine_residual_absolute = 1.0e-4;
+    tolerance.engine_internal_gap_absolute = 0.05;
+    const auto report = audit_whole_system_mass(baseline, current, tolerance);
+
+    ASSERT_TRUE(report.swmm_internal_gap_volume.has_value());
+    EXPECT_NEAR(*report.swmm_internal_gap_volume, -0.1, 1.0e-12);
+    EXPECT_NEAR(report.coupling_residual, 0.0, 1.0e-12);
+    EXPECT_FALSE(report.conserved);
+    EXPECT_EQ(report.verdict, WholeSystemMassVerdict::review_required);
+}
+
+TEST(WholeSystemMassAudit, CouplingResidualIsNotMaskedByEngineGapAllowance) {
+    const auto baseline = ledger_baseline_sample();
+    auto current = baseline;
+    current.epoch = 1U;
+    current.logical_time = 60.0;
+    // Surface lost 10 but the ledger claims only 9.9 was written: 0.1 leaked
+    // in the COUPLING seam, which no engine-gap allowance may absorb.
+    current.surface_volume = 90.0;
+    current.swmm_storage_volume = 29.9;
+    current.swmm_coupling_lateral_volume = 9.9;
+
+    WholeSystemMassTolerance tolerance{};
+    tolerance.strict = false;
+    tolerance.engine_residual_absolute = 1.0e-4;
+    tolerance.engine_internal_gap_absolute = 1.0;
+    const auto report = audit_whole_system_mass(baseline, current, tolerance);
+
+    ASSERT_TRUE(report.swmm_internal_gap_volume.has_value());
+    EXPECT_NEAR(*report.swmm_internal_gap_volume, 0.0, 1.0e-12);
+    EXPECT_NEAR(report.coupling_residual, -0.1, 1.0e-12);
+    EXPECT_FALSE(report.conserved);
+    EXPECT_EQ(report.verdict, WholeSystemMassVerdict::review_required);
+}
+
+TEST(WholeSystemMassAudit, LedgerScopeAsymmetryThrows) {
+    const auto baseline = baseline_sample();
+    auto current = baseline;
+    current.epoch = 1U;
+    current.logical_time = 60.0;
+    current.swmm_coupling_lateral_volume = 1.0;
+    EXPECT_THROW(static_cast<void>(audit_whole_system_mass(baseline, current)),
+                 std::invalid_argument);
+}
+
+TEST(WholeSystemMassAudit, MissingLedgerKeepsLegacySemantics) {
+    const auto baseline = baseline_sample();
+    auto current = baseline;
+    current.epoch = 1U;
+    current.logical_time = 60.0;
+    current.surface_volume = 99.0;  // 1.0 lost, no decomposition available
+
+    const auto report = audit_whole_system_mass(baseline, current);
+    EXPECT_FALSE(report.swmm_internal_gap_volume.has_value());
+    EXPECT_FALSE(report.dflowfm_internal_gap_volume.has_value());
+    EXPECT_DOUBLE_EQ(report.coupling_residual, report.residual);
+    EXPECT_FALSE(report.conserved);
+}

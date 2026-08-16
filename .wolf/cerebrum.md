@@ -24,6 +24,8 @@
 
 - [2026-08-14] M276/G27 LANDED + bug-207: BMI vol1 array = internal cells first THEN boundary ghost nodes (ndxi..ndx); full sum(vol1) overcounts storage on open-boundary models (6500 vs vol1tot 5500 on the authored open case) and its deltas are polluted by ghost dynamics. M258/M259 closed-case evidence does NOT generalize. Production: real mode binds native vol1tot via RunLoopHooks.dflowfm_storage_volume; independent verification uses observe_dflowfm_internal_volume (vol1[0:ndxi], ndxi fail-closed). D-Flow audit external net = boundary only; ALL laterals are CouplingLib API exchange deduped once; source/qext/rain/evap/gw guarded observed-zero fail-closed. G27 3-leg real golden PASS locally; candidate_non_gating until gateway green on master.
 
+- [2026-08-15] M277 G19 PROMOTED + audit v2: real engines carry percent-scale INTERNAL continuity error that must be decomposed OUT of the whole-system residual, never absorbed by it: engine_gap = dS - ledger_lateral - external_net_delta (per engine), coupling_residual = residual - gaps, each bounded separately (coupling: strict M270 tolerance; gaps: documented engine_internal_gap_absolute). Three real defects found by the fresh audit: bug-208 (stage-driven outfall backwater imports untracked mass, bypasses ledger), bug-209 (SWMM dry-start wetting front creates ~0.067 m3 once; wet-start fixtures via conduit InitFlow), bug-210 (rate-sampled interface injection not volume conservative). G19 fixture: free outfall, wet start, no interface leg; M278 owns the blocked capabilities; audit stays armed. GOTCHA: file(COPY cases) runs at CMake configure time - editing a source .inp does nothing until reconfigure.
+
 ## Do-Not-Repeat
 
 <!-- Mistakes made and corrected. Each entry prevents the same mistake recurring. -->

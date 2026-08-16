@@ -51,6 +51,16 @@ void validate_sample(const WholeSystemMassSample& sample, const char* side) {
                    "cumulative_abstraction_volume");
     require_finite(sample.cumulative_depression_storage_delta_volume,
                    "cumulative_depression_storage_delta_volume");
+    require_nonnegative_finite(sample.cumulative_engine_internal_return_volume,
+                               "cumulative_engine_internal_return_volume");
+    if (sample.swmm_coupling_lateral_volume.has_value()) {
+        require_nonnegative_finite(*sample.swmm_coupling_lateral_volume,
+                                   "swmm_coupling_lateral_volume");
+    }
+    if (sample.dflowfm_coupling_lateral_volume.has_value()) {
+        require_nonnegative_finite(*sample.dflowfm_coupling_lateral_volume,
+                                   "dflowfm_coupling_lateral_volume");
+    }
     static_cast<void>(side);
 }
 
@@ -86,7 +96,9 @@ WholeSystemMassAuditReport audit_whole_system_mass(
     if (!std::isfinite(tolerance.engine_residual_absolute) ||
         tolerance.engine_residual_absolute < 0.0 ||
         !std::isfinite(tolerance.engine_residual_relative) ||
-        tolerance.engine_residual_relative < 0.0) {
+        tolerance.engine_residual_relative < 0.0 ||
+        !std::isfinite(tolerance.engine_internal_gap_absolute) ||
+        tolerance.engine_internal_gap_absolute < 0.0) {
         throw std::invalid_argument(
             "whole-system mass audit tolerances must be finite and non-negative");
     }
@@ -117,10 +129,51 @@ WholeSystemMassAuditReport audit_whole_system_mass(
         (dflowfm_external_scope
              ? *current.dflowfm_external_net_volume -
                    *baseline.dflowfm_external_net_volume
-             : 0.0);
+             : 0.0) +
+        (current.cumulative_engine_internal_return_volume -
+         baseline.cumulative_engine_internal_return_volume);
     report.residual =
         (report.current_storage_total - report.baseline_storage_total) -
         report.external_net_volume;
+
+    // M277: decompose each real engine's OWN internal continuity gap out of
+    // the residual. An engine's balance is
+    //   delta storage = ledger lateral input + external net + internal gap,
+    // so the gap is engine-side error (documented third-party property); the
+    // remaining coupling_residual is what CouplingLib is accountable for.
+    if (baseline.swmm_coupling_lateral_volume.has_value() !=
+        current.swmm_coupling_lateral_volume.has_value()) {
+        throw std::invalid_argument(
+            "whole-system mass audit SWMM ledger lateral scope differs between samples");
+    }
+    if (baseline.dflowfm_coupling_lateral_volume.has_value() !=
+        current.dflowfm_coupling_lateral_volume.has_value()) {
+        throw std::invalid_argument(
+            "whole-system mass audit D-Flow FM ledger lateral scope differs between samples");
+    }
+    report.coupling_residual = report.residual;
+    if (swmm_external_scope && baseline.swmm_storage_volume.has_value() &&
+        current.swmm_coupling_lateral_volume.has_value()) {
+        const double gap =
+            (*current.swmm_storage_volume - *baseline.swmm_storage_volume) -
+            (*current.swmm_coupling_lateral_volume -
+             *baseline.swmm_coupling_lateral_volume) -
+            (*current.swmm_external_net_volume - *baseline.swmm_external_net_volume);
+        report.swmm_internal_gap_volume = gap;
+        report.coupling_residual -= gap;
+    }
+    if (dflowfm_external_scope && baseline.dflowfm_volume.has_value() &&
+        current.dflowfm_coupling_lateral_volume.has_value()) {
+        const double gap =
+            (*current.dflowfm_volume - *baseline.dflowfm_volume) -
+            (*current.dflowfm_coupling_lateral_volume -
+             *baseline.dflowfm_coupling_lateral_volume) -
+            (*current.dflowfm_external_net_volume -
+             *baseline.dflowfm_external_net_volume);
+        report.dflowfm_internal_gap_volume = gap;
+        report.coupling_residual -= gap;
+    }
+
     report.epsilon_deficit =
         std::max(1.0e-10, 1.0e-12 * baseline.surface_reference_volume);
     report.applied_tolerance = report.epsilon_deficit;
@@ -132,8 +185,25 @@ WholeSystemMassAuditReport audit_whole_system_mass(
         report.applied_tolerance =
             std::max(report.applied_tolerance, engine_tolerance);
     }
-    report.conserved = report.scope_complete &&
-                       std::abs(report.residual) <= report.applied_tolerance;
+    report.applied_engine_gap_tolerance = report.epsilon_deficit;
+    if (!tolerance.strict) {
+        report.applied_engine_gap_tolerance = std::max(
+            report.applied_engine_gap_tolerance, tolerance.engine_internal_gap_absolute);
+    }
+
+    bool engine_gaps_bounded = true;
+    if (report.swmm_internal_gap_volume.has_value() &&
+        std::abs(*report.swmm_internal_gap_volume) >
+            report.applied_engine_gap_tolerance) {
+        engine_gaps_bounded = false;
+    }
+    if (report.dflowfm_internal_gap_volume.has_value() &&
+        std::abs(*report.dflowfm_internal_gap_volume) >
+            report.applied_engine_gap_tolerance) {
+        engine_gaps_bounded = false;
+    }
+    report.conserved = report.scope_complete && engine_gaps_bounded &&
+                       std::abs(report.coupling_residual) <= report.applied_tolerance;
     report.verdict = report.conserved
                          ? WholeSystemMassVerdict::conserved
                          : WholeSystemMassVerdict::review_required;

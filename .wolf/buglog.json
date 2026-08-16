@@ -292,6 +292,82 @@
       ],
       "occurrences": 1,
       "last_seen": "2026-08-14T00:00:00"
+    },
+    {
+      "id": "bug-208",
+      "timestamp": "2026-08-15T00:00:00",
+      "error_message": "G19 scope-complete audit residual +37.79 m3/epoch with drive_outfall_stage=true",
+      "file": "tests/golden/surface2d_tri_coupling_real/test_surface2d_tri_coupling_real.cpp",
+      "root_cause": "Writing river stage onto a SWMM outfall makes the engine fill from its boundary (reverse flow) with NO routing-totals class and NO CouplingLib debit from D-Flow: system-level mass creation bypassing the ledger invariant.",
+      "fix": "G19 fixture stops driving outfall stage; governed reverse exchange planned as M278; whole-system audit stays armed and fails closed on any reverse-import config.",
+      "tags": [
+        "swmm",
+        "outfall",
+        "backwater",
+        "mass-audit",
+        "g19"
+      ],
+      "related_bugs": [
+        "bug-210"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-08-15T00:00:00"
+    },
+    {
+      "id": "bug-209",
+      "timestamp": "2026-08-15T00:00:00",
+      "error_message": "Standalone SWMM probe: constant API lateral into dry pipes delivers +0.067 m3 more than q*dt (constant beyond 60s), massbal records only q*dt",
+      "file": "tests/golden/surface2d_tri_coupling_real/cases/swmm_river_datum.inp",
+      "root_cause": "SWMM dynamic/kinematic wetting front on initially dry conduits creates geometric volume not backed by recorded inflow (engine-internal startup continuity error; routing-step and MIN_SURFAREA independent).",
+      "fix": "G19 fixture starts wet (conduit InitFlow=0.005) removing the artifact; residual recession error (-0.03 m3 scale) measured and bounded as documented engine gap (0.05 m3) in the M277 audit decomposition.",
+      "tags": [
+        "swmm",
+        "wetting-front",
+        "continuity-error",
+        "fixture"
+      ],
+      "related_bugs": [
+        "bug-208"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-08-15T00:00:00"
+    },
+    {
+      "id": "bug-210",
+      "timestamp": "2026-08-15T00:00:00",
+      "error_message": "G19 epoch-2 residual -0.030: driver injected 0.6207 m3 into river while SWMM emitted only 0.5243 m3 through the outfall",
+      "file": "libs/coupling/driver/src/tri_coupling.cpp",
+      "root_cause": "1D-1D interface q_request samples the instantaneous outfall rate pre-step and injects it for the whole dt_sub; during recession the sample overestimates and the seam creates the difference (not volume conservative).",
+      "fix": "Interface leg excluded from the G19 conservation fixture (G17 keeps behavioral coverage); emitted-volume ledger-backed injection designed as M278; audit armed against re-enablement.",
+      "tags": [
+        "tri-coupling",
+        "interface-exchange",
+        "conservation",
+        "g19"
+      ],
+      "related_bugs": [
+        "bug-208"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-08-15T00:00:00"
+    },
+    {
+      "id": "bug-211",
+      "timestamp": "2026-08-16T00:00:00",
+      "error_message": "Env-less ctest of G19 hung indefinitely after a gateway run (and after manually deleting the app-local netcdf.dll)",
+      "file": "tools/dflowfm/run_real_goldens.sh",
+      "root_cause": "The gateway overwrites the vcpkg-deployed app-local netcdf.dll with the D-Flow runtime's copy, whose dependencies only resolve with the runtime bin on PATH; a plain ctest run then blocks forever on a Windows loader error dialog. Deleting the DLL entirely hangs the same way (missing import).",
+      "fix": "Gateway now restores the vcpkg netcdf.dll beside the G19 exe after the real run (best-effort); never delete an app-local vcpkg DLL, and check for loader dialogs when a test that should GTEST_SKIP hangs.",
+      "tags": [
+        "windows",
+        "dll",
+        "netcdf",
+        "ctest-hang",
+        "gateway"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-08-16T00:00:00"
     }
   ]
 }

@@ -110,4 +110,17 @@ G19_EXE=$(find_test surface2d_tri_coupling_real)
 cp "$RUNTIME_BIN/netcdf.dll" "$(dirname "$G19_EXE")/netcdf.dll"
 run_test surface2d_tri_coupling_real
 
+# Restore the vcpkg-deployed netcdf.dll: the runtime copy resolves its own
+# dependencies only with RUNTIME_BIN on PATH, so leaving it in place makes a
+# later plain (env-less) ctest invocation of G19 hang on a loader error
+# dialog instead of skipping. Best-effort: hosted CI always builds fresh.
+for vcpkg_netcdf in \
+    "$BUILD_DIR/vcpkg_installed/x64-windows/debug/bin/netcdf.dll" \
+    "$BUILD_DIR/vcpkg_installed/x64-windows/bin/netcdf.dll"; do
+    if [ -f "$vcpkg_netcdf" ]; then
+        cp "$vcpkg_netcdf" "$(dirname "$G19_EXE")/netcdf.dll" || true
+        break
+    fi
+done
+
 echo "OK real D-Flow FM phase gateway: 7/7 goldens passed"
