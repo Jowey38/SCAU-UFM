@@ -636,3 +636,13 @@
 | -- | Implemented native water-balance observation + external-net provider | dflowfm_engine.*, dflowfm_external_net_provider.* | concrete-only + driver-owned | ~1500 |
 | -- | G27 first run FAILED -> bug-207 ghost-node discovery -> ndxi fix | dflowfm_volume_provider.*, run_loop.*, main.cpp | real G27 PASS | ~1200 |
 | -- | Registered G27 candidate_non_gating; gateway 7 goldens | manifest, ci.yml, run_real_goldens.sh | manifest OK, 160/160 | ~600 |
+
+## Session: 2026-08-15/16 M277 G19 promotion
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| -- | Reworked G19 to scope-complete run-loop audit | test_surface2d_tri_coupling_real.cpp | 3 real defects exposed | ~2000 |
+| -- | bug-208 backwater / bug-209 wet-front / bug-210 interface diagnosis | probe + fixture tuning | mechanisms proven | ~2500 |
+| -- | Audit v2: engine-internal gap decomposition | whole_system_mass_audit.*, run_loop.*, sim_driver.hpp | coupling residual fp-exact, G19 PASS 3/3 | ~2000 |
+| -- | 5 new audit unit tests; manifest G19 ci_gate:true | test_coupling_whole_system_mass_audit.cpp, manifest | checker OK | ~800 |
+| -- | Decision evidence + M278 plan + bugs 208-210 + tolerances.md | specs/plans/buglog/INDEX | Phase C documented | ~1200 |

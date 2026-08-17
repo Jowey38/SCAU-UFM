@@ -47,6 +47,15 @@ struct RunSummary {
     double final_time{0.0};
     double total_drained_volume{0.0};
     double total_returned_volume{0.0};
+    // M277: driver-returned in-system volume that engine-native mass
+    // balances counted as external outflow (interface + overflow returns).
+    double total_engine_internal_return_volume{0.0};
+    // CouplingLib ledger total written to SWMM as node lateral inflow
+    // (granted + deficit repay), for audit cross-checks.
+    double total_swmm_lateral_volume{0.0};
+    // CouplingLib ledger total injected into D-Flow FM as laterals
+    // (surface->river granted + repay, plus interface-granted volume).
+    double total_dflowfm_lateral_volume{0.0};
     double total_boundary_inflow_volume{0.0};
     double final_surface_physical_volume{0.0};
     double final_coupling_deficit_volume{0.0};

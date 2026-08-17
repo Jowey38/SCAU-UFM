@@ -201,6 +201,8 @@ RuntimeConfig parse_runtime_config_text(const std::string& text) {
             config.mass_audit_engine_residual_absolute = parse_double(value, key);
         } else if (key == "mass_audit_engine_residual_relative") {
             config.mass_audit_engine_residual_relative = parse_double(value, key);
+        } else if (key == "mass_audit_engine_internal_gap_absolute") {
+            config.mass_audit_engine_internal_gap_absolute = parse_double(value, key);
         } else if (key == "engine_mode") {
             if (value == "mock") {
                 config.engine_mode = EngineMode::mock;

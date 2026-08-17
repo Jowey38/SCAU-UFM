@@ -113,6 +113,8 @@ struct LastCommit {
     double cumulative_abstraction_volume{0.0};
     double cumulative_swmm_lateral_volume{0.0};
     double cumulative_depression_delta_volume{0.0};
+    double cumulative_engine_internal_return_volume{0.0};
+    double cumulative_dflowfm_lateral_volume{0.0};
 };
 
 }  // namespace
@@ -174,6 +176,8 @@ RunLoopResult run_simulation(
     double cumulative_infiltration_volume = 0.0;
     double cumulative_abstraction_volume = 0.0;
     double cumulative_swmm_lateral_volume = 0.0;
+    double cumulative_engine_internal_return_volume = 0.0;
+    double cumulative_dflowfm_lateral_volume = 0.0;
     double cumulative_depression_delta_volume = 0.0;
     summary.whole_system_mass_audit_enabled =
         config.enable_whole_system_mass_audit;
@@ -212,6 +216,12 @@ RunLoopResult run_simulation(
         if (hooks.dflowfm_external_net_volume) {
             initial_sample.dflowfm_external_net_volume =
                 hooks.dflowfm_external_net_volume();
+        }
+        if (hooks.swmm_external_net_volume) {
+            initial_sample.swmm_coupling_lateral_volume = 0.0;
+        }
+        if (hooks.dflowfm_external_net_volume) {
+            initial_sample.dflowfm_coupling_lateral_volume = 0.0;
         }
         mass_baseline = initial_sample;
     }
@@ -253,6 +263,10 @@ RunLoopResult run_simulation(
         cumulative_infiltration_volume = last_commit.cumulative_infiltration_volume;
         cumulative_abstraction_volume = last_commit.cumulative_abstraction_volume;
         cumulative_swmm_lateral_volume = last_commit.cumulative_swmm_lateral_volume;
+        cumulative_engine_internal_return_volume =
+            last_commit.cumulative_engine_internal_return_volume;
+        cumulative_dflowfm_lateral_volume =
+            last_commit.cumulative_dflowfm_lateral_volume;
         cumulative_depression_delta_volume =
             last_commit.cumulative_depression_delta_volume;
         driver_ns::DFlowFMRollbackRequest request{};
@@ -409,8 +423,29 @@ RunLoopResult run_simulation(
             if (decision.endpoint.engine == core::SharedExchangeEngine::drainage) {
                 cumulative_swmm_lateral_volume += decision.exchange.v_granted +
                     decision.exchange.v_repay;
+            } else if (decision.endpoint.engine == core::SharedExchangeEngine::river) {
+                cumulative_dflowfm_lateral_volume += decision.exchange.v_granted +
+                    decision.exchange.v_repay;
             }
         }
+        // M277: engine-native mass balances count these volumes as external
+        // outflow, but the driver returned them into the tri-model system:
+        // SWMM outfall discharge accepted by the river interface and SWMM
+        // node overflow returned onto the 2D surface. River spill stays
+        // uncorrected on purpose (the driver never debits D-Flow for spill).
+        for (const auto& decision : report.interface_decisions) {
+            cumulative_engine_internal_return_volume += decision.v_granted;
+            cumulative_dflowfm_lateral_volume += decision.v_granted;
+        }
+        for (const auto& decision : report.return_decisions) {
+            if (decision.source.engine == core::SharedExchangeEngine::drainage) {
+                cumulative_engine_internal_return_volume += decision.v_returned;
+            }
+        }
+        summary.total_engine_internal_return_volume =
+            cumulative_engine_internal_return_volume;
+        summary.total_swmm_lateral_volume = cumulative_swmm_lateral_volume;
+        summary.total_dflowfm_lateral_volume = cumulative_dflowfm_lateral_volume;
 
         // M271 epoch-end obligation governance. replay_pending and write-back
         // already completed; age/write-off must become part of the atomic
@@ -501,6 +536,16 @@ RunLoopResult run_simulation(
                 cumulative_abstraction_volume;
             current_sample.cumulative_depression_storage_delta_volume =
                 cumulative_depression_delta_volume;
+            current_sample.cumulative_engine_internal_return_volume =
+                cumulative_engine_internal_return_volume;
+            if (hooks.swmm_external_net_volume) {
+                current_sample.swmm_coupling_lateral_volume =
+                    cumulative_swmm_lateral_volume;
+            }
+            if (hooks.dflowfm_external_net_volume) {
+                current_sample.dflowfm_coupling_lateral_volume =
+                    cumulative_dflowfm_lateral_volume;
+            }
 
             driver_ns::WholeSystemMassTolerance mass_tolerance{};
             mass_tolerance.strict = config.engine_mode == EngineMode::mock;
@@ -508,6 +553,8 @@ RunLoopResult run_simulation(
                 config.mass_audit_engine_residual_absolute;
             mass_tolerance.engine_residual_relative =
                 config.mass_audit_engine_residual_relative;
+            mass_tolerance.engine_internal_gap_absolute =
+                config.mass_audit_engine_internal_gap_absolute;
             whole_system_audit = driver_ns::audit_whole_system_mass(
                 *mass_baseline, current_sample, mass_tolerance);
             summary.final_whole_system_mass_residual =
@@ -567,6 +614,10 @@ RunLoopResult run_simulation(
         last_commit.cumulative_swmm_lateral_volume = cumulative_swmm_lateral_volume;
         last_commit.cumulative_depression_delta_volume =
             cumulative_depression_delta_volume;
+        last_commit.cumulative_engine_internal_return_volume =
+            cumulative_engine_internal_return_volume;
+        last_commit.cumulative_dflowfm_lateral_volume =
+            cumulative_dflowfm_lateral_volume;
 
         EpochRecord record{};
         record.epoch = static_cast<std::uint64_t>(epoch);

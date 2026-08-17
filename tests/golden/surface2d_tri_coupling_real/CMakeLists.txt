@@ -15,4 +15,4 @@ target_link_libraries(test_surface2d_tri_coupling_real
 target_compile_definitions(test_surface2d_tri_coupling_real
     PRIVATE SCAU_SWMM_TEST_CASE_DIR="${CMAKE_CURRENT_BINARY_DIR}/cases")
 add_test(NAME test_surface2d_tri_coupling_real COMMAND test_surface2d_tri_coupling_real)
-set_tests_properties(test_surface2d_tri_coupling_real PROPERTIES LABELS candidate_non_gating)
+set_tests_properties(test_surface2d_tri_coupling_real PROPERTIES LABELS golden)
