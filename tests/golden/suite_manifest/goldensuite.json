@@ -171,6 +171,15 @@
     "status": "implemented"
   },
   {
+    "test_id": "G20",
+    "name": "dflowfm_longrun_10000",
+    "test_path": "tests/golden/dflowfm_longrun_10000/",
+    "applicable_phase": "Phase 2+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": false,
+    "status": "implemented"
+  },
+  {
     "test_id": "G21",
     "name": "stcf_case_pipeline",
     "test_path": "tests/golden/stcf_case_pipeline/",

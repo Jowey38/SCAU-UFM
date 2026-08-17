@@ -646,3 +646,11 @@
 | -- | Audit v2: engine-internal gap decomposition | whole_system_mass_audit.*, run_loop.*, sim_driver.hpp | coupling residual fp-exact, G19 PASS 3/3 | ~2000 |
 | -- | 5 new audit unit tests; manifest G19 ci_gate:true | test_coupling_whole_system_mass_audit.cpp, manifest | checker OK | ~800 |
 | -- | Decision evidence + M278 plan + bugs 208-210 + tolerances.md | specs/plans/buglog/INDEX | Phase C documented | ~1200 |
+
+## Session: 2026-08-17 M279 G20
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| -- | Authored longrun+restart MDUs, G20 test, registration | dflowfm_longrun_10000/*, manifest, gateway, ci.yml | manifest OK | ~1500 |
+| -- | Real G20 run | -- | PASS: 10000 steps 1.84s, volerr -2.7e-9, replay 1e-9 | ~300 |
+| -- | Disk-full incident: freed b276/b277 | H:/ | 9.4G free | ~200 |
