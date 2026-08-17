@@ -26,6 +26,8 @@
 
 - [2026-08-15] M277 G19 PROMOTED + audit v2: real engines carry percent-scale INTERNAL continuity error that must be decomposed OUT of the whole-system residual, never absorbed by it: engine_gap = dS - ledger_lateral - external_net_delta (per engine), coupling_residual = residual - gaps, each bounded separately (coupling: strict M270 tolerance; gaps: documented engine_internal_gap_absolute). Three real defects found by the fresh audit: bug-208 (stage-driven outfall backwater imports untracked mass, bypasses ledger), bug-209 (SWMM dry-start wetting front creates ~0.067 m3 once; wet-start fixtures via conduit InitFlow), bug-210 (rate-sampled interface injection not volume conservative). G19 fixture: free outfall, wet start, no interface leg; M278 owns the blocked capabilities; audit stays armed. GOTCHA: file(COPY cases) runs at CMake configure time - editing a source .inp does nothing until reconfigure.
 
+- [2026-08-17] M279 G20 landed: the authored 1D reach runs ~5400 engine steps/s (10000x60s in 1.8s wall) - long-run goldens on this case are CHEAP; earlier gateway-minutes intuition came from init/IO overhead, not stepping. 10000-step cumulative volerr -2.7e-9 m3. Boundary forcing integrates EXACTLY over 10000 steps (75000.0). ALSO: H: hit 100% full (build dirs accumulate ~10GB each); delete merged-branch build dirs (b276/b277) promptly - full disk broke CL.exe with C2471/MSB6003 and curl.
+
 ## Do-Not-Repeat
 
 <!-- Mistakes made and corrected. Each entry prevents the same mistake recurring. -->

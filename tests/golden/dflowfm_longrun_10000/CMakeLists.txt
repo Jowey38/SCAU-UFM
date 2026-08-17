@@ -1,0 +1,5 @@
+add_executable(test_dflowfm_longrun_10000 test_dflowfm_longrun_10000.cpp)
+target_link_libraries(test_dflowfm_longrun_10000
+    PRIVATE scau::coupling_driver scau::coupling_river scau::warnings GTest::gtest_main)
+add_test(NAME test_dflowfm_longrun_10000 COMMAND test_dflowfm_longrun_10000)
+set_tests_properties(test_dflowfm_longrun_10000 PROPERTIES LABELS candidate_non_gating)
