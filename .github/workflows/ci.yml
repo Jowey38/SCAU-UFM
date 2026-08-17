@@ -170,6 +170,7 @@ jobs:
           test_tri_coupling_real_minimal
           test_dflowfm_checkpoint_reload
           test_dflowfm_external_net
+          test_dflowfm_longrun_10000
           test_surface2d_tri_coupling_real
 
       - name: Run real D-Flow FM phase gateway

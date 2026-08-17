@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # SCAU-UFM real D-Flow FM Phase Gateway.
 #
-# Runs the seven real-runtime Goldens (G11, G16, G17, checkpoint reload,
-# G27, G18, G19)
+# Runs the eight real-runtime Goldens (G11, G16, G17, checkpoint reload,
+# G27, G20, G18, G19)
 # against the authored single_reach_1d case in one reproducible command.
 # This is the local/release gateway and the exact sequence the future
 # self-hosted CI job executes.
@@ -54,6 +54,11 @@ export SCAU_DFLOWFM_G27_OPEN_CASE_DIR="$OPEN_CASE_DIR"
 export SCAU_DFLOWFM_G27_OPEN_MDU="single_reach_open.mdu"
 export SCAU_DFLOWFM_G27_CLOSED_CASE_DIR="$CASE_DIR"
 export SCAU_DFLOWFM_G27_CLOSED_MDU="single_reach.mdu"
+# G20 long-run policy golden: 10,000 x 60 s + restart replay on the authored
+# open-boundary long-run case (adds ~5-10 min to the gateway).
+export SCAU_DFLOWFM_G20_CASE_DIR="$OPEN_CASE_DIR"
+export SCAU_DFLOWFM_G20_MDU="single_reach_open_longrun.mdu"
+export SCAU_DFLOWFM_G20_RESTART_MDU="single_reach_open_longrun_restart300000.mdu"
 
 find_test() {
     local name=$1
@@ -99,6 +104,9 @@ run_test dflowfm_checkpoint_reload
 # G27 manages its own case-directory cwd via the SCAU_DFLOWFM_G27_* env vars.
 run_test dflowfm_external_net
 
+# G20 manages its own case-directory cwd via the SCAU_DFLOWFM_G20_* env vars.
+run_test dflowfm_longrun_10000
+
 # G19 is the first golden whose executable statically imports the vcpkg
 # netcdf.dll (STCF I/O) AND loads the D-Flow FM runtime. The Windows loader
 # resolves netcdff.dll's netcdf dependency against the already-loaded module
@@ -123,4 +131,4 @@ for vcpkg_netcdf in \
     fi
 done
 
-echo "OK real D-Flow FM phase gateway: 7/7 goldens passed"
+echo "OK real D-Flow FM phase gateway: 8/8 goldens passed"

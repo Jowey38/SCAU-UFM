@@ -3,7 +3,7 @@
 // precision update plus a FIXED-ORDER reduction is bitwise deterministic
 // across repeated runs, and matches a sequential CPU reference exactly when
 // the summation order is fixed. This de-risks the core G9 requirement
-// before any CUDA code enters libs/surface2d (M266 contract).
+// before any CUDA code enters the Surface2D core (M266 contract).
 //
 // Deliberately mirrors the solver's accumulation shape:
 //   per-cell: state update from per-edge fluxes (each cell owns its edges'

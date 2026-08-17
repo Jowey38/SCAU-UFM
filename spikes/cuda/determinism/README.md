@@ -2,7 +2,7 @@
 
 Standalone spike (NOT in the main graph) proving the deterministic-CUDA
 pattern required by the M266 backend contract before any CUDA code enters
-`libs/surface2d`:
+the Surface2D core:
 
 - gather-by-owner per-cell update (fixed per-cell edge order, no atomics);
 - fixed-order block-tree reduction with sequential host combination;
