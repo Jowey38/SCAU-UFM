@@ -26,6 +26,8 @@
 
 - [2026-08-15] M277 G19 PROMOTED + audit v2: real engines carry percent-scale INTERNAL continuity error that must be decomposed OUT of the whole-system residual, never absorbed by it: engine_gap = dS - ledger_lateral - external_net_delta (per engine), coupling_residual = residual - gaps, each bounded separately (coupling: strict M270 tolerance; gaps: documented engine_internal_gap_absolute). Three real defects found by the fresh audit: bug-208 (stage-driven outfall backwater imports untracked mass, bypasses ledger), bug-209 (SWMM dry-start wetting front creates ~0.067 m3 once; wet-start fixtures via conduit InitFlow), bug-210 (rate-sampled interface injection not volume conservative). G19 fixture: free outfall, wet start, no interface leg; M278 owns the blocked capabilities; audit stays armed. GOTCHA: file(COPY cases) runs at CMake configure time - editing a source .inp does nothing until reconfigure.
 
+- [2026-08-17] M280 CUDA spike: CUDA 13.x DROPS Pascal (min compute_75) and needs >=580 driver - this host (P2200 sm_61, driver 571.59=CUDA 12.8) requires Toolkit 12.8 side-install (winget refuses downgrade; use the NVIDIA local installer with component flags, no driver). Deterministic-CUDA pattern PROVEN on device: gather-by-owner (no atomics) + fixed-order block-tree reduction + sequential host combine = bitwise repeatable AND bitwise CPU-matchable at 1M cells double precision. This is the mandatory pattern for the G9 solver port.
+
 ## Do-Not-Repeat
 
 <!-- Mistakes made and corrected. Each entry prevents the same mistake recurring. -->

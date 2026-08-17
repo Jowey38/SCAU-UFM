@@ -173,6 +173,7 @@
 | `superpowers/specs/2026-08-14-m276-dflowfm-external-net-evidence.md` | M276 D-Flow FM external-net provider + G27 实施证据；concrete-only 原生水量平衡观测、driver 审计派生（boundary 净通量 + API lateral 去重 + 未证明强迫类 fail-closed）、real 路径 audit scope 首次补全、G27 candidate_non_gating 注册与真实网关执行；含 bug-207（开边界模型 full sum(vol1) 含 ghost 节点多计储量）发现与 ndxi 内部截断修复。G19 提升仍需 Phase C 独立决策。 |
 | `superpowers/specs/2026-08-15-m277-g19-promotion-decision-evidence.md` | M277 G19 提升决策证据（取代 2026-08-08 BLOCKED 决策）；scope-complete 真实审计 3/3 epoch conserved，耦合残差浮点级为零（严格容差未放宽），引擎内部连续性缺口按 M277 分解单独界限（SWMM -0.0269 m3 < 0.05 文档化界限）；记录审计揭示的 bug-208/209/210 三项真实缺陷与 G19 fixture 范围决策；G19 提升为 ci_gate:true。 |
 | `docs/superpowers/plans/2026-08-15-m278-conservative-interface-exchange.md` | M278 计划（BLOCKED 能力记录）；体积守恒的 1D-1D 接口交换（按已排体积注入 + 在途缓冲台账）与回水质量治理（反向 outfall 体积桥接 + D-Flow 扣减）；在落地前由武装的全系统审计 fail-closed 守卫。 |
+| `superpowers/specs/2026-08-17-m280-cuda-determinism-spike-evidence.md` | M280 CUDA determinism spike 证据；治理主机工具链落定（P2200 sm_61 + CUDA 12.8，13.x 因弃用 Pascal 被拒），100 万单元 x25 步 gather-by-owner + 固定序块树归约在 5 次重复运行间逐位一致且与同结合序 CPU 参考逐位一致。G9 两大入口风险解除；G9 保持 pending，后续为按 M266 矩阵的完整 solver 移植。 |
 
 ## 历史记录规则
 
