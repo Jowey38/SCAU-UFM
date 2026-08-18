@@ -175,6 +175,9 @@
 | `docs/superpowers/plans/2026-08-15-m278-conservative-interface-exchange.md` | M278 计划（BLOCKED 能力记录）；体积守恒的 1D-1D 接口交换（按已排体积注入 + 在途缓冲台账）与回水质量治理（反向 outfall 体积桥接 + D-Flow 扣减）；在落地前由武装的全系统审计 fail-closed 守卫。 |
 | `superpowers/specs/2026-08-17-m279-g20-longrun-evidence.md` | M279 G20 长跑策略实施证据；真实引擎 10000x60s 逐步 dt 审计（max_dt_abs_error=0）、每 1000 步原生水量闭合（累计 volerr -2.7e-9 m3）、boundary_in 75000.0 精确、restart 重放 1e-9 一致、资源策略实测 1.84s/预算 1800s；candidate_non_gating 首落地，提升待 master 网关绿。 |
 | `superpowers/specs/2026-08-17-m280-cuda-determinism-spike-evidence.md` | M280 CUDA determinism spike 证据；治理主机工具链落定（P2200 sm_61 + CUDA 12.8，13.x 因弃用 Pascal 被拒），100 万单元 x25 步 gather-by-owner + 固定序块树归约在 5 次重复运行间逐位一致且与同结合序 CPU 参考逐位一致。G9 两大入口风险解除；G9 保持 pending，后续为按 M266 矩阵的完整 solver 移植。 |
+| `superpowers/specs/2026-08-18-m281-g27-promotion-decision-evidence.md` | M281 G27 提升决策证据；三次 master 网关绿运行（31867411713/32005608524/32140995554），中间一次 configure 基础设施故障（磁盘满，网关未执行）不构成测试不稳定证据；G27 提升 ci_gate:true。G20 待第三次绿后同样提升。 |
+| `superpowers/specs/2026-08-18-m281-city-data-import-blocked-decision.md` | M281 城市数据导入 BLOCKED 决策记录（Phase D-5）；无授权上游样例与格式契约，M267 fail-closed 导入契约在位，不自造 schema；解锁路径为外部提供授权样例。 |
+| `docs/superpowers/plans/2026-08-18-m282-cvc-wetdry-sandbox-plan.md` | M282 高阶 CVC/任意干湿正性 sandbox 入口计划（Phase D-4）；定义正性/近干/任意干湿/replay 四类退出标准与 failure-revealing 候选先行规则；G23 一阶闭合保持唯一激活 CVC 门。 |
 
 ## 历史记录规则
 

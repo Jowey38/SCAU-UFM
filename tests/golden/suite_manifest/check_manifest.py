@@ -38,7 +38,8 @@ REQUIRED = {
     "G24": ("whole_system_mass_audit", "implemented", True),
     "G25": ("deficit_writeoff_replay", "implemented", True),
     "G26": ("swmm_external_net", "implemented", False),
-    "G27": ("dflowfm_external_net", "implemented", False),
+    # G27 promoted per the M281 decision evidence (three green gateway runs).
+    "G27": ("dflowfm_external_net", "implemented", True),
 }
 
 
