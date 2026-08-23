@@ -654,3 +654,10 @@
 | -- | Authored longrun+restart MDUs, G20 test, registration | dflowfm_longrun_10000/*, manifest, gateway, ci.yml | manifest OK | ~1500 |
 | -- | Real G20 run | -- | PASS: 10000 steps 1.84s, volerr -2.7e-9, replay 1e-9 | ~300 |
 | -- | Disk-full incident: freed b276/b277 | H:/ | 9.4G free | ~200 |
+
+## Session: 2026-08-18 M281 governance close
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| -- | G27 promotion (manifest/checker/labels) + decision doc | suite_manifest, dflowfm_external_net | manifest OK | ~600 |
+| -- | D-5 BLOCKED record + D-4 M282 sandbox plan | specs/plans | Phase D governance closed | ~700 |
