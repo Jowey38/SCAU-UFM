@@ -30,8 +30,8 @@ REQUIRED = {
     # G19 promoted to an active gate with M272+M276 external scope and the
     # fresh scope-complete real audit (M277 decision evidence).
     "G19": ("surface2d_tri_coupling_real", "implemented", True),
-    # G20 long-run policy landed as a non-gating candidate (M279).
-    "G20": ("dflowfm_longrun_10000", "implemented", False),
+    # G20 promoted per the M283 decision evidence (three green gateway runs).
+    "G20": ("dflowfm_longrun_10000", "implemented", True),
     "G21": ("stcf_case_pipeline", "implemented", True),
     "G22": ("preproc_mixed_mesh_case", "implemented", True),
     "G23": ("cvc_spatial_phi_t_dynamic", "implemented", True),

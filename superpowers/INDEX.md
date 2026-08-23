@@ -178,6 +178,7 @@
 | `superpowers/specs/2026-08-18-m281-g27-promotion-decision-evidence.md` | M281 G27 提升决策证据；三次 master 网关绿运行（31867411713/32005608524/32140995554），中间一次 configure 基础设施故障（磁盘满，网关未执行）不构成测试不稳定证据；G27 提升 ci_gate:true。G20 待第三次绿后同样提升。 |
 | `superpowers/specs/2026-08-18-m281-city-data-import-blocked-decision.md` | M281 城市数据导入 BLOCKED 决策记录（Phase D-5）；无授权上游样例与格式契约，M267 fail-closed 导入契约在位，不自造 schema；解锁路径为外部提供授权样例。 |
 | `docs/superpowers/plans/2026-08-18-m282-cvc-wetdry-sandbox-plan.md` | M282 高阶 CVC/任意干湿正性 sandbox 入口计划（Phase D-4）；定义正性/近干/任意干湿/replay 四类退出标准与 failure-revealing 候选先行规则；G23 一阶闭合保持唯一激活 CVC 门。 |
+| `superpowers/specs/2026-08-23-m283-g20-promotion-decision-evidence.md` | M283 G20 提升决策证据；三次连续 master 网关绿运行（32005608524/32140995554/32633906848），长跑策略（逐步 dt 审计、原生闭合、restart 重放、资源预算）提升为 ci_gate:true。 |
 
 ## 历史记录规则
 
