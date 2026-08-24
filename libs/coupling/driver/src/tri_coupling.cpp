@@ -1,5 +1,6 @@
 #include "coupling/driver/tri_coupling.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <map>
@@ -130,13 +131,12 @@ void validate_config(
     }
 }
 
-}  // namespace
-
-TriCouplingStepReport advance_tri_coupling_step(
+TriCouplingStepReport advance_tri_coupling_step_impl(
     core::CouplingState& state,
     drainage::ISwmmEngine& swmm,
     river::IDFlowFMEngine& dflowfm,
     const TriCouplingStepConfig& config,
+    DrainageRiverInterfaceState* interface_state,
     double dt_sub,
     double h_wet) {
     validate_config(config, dt_sub, state.cells().size());
@@ -217,29 +217,84 @@ TriCouplingStepReport advance_tri_coupling_step(
         }
     }
 
-    // Phase 2: 1D-1D interface exchange. The outfall discharge currently
-    // arriving in the drainage engine is offered against the river acceptance
-    // capacity; the core decision is the only thing either engine sees.
-    for (const auto& link : config.drainage_river) {
-        double q_outfall = swmm.get_node_inflow(link.outfall_node_id);
-        if (!std::isfinite(q_outfall) || q_outfall < 0.0) {
-            q_outfall = 0.0;
+    // Phase 2: 1D-1D interface exchange.
+    // Legacy links (bug-210, audit-guarded): the sampled instantaneous
+    // outfall rate is offered against the river acceptance capacity and
+    // applied in the SAME substep.
+    // M278 emitted_volume links: volume buffered by the interface ledger at
+    // the END of previous substeps is released here (next-substep injection),
+    // capacity-clamped through the same core primitive; the backwater
+    // reverse buffer is debited as a negative river lateral symmetrically.
+    // Either way the core decision is the only thing either engine sees.
+    report.interface_buffer_reports.resize(config.drainage_river.size());
+    for (std::size_t i = 0; i < config.drainage_river.size(); ++i) {
+        const auto& link = config.drainage_river[i];
+        report.interface_buffer_reports[i].outfall_node_id = link.outfall_node_id;
+        if (link.injection_mode == DrainageRiverInjectionMode::sampled_rate_legacy) {
+            double q_outfall = swmm.get_node_inflow(link.outfall_node_id);
+            if (!std::isfinite(q_outfall) || q_outfall < 0.0) {
+                q_outfall = 0.0;
+            }
+            const auto decision = core::evaluate_engine_interface_exchange({
+                .source = {
+                    .engine = core::SharedExchangeEngine::drainage,
+                    .node_id = static_cast<std::size_t>(link.outfall_node_id),
+                },
+                .target = {
+                    .engine = core::SharedExchangeEngine::river,
+                    .node_id = static_cast<std::size_t>(link.river_location_id),
+                },
+                .q_request = q_outfall,
+                .q_capacity = link.q_capacity,
+                .dt_sub = dt_sub,
+            });
+            river_lateral_discharge[link.river_location_id] += decision.q_granted;
+            report.interface_decisions.push_back(decision);
+            continue;
         }
-        const auto decision = core::evaluate_engine_interface_exchange({
-            .source = {
-                .engine = core::SharedExchangeEngine::drainage,
-                .node_id = static_cast<std::size_t>(link.outfall_node_id),
-            },
-            .target = {
-                .engine = core::SharedExchangeEngine::river,
-                .node_id = static_cast<std::size_t>(link.river_location_id),
-            },
-            .q_request = q_outfall,
-            .q_capacity = link.q_capacity,
-            .dt_sub = dt_sub,
-        });
-        river_lateral_discharge[link.river_location_id] += decision.q_granted;
-        report.interface_decisions.push_back(decision);
+
+        auto& emitted = interface_state->emitted[link.outfall_node_id];
+        if (emitted.volume > 0.0) {
+            const auto decision = core::evaluate_engine_interface_exchange({
+                .source = {
+                    .engine = core::SharedExchangeEngine::drainage,
+                    .node_id = static_cast<std::size_t>(link.outfall_node_id),
+                },
+                .target = {
+                    .engine = core::SharedExchangeEngine::river,
+                    .node_id = static_cast<std::size_t>(link.river_location_id),
+                },
+                .q_request = emitted.volume / dt_sub,
+                .q_capacity = link.q_capacity,
+                .dt_sub = dt_sub,
+            });
+            river_lateral_discharge[link.river_location_id] += decision.q_granted;
+            // v_granted is exactly what the river receives (q_granted * dt);
+            // the max() guards the sub-ulp round-trip of volume/dt*dt.
+            emitted.volume = std::max(0.0, emitted.volume - decision.v_granted);
+            report.interface_buffer_reports[i].injected_volume_m3 = decision.v_granted;
+            report.interface_decisions.push_back(decision);
+        }
+        auto& reverse = interface_state->reverse[link.outfall_node_id];
+        if (reverse.volume > 0.0) {
+            const auto decision = core::evaluate_engine_interface_exchange({
+                .source = {
+                    .engine = core::SharedExchangeEngine::river,
+                    .node_id = static_cast<std::size_t>(link.river_location_id),
+                },
+                .target = {
+                    .engine = core::SharedExchangeEngine::drainage,
+                    .node_id = static_cast<std::size_t>(link.outfall_node_id),
+                },
+                .q_request = reverse.volume / dt_sub,
+                .q_capacity = link.q_capacity,
+                .dt_sub = dt_sub,
+            });
+            river_lateral_discharge[link.river_location_id] -= decision.q_granted;
+            reverse.volume = std::max(0.0, reverse.volume - decision.v_granted);
+            report.interface_buffer_reports[i].debited_volume_m3 = decision.v_granted;
+            report.interface_decisions.push_back(decision);
+        }
     }
 
     // Phase 3: acceptance. Accumulated totals are written once per engine
@@ -269,6 +324,34 @@ TriCouplingStepReport advance_tri_coupling_step(
     if (config.step_engines) {
         swmm.step(dt_sub);
         dflowfm.update(dt_sub);
+    }
+
+    // Phase 4.5 (M278): post-step emitted-volume observation. The cumulative
+    // massbal node-outflow register delta since the last observation is the
+    // boundary volume truth: positive deltas accrue into the emitted buffer
+    // (injected from the NEXT substep on), negative deltas are stage-driven
+    // backwater imports and accrue into the reverse-debit buffer.
+    for (std::size_t i = 0; i < config.drainage_river.size(); ++i) {
+        const auto& link = config.drainage_river[i];
+        if (link.injection_mode != DrainageRiverInjectionMode::emitted_volume) {
+            continue;
+        }
+        const double now = swmm.get_node_cumulative_outflow_volume(link.outfall_node_id);
+        if (!std::isfinite(now)) {
+            throw std::invalid_argument(
+                "SWMM cumulative outfall outflow volume must be finite");
+        }
+        const auto emplaced =
+            interface_state->last_cumulative_outflow_m3.emplace(link.outfall_node_id, 0.0);
+        const double delta = now - emplaced.first->second;
+        emplaced.first->second = now;
+        if (delta >= 0.0) {
+            interface_state->emitted[link.outfall_node_id].volume += delta;
+            report.interface_buffer_reports[i].emitted_volume_m3 = delta;
+        } else {
+            interface_state->reverse[link.outfall_node_id].volume += -delta;
+            report.interface_buffer_reports[i].reverse_volume_m3 = -delta;
+        }
     }
 
     // Phase 5: return flows back onto the 2D surface (engine_to_surface),
@@ -317,6 +400,63 @@ TriCouplingStepReport advance_tri_coupling_step(
     state.replay_pending();
     report.surface_mass_after = state.compute_system_mass(h_wet);
     return report;
+}
+
+}  // namespace
+
+double DrainageRiverInterfaceState::inflight_volume() const {
+    double total = 0.0;
+    for (const auto& entry : emitted) {
+        total += entry.second.volume;
+    }
+    for (const auto& entry : reverse) {
+        total -= entry.second.volume;
+    }
+    return total;
+}
+
+void age_drainage_river_interface_buffers(DrainageRiverInterfaceState& interface_state) {
+    const auto age = [](std::map<int, InterfaceBufferAccount>& accounts) {
+        for (auto& entry : accounts) {
+            if (entry.second.volume > 0.0) {
+                ++entry.second.age_epochs;
+            } else {
+                entry.second.age_epochs = 0U;
+            }
+        }
+    };
+    age(interface_state.emitted);
+    age(interface_state.reverse);
+}
+
+TriCouplingStepReport advance_tri_coupling_step(
+    core::CouplingState& state,
+    drainage::ISwmmEngine& swmm,
+    river::IDFlowFMEngine& dflowfm,
+    const TriCouplingStepConfig& config,
+    double dt_sub,
+    double h_wet) {
+    for (const auto& link : config.drainage_river) {
+        if (link.injection_mode == DrainageRiverInjectionMode::emitted_volume) {
+            throw std::invalid_argument(
+                "emitted_volume injection requires the caller-owned "
+                "DrainageRiverInterfaceState entry point (M278)");
+        }
+    }
+    return advance_tri_coupling_step_impl(
+        state, swmm, dflowfm, config, nullptr, dt_sub, h_wet);
+}
+
+TriCouplingStepReport advance_tri_coupling_step(
+    core::CouplingState& state,
+    drainage::ISwmmEngine& swmm,
+    river::IDFlowFMEngine& dflowfm,
+    const TriCouplingStepConfig& config,
+    DrainageRiverInterfaceState& interface_state,
+    double dt_sub,
+    double h_wet) {
+    return advance_tri_coupling_step_impl(
+        state, swmm, dflowfm, config, &interface_state, dt_sub, h_wet);
 }
 
 }  // namespace scau::coupling::driver

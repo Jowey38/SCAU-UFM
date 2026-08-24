@@ -127,6 +127,9 @@ public:
     void set_outfall_stage(int node_id, double stage) override {
         inner_.set_outfall_stage(node_id, stage);
     }
+    [[nodiscard]] double get_node_cumulative_outflow_volume(int node_id) const override {
+        return inner_.get_node_cumulative_outflow_volume(node_id);
+    }
     [[nodiscard]] double get_link_flow(int link_id) const override {
         return inner_.get_link_flow(link_id);
     }

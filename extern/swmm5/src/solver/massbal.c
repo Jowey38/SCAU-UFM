@@ -680,6 +680,44 @@ int massbal_getRoutingTotals(SwmmRoutingTotalsSnapshot* totals)
 
 //=============================================================================
 
+int massbal_getNodeTotalInflow(int nodeIndex, double* volume)
+//
+//  Input:   nodeIndex = node object index
+//           volume = destination for the cumulative node inflow volume (ft3)
+//  Output:  returns 0 on success, non-zero for invalid arguments
+//  Purpose: exposes the cumulative NodeInflow register across the governed
+//           ABI boundary (M278 reverse-boundary-volume bridge).
+//
+{
+    if (volume == NULL) return 1;
+    if (nodeIndex < 0 || nodeIndex >= Nobjects[NODE]) return 1;
+    if (NodeInflow == NULL) return 1;
+    *volume = NodeInflow[nodeIndex];
+    return 0;
+}
+
+//=============================================================================
+
+int massbal_getNodeTotalOutflow(int nodeIndex, double* volume)
+//
+//  Input:   nodeIndex = node object index
+//           volume = destination for the cumulative node outflow volume (ft3)
+//  Output:  returns 0 on success, non-zero for invalid arguments
+//  Purpose: exposes the cumulative NodeOutflow register across the governed
+//           ABI boundary. For an OUTFALL this is the emitted boundary volume;
+//           reverse (backwater) boundary flow appears as negative deltas
+//           (M278 emitted-volume / reverse-debit measurement).
+//
+{
+    if (volume == NULL) return 1;
+    if (nodeIndex < 0 || nodeIndex >= Nobjects[NODE]) return 1;
+    if (NodeOutflow == NULL) return 1;
+    *volume = NodeOutflow[nodeIndex];
+    return 0;
+}
+
+//=============================================================================
+
 double massbal_getStorage(char isFinalStorage)
 //
 //  Input:   isFinalStorage = TRUE if at final time period
