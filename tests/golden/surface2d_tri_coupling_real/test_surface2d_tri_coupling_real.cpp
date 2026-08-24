@@ -124,11 +124,17 @@ TEST(GoldenSurface2DTriCouplingReal, RunLoopDrivesRealSolverAndBothRealEngines) 
     //   bug-210: rate-sampled outfall->river injection is not volume
     //     conservative (injected 0.6207 m3 vs emitted 0.5243 m3 over two
     //     epochs; the seam creates the difference).
-    // Until M278 lands a volume-conservative, ledger-backed 1D-1D interface,
-    // G19 audits the tri-model system without that leg; O1 outflow is a
-    // genuinely external, massbal-tracked loss. The audit stays armed: any
-    // config re-enabling the interface trips REVIEW_REQUIRED on drift.
-    // (G17 keeps behavioral coverage of the interface exchange itself.)
+    // M278 landed the governed replacement: emitted_volume_injection routes
+    // the leg through the driver-owned interface buffer ledger (post-step
+    // massbal register deltas, next-substep capacity-clamped injection,
+    // backwater debited as negative river laterals; deterministic locks in
+    // G28/G29 and the audit owns interface_inflight_volume). Re-including
+    // the leg HERE still requires fresh REAL-engine evidence from the
+    // self-hosted gateway (this golden runs real SWMM + D-Flow), so the
+    // exclusion stays until that promotion run is recorded; the audit stays
+    // armed: any config re-enabling the LEGACY sampled-rate leg trips
+    // REVIEW_REQUIRED on drift. (G17 keeps behavioral coverage of the
+    // interface exchange itself.)
 
     sim::SimDriver driver;
     driver.configure(config);

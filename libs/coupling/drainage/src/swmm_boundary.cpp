@@ -25,6 +25,7 @@ void MockSwmmEngine::initialize(const std::string& inp_path) {
     outfall_stages_.clear();
     link_flows_.clear();
     node_surcharge_flags_.clear();
+    node_cumulative_outflow_volumes_.clear();
 }
 
 void MockSwmmEngine::step(double dt_swmm) {
@@ -46,6 +47,7 @@ void MockSwmmEngine::finalize() {
     outfall_stages_.clear();
     link_flows_.clear();
     node_surcharge_flags_.clear();
+    node_cumulative_outflow_volumes_.clear();
 }
 
 double MockSwmmEngine::get_node_head(int node_id) const {
@@ -240,6 +242,33 @@ bool MockSwmmEngine::initialized() const noexcept {
 
 double MockSwmmEngine::elapsed_time() const noexcept {
     return elapsed_time_;
+}
+
+double MockSwmmEngine::get_node_cumulative_outflow_volume(int node_id) const {
+    if (!initialized_) {
+        throw SwmmEngineError("SWMM mock engine is not initialized");
+    }
+    if (node_id < 0) {
+        throw SwmmEngineError("node_id must be non-negative");
+    }
+    const auto iter = node_cumulative_outflow_volumes_.find(node_id);
+    if (iter == node_cumulative_outflow_volumes_.end()) {
+        return 0.0;
+    }
+    return iter->second;
+}
+
+void MockSwmmEngine::set_node_cumulative_outflow_fixture(int node_id, double volume) {
+    if (!initialized_) {
+        throw SwmmEngineError("SWMM mock engine is not initialized");
+    }
+    if (node_id < 0) {
+        throw SwmmEngineError("node_id must be non-negative");
+    }
+    if (!std::isfinite(volume)) {
+        throw SwmmEngineError("cumulative outflow fixture must be finite");
+    }
+    node_cumulative_outflow_volumes_[node_id] = volume;
 }
 
 core::ExchangeRequest make_swmm_exchange_request(double q_request, double dt_sub) {

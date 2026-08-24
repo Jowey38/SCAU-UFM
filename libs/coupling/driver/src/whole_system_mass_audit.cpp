@@ -68,6 +68,7 @@ double storage_total(const WholeSystemMassSample& sample) {
     return sample.surface_volume +
            sample.swmm_storage_volume.value_or(0.0) +
            sample.dflowfm_volume.value_or(0.0) +
+           sample.interface_inflight_volume +
            sample.cumulative_depression_storage_delta_volume;
 }
 

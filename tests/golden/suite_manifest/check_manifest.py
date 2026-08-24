@@ -40,6 +40,8 @@ REQUIRED = {
     "G26": ("swmm_external_net", "implemented", False),
     # G27 promoted per the M281 decision evidence (three green gateway runs).
     "G27": ("dflowfm_external_net", "implemented", True),
+    "G28": ("interface_emitted_volume_conservation", "implemented", True),
+    "G29": ("backwater_reverse_debit", "implemented", True),
 }
 
 

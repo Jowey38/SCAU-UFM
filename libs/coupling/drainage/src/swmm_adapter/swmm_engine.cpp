@@ -220,6 +220,28 @@ int SwmmEngine::link_index(const std::string& link_name) const {
     return index;
 }
 
+double SwmmEngine::get_node_cumulative_outflow_volume(int node_id) const {
+    require_initialized();
+    if (node_id < 0) {
+        throw SwmmEngineError(
+            "node_id must be non-negative", "SWMM", "swmm_node_id_invalid");
+    }
+    double volume_ft3 = 0.0;
+    if (massbal_getNodeTotalOutflow(node_id, &volume_ft3) != 0) {
+        throw SwmmEngineError(
+            "SWMM node total-outflow bridge failed", "SWMM",
+            "swmm_node_outflow_unavailable");
+    }
+    constexpr double kCubicMetresPerCubicFoot = 0.02832;
+    const double volume_m3 = volume_ft3 * kCubicMetresPerCubicFoot;
+    if (!std::isfinite(volume_m3)) {
+        throw SwmmEngineError(
+            "SWMM node cumulative outflow volume is invalid", "SWMM",
+            "swmm_node_outflow_invalid");
+    }
+    return volume_m3;
+}
+
 double SwmmEngine::total_stored_volume() const {
     require_initialized();
     const double internal_storage_ft3 = massbal_getStorage(0);

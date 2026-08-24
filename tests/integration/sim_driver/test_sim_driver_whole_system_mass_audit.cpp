@@ -44,6 +44,9 @@ std::string case_path_from_env() {
 
 class StorageTrackingSwmm final : public scau::coupling::drainage::ISwmmEngine {
 public:
+    [[nodiscard]] double get_node_cumulative_outflow_volume(int) const override {
+        return 0.0;  // M278 register unused by this storage-tracking fake
+    }
     void initialize(const std::string&) override {
         initialized_ = true;
         elapsed_ = 0.0;

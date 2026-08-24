@@ -61,6 +61,7 @@ public:
 
     [[nodiscard]] double get_link_flow(int link_id) const override;
     [[nodiscard]] bool is_surcharged(int node_id) const override;
+    [[nodiscard]] double get_node_cumulative_outflow_volume(int node_id) const override;
 
     [[nodiscard]] bool initialized() const noexcept;
     [[nodiscard]] double elapsed_time() const noexcept;  // seconds since start
