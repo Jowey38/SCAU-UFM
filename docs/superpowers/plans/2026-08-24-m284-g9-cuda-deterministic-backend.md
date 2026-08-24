@@ -1,7 +1,8 @@
 # M284: G9 deterministic CUDA backend (M266 contract, M280 pattern)
 
 Date: 2026-08-24
-Status: IN PROGRESS
+Status: IMPLEMENTED (see superpowers/specs/2026-08-24-m284-g9-cuda-deterministic-evidence.md);
+G9 `implemented`/`ci_gate:false` pending a blocking GPU CI lane
 
 ## Scope
 

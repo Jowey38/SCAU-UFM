@@ -17,7 +17,7 @@ REQUIRED = {
     "G6": ("phi_c_spd_reject", "implemented", True),
     "G7": ("stcf_v4_to_v5_migration", "implemented", True),
     "G8": ("swmm_single_pipe_surcharge", "implemented", True),
-    "G9": ("cpu_gpu_deterministic_match", "pending", False),
+    "G9": ("cpu_gpu_deterministic_match", "implemented", False),
     "G10": ("snapshot_replay_mass_deficit", "implemented", True),
     "G11": ("dflowfm_river_steady", "implemented", True),
     "G12": ("dual_engine_shared_cell", "implemented", True),

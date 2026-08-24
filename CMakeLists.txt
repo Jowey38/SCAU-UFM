@@ -15,6 +15,17 @@ include(ScauWarnings)
 
 option(SCAU_EMBED_SWMM "Build the vendored SWMM 5.2.4 solver and the real SwmmEngine adapter" ON)
 option(SCAU_ENABLE_DFLOWFM_BMI_RUNTIME "Build the runtime-loaded D-Flow FM BMI adapter" ON)
+option(SCAU_ENABLE_CUDA "Build the deterministic CUDA Surface2D backend (M284/G9)" OFF)
+set(SCAU_CUDA_ARCHITECTURES "61" CACHE STRING "CUDA architectures for the deterministic backend (61 = governed Quadro P2200)")
+
+if(SCAU_ENABLE_CUDA)
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        set(CMAKE_CUDA_ARCHITECTURES ${SCAU_CUDA_ARCHITECTURES})
+    endif()
+    enable_language(CUDA)
+    set(CMAKE_CUDA_STANDARD 20)
+    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+endif()
 
 if(SCAU_EMBED_SWMM)
     include(${CMAKE_SOURCE_DIR}/cmake/third_party/swmm.cmake)

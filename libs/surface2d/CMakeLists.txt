@@ -44,3 +44,32 @@ target_link_libraries(scau_surface2d
 )
 
 target_compile_features(scau_surface2d PUBLIC cxx_std_20)
+
+if(SCAU_ENABLE_CUDA)
+    # Separate target so scau::warnings' MSVC/GCC flags never reach nvcc.
+    # --fmad=false keeps device contraction identical to the /fp:precise
+    # host, which is what makes the shared SCAU_HD numerics CPU-matchable
+    # (M280 pattern / M284 plan).
+    add_library(scau_surface2d_cuda STATIC
+        src/backends/cuda/cuda_backend.cu
+    )
+    target_include_directories(scau_surface2d_cuda
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+    target_link_libraries(scau_surface2d_cuda
+        PUBLIC
+            scau::core
+            scau::mesh
+    )
+    set_target_properties(scau_surface2d_cuda PROPERTIES
+        CUDA_ARCHITECTURES "${SCAU_CUDA_ARCHITECTURES}"
+        CUDA_STANDARD 20
+        CUDA_STANDARD_REQUIRED ON
+    )
+    target_compile_options(scau_surface2d_cuda PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--fmad=false>
+    )
+    target_compile_definitions(scau_surface2d PUBLIC SCAU_SURFACE2D_HAS_CUDA)
+    target_link_libraries(scau_surface2d PRIVATE scau_surface2d_cuda)
+endif()
