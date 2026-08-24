@@ -5,6 +5,7 @@
 
 #include "core/types.hpp"
 #include "mesh/mesh.hpp"
+#include "surface2d/portability.hpp"
 
 namespace scau::surface2d {
 
@@ -18,11 +19,11 @@ struct CellState {
     ConservedState conserved;
     core::Real eta{0.0};
 
-    [[nodiscard]] core::Real u() const {
+    [[nodiscard]] SCAU_HD core::Real u() const {
         return conserved.h > 0.0 ? conserved.hu / conserved.h : 0.0;
     }
 
-    [[nodiscard]] core::Real v() const {
+    [[nodiscard]] SCAU_HD core::Real v() const {
         return conserved.h > 0.0 ? conserved.hv / conserved.h : 0.0;
     }
 };

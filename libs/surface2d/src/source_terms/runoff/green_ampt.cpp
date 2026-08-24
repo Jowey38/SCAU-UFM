@@ -1,6 +1,5 @@
 #include "surface2d/source_terms/runoff/green_ampt.hpp"
 
-#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
@@ -25,20 +24,8 @@ GreenAmptStep green_ampt_infiltration_step(
     if (!std::isfinite(f_inf_floor) || f_inf_floor <= 0.0) {
         throw std::invalid_argument("green-ampt f_inf_floor must be finite and positive");
     }
-
-    const core::Real delta_theta = params.theta_s - params.theta_i;
-    const core::Real f_eval = std::max(cumulative_infiltration_before, f_inf_floor);
-    const core::Real capacity_rate = params.k_s * (1.0 + params.psi_f * delta_theta / f_eval);
-    const core::Real potential_depth = capacity_rate * dt;
-
-    GreenAmptStep step;
-    step.infiltrated_depth = std::min(available_depth, potential_depth);
-    if (step.infiltrated_depth < 0.0) {
-        step.infiltrated_depth = 0.0;
-    }
-    step.cumulative_infiltration = cumulative_infiltration_before + step.infiltrated_depth;
-    step.ponding_started = available_depth > potential_depth;
-    return step;
+    return green_ampt_infiltration_step_unchecked(
+        params, cumulative_infiltration_before, available_depth, dt, f_inf_floor);
 }
 
 }  // namespace scau::surface2d
