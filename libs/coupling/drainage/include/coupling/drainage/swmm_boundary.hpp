@@ -48,6 +48,13 @@ public:
 
     [[nodiscard]] virtual double get_link_flow(int link_id) const = 0;
     [[nodiscard]] virtual bool is_surcharged(int node_id) const = 0;
+
+    // Cumulative massbal boundary outflow volume (m3) for one node since
+    // initialize(). For an outfall this is the emitted-volume register the
+    // M278 interface buffer ledger measures per-substep deltas from; a
+    // stage-driven reverse (backwater) boundary import appears as a NEGATIVE
+    // delta of the same register.
+    [[nodiscard]] virtual double get_node_cumulative_outflow_volume(int node_id) const = 0;
 };
 
 class MockSwmmEngine final : public ISwmmEngine {
@@ -71,6 +78,10 @@ public:
     void set_link_flow_fixture(int link_id, double q);
     [[nodiscard]] bool is_surcharged(int node_id) const override;
     void set_node_surcharge_fixture(int node_id, bool surcharged);
+    [[nodiscard]] double get_node_cumulative_outflow_volume(int node_id) const override;
+    // Standing fixture: cumulative outflow register value (m3). Goldens grow
+    // (or shrink, for backwater) this value between substeps.
+    void set_node_cumulative_outflow_fixture(int node_id, double volume);
 
     [[nodiscard]] bool initialized() const noexcept;
     [[nodiscard]] double elapsed_time() const noexcept;
@@ -85,6 +96,7 @@ private:
     std::unordered_map<int, double> outfall_stages_{};
     std::unordered_map<int, double> link_flows_{};
     std::unordered_map<int, bool> node_surcharge_flags_{};
+    std::unordered_map<int, double> node_cumulative_outflow_volumes_{};
 };
 
 [[nodiscard]] core::ExchangeRequest make_swmm_exchange_request(double q_request, double dt_sub);

@@ -28,6 +28,17 @@ typedef struct
  */
 int massbal_getRoutingTotals(SwmmRoutingTotalsSnapshot* totals);
 
+/*
+ * Copies one node's cumulative massbal boundary volume registers (ft3,
+ * accumulated since swmm_start). For an OUTFALL node the total-outflow
+ * register is the emitted boundary volume; stage-driven reverse (backwater)
+ * boundary flow appears as NEGATIVE deltas of the same register (M278).
+ * Read-only; returns 0 on success, non-zero for an invalid destination or
+ * node index.
+ */
+int massbal_getNodeTotalInflow(int nodeIndex, double* volume);
+int massbal_getNodeTotalOutflow(int nodeIndex, double* volume);
+
 #ifdef __cplusplus
 }
 #endif
