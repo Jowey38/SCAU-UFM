@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/types.hpp"
+#include "surface2d/portability.hpp"
 
 namespace scau::surface2d {
 
@@ -32,6 +33,28 @@ struct EdgeClassification {
 
 // Pure classifier over the edge DPM scalars. Side-effect free and hot-path
 // safe; field-domain validation belongs to the DPM field validators.
-[[nodiscard]] EdgeClassification classify_edge(core::Real omega_edge, core::Real phi_e_n);
+// Header-inline SCAU_HD so the deterministic CUDA backend (M284/G9) compiles
+// the exact same classifier for the device.
+[[nodiscard]] SCAU_HD inline EdgeClassification classify_edge(core::Real omega_edge, core::Real phi_e_n) {
+    if (omega_edge <= 0.0) {
+        return EdgeClassification{
+            .block_class = EdgeBlockClass::HardBlock,
+            .advective_flux_zeroed = true,
+            .wb_pairing_assembled = false,
+        };
+    }
+    if (omega_edge < EpsilonOmega || phi_e_n < PhiEdgeMin) {
+        return EdgeClassification{
+            .block_class = EdgeBlockClass::SoftBlock,
+            .advective_flux_zeroed = true,
+            .wb_pairing_assembled = true,
+        };
+    }
+    return EdgeClassification{
+        .block_class = EdgeBlockClass::Regular,
+        .advective_flux_zeroed = false,
+        .wb_pairing_assembled = true,
+    };
+}
 
 }  // namespace scau::surface2d

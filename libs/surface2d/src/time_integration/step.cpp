@@ -16,6 +16,7 @@
 #include "surface2d/source_terms/runoff/runoff_generation.hpp"
 #include "surface2d/source_terms/runoff/step_inputs.hpp"
 #include "surface2d/source_terms/well_balanced.hpp"
+#include "surface2d/time_integration/boundary_ghosts.hpp"
 #include "surface2d/wetting_drying/limits.hpp"
 
 namespace scau::surface2d {
@@ -106,25 +107,6 @@ StepDiagnostics base_diagnostics(
         .rollback_required = cfl.rollback_required,
         .cells = std::vector<CellStepDiagnostics>(mesh.cells.size()),
         .edges = {},
-    };
-}
-
-CellState open_boundary_outside_state(const CellState& inside) {
-    return CellState{
-        .conserved = {.h = inside.conserved.h, .hu = inside.conserved.hu, .hv = inside.conserved.hv},
-        .eta = inside.eta,
-    };
-}
-
-// WaterLevel boundary ghost state: prescribed stage over the inside cell's
-// bed (z_b = eta - h), inside velocity carried at the ghost depth. Equal
-// stages produce the same reconstructed pair as a lake at rest (zero flux).
-CellState water_level_outside_state(const CellState& inside, core::Real eta_bc) {
-    const core::Real z_b = inside.eta - inside.conserved.h;
-    const core::Real h_out = eta_bc > z_b ? eta_bc - z_b : 0.0;
-    return CellState{
-        .conserved = {.h = h_out, .hu = h_out * inside.u(), .hv = h_out * inside.v()},
-        .eta = z_b + h_out,
     };
 }
 

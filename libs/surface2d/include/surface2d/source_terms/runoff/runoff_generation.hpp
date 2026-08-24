@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/types.hpp"
+#include "surface2d/portability.hpp"
 #include "surface2d/source_terms/runoff/green_ampt.hpp"
 #include "surface2d/source_terms/runoff/result.hpp"
 #include "surface2d/source_terms/runoff/soil_params.hpp"
@@ -62,6 +63,64 @@ struct GroundRunoffResult {
     RunoffCellState& state,
     core::Real dt,
     core::Real f_inf_floor);
+
+// Unchecked SCAU_HD core shared with the deterministic CUDA backend
+// (M284/G9). Identical arithmetic to the checked entry point; the CUDA path
+// re-creates the checked failure surface with host pre-validation plus a
+// device error flag.
+[[nodiscard]] SCAU_HD inline GroundRunoffResult evaluate_ground_runoff_unchecked(
+    const RunoffCellInputs& inputs,
+    const RunoffCellParams& params,
+    RunoffCellState& state,
+    core::Real dt,
+    core::Real f_inf_floor) {
+    const core::Real area_pervious = params.pervious_fraction * inputs.cell_area;
+    const core::Real area_impervious = params.impervious_fraction * inputs.cell_area;
+    const core::Real area_ground = area_pervious + area_impervious;
+    const core::Real rain_depth = inputs.rainfall_rate * dt;
+
+    const core::Real abs_remaining =
+        hd::max_(0.0, params.initial_abstraction_capacity - state.abstraction_filled);
+    const core::Real abs_fill_depth = hd::min_(abs_remaining, rain_depth);
+    state.abstraction_filled += abs_fill_depth;
+    const core::Real after_abstraction = rain_depth - abs_fill_depth;
+
+    const core::Real dep_remaining =
+        hd::max_(0.0, params.depression_storage_capacity - state.depression_storage_filled);
+    const core::Real dep_fill_depth = hd::min_(dep_remaining, after_abstraction);
+    state.depression_storage_filled += dep_fill_depth;
+    const core::Real rain_excess = after_abstraction - dep_fill_depth;
+
+    // Couple the cell's existing ponded surface water into the SAME Green-Ampt
+    // call. Surface storage is phi_t * h * A, so pre-scale the ponded depth by
+    // phi_t when forming the capacity offered to the soil. The resulting
+    // infiltrated_depth is PURE LIQUID (no phi_t factor on the recomposed volume).
+    const core::Real surface_depth_equivalent = inputs.surface_depth * inputs.phi_t;
+    const core::Real available_depth = rain_excess + surface_depth_equivalent;
+
+    GroundRunoffResult result;
+    result.abstraction_volume = abs_fill_depth * area_ground;
+    result.depression_storage_delta_volume = dep_fill_depth * area_ground;
+
+    core::Real inf_from_rain_depth = 0.0;
+    core::Real inf_from_ponded_depth = 0.0;
+    if (area_pervious > 0.0) {
+        const auto ga = green_ampt_infiltration_step_unchecked(
+            params.soil, state.cumulative_infiltration, available_depth, dt, f_inf_floor);
+        state.cumulative_infiltration = ga.cumulative_infiltration;
+        result.ponding_started = ga.ponding_started;
+        // Post-call attribution: rain is consumed first, ponded h covers the rest.
+        inf_from_rain_depth = hd::min_(ga.infiltrated_depth, rain_excess);
+        inf_from_ponded_depth = ga.infiltrated_depth - inf_from_rain_depth;
+    }
+
+    const core::Real runoff_pervious_depth = rain_excess - inf_from_rain_depth;
+    result.infiltration_volume = inf_from_rain_depth * area_pervious;
+    result.ponded_infiltration_volume = inf_from_ponded_depth * area_pervious;
+    result.surface_added_volume =
+        runoff_pervious_depth * area_pervious + rain_excess * area_impervious;
+    return result;
+}
 
 // Roof emit outcome for one substep (m^3). roof_input_volume is the water added
 // to the pending buffer this substep; requested_volume is the drain request.

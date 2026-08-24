@@ -10,3 +10,11 @@ Authoritative source: `superpowers/specs/2026-04-11-scau-ufm-global-architecture
 - G19 real whole-system audit (M277): coupling residual vs `max(epsilon_deficit, 1e-4 + 1e-6 * max(1, S0))` (M270 real-engine tolerance, unchanged); per-engine internal continuity gaps decomposed via CouplingLib ledger laterals and bounded by the documented `engine_internal_gap_absolute` (G19 fixture: 0.05 m3 from measured SWMM recession error; D-Flow gap at native volume-error scale). Engine gaps never absorb or mask coupling drift.
 
 Deterministic path requirement (§10.3): CPU double precision, fixed reduction order.
+
+- G9 cpu_gpu_deterministic_match (M284): h, eta, per-cell residuals, per-edge
+  diagnostics, raw `max_cell_cfl` and rollback state are BITWISE equal between
+  `cpu_reference` and `cuda_deterministic` (shared SCAU_HD numerics, identical
+  gather association, `--fmad=false`). hu/hv are bitwise except through Manning
+  friction (device `pow` ulp difference): `1e-12` absolute. Accumulated volume
+  diagnostics (CPU sequential vs fixed-order M280 block tree): `1e-12` absolute.
+  Repeated CUDA runs and device snapshot/restore roundtrips are bitwise.

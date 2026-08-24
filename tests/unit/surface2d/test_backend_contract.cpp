@@ -13,19 +13,49 @@ TEST(SurfaceBackendContract, CpuReferenceIsAvailableAndDeterministic) {
     EXPECT_TRUE(capabilities.supports_snapshot_restore);
 }
 
-TEST(SurfaceBackendContract, CudaPathsFailClosedUntilG9Exists) {
-    for (const auto kind : {
-             scau::surface2d::BackendKind::cuda_deterministic,
-             scau::surface2d::BackendKind::cuda_performance}) {
-        const auto capabilities = scau::surface2d::query_backend_capabilities(kind);
-        EXPECT_FALSE(capabilities.available);
+TEST(SurfaceBackendContract, CudaPerformanceStaysFailClosed) {
+    // M266: cuda_performance can never be the sole correctness path; it stays
+    // fail-closed even when the deterministic CUDA backend is compiled in.
+    const auto capabilities = scau::surface2d::query_backend_capabilities(
+        scau::surface2d::BackendKind::cuda_performance);
+    EXPECT_FALSE(capabilities.available);
+    auto mesh = scau::mesh::build_mixed_minimal_mesh();
+    auto state = scau::surface2d::SurfaceState::for_mesh(mesh);
+    EXPECT_THROW(
+        static_cast<void>(scau::surface2d::advance_one_step(
+            scau::surface2d::BackendKind::cuda_performance, mesh, state, {.dt = 0.01})),
+        std::runtime_error);
+}
+
+TEST(SurfaceBackendContract, CudaDeterministicFailsClosedUnlessCompiledAndDevicePresent) {
+    const auto capabilities = scau::surface2d::query_backend_capabilities(
+        scau::surface2d::BackendKind::cuda_deterministic);
+#if !defined(SCAU_SURFACE2D_HAS_CUDA)
+    // Default build: the backend is not compiled, so the M266 fail-closed
+    // contract holds exactly as before G9 implementation.
+    EXPECT_FALSE(capabilities.available);
+    auto mesh = scau::mesh::build_mixed_minimal_mesh();
+    auto state = scau::surface2d::SurfaceState::for_mesh(mesh);
+    EXPECT_THROW(
+        static_cast<void>(scau::surface2d::advance_one_step(
+            scau::surface2d::BackendKind::cuda_deterministic, mesh, state, {.dt = 0.01})),
+        std::runtime_error);
+#else
+    // CUDA build: availability is a runtime device probe; when available the
+    // backend must advertise the full deterministic contract.
+    if (capabilities.available) {
+        EXPECT_TRUE(capabilities.deterministic);
+        EXPECT_TRUE(capabilities.double_precision);
+        EXPECT_TRUE(capabilities.supports_snapshot_restore);
+    } else {
         auto mesh = scau::mesh::build_mixed_minimal_mesh();
         auto state = scau::surface2d::SurfaceState::for_mesh(mesh);
         EXPECT_THROW(
             static_cast<void>(scau::surface2d::advance_one_step(
-                kind, mesh, state, {.dt = 0.01})),
+                scau::surface2d::BackendKind::cuda_deterministic, mesh, state, {.dt = 0.01})),
             std::runtime_error);
     }
+#endif
 }
 
 TEST(SurfaceBackendContract, CpuDispatchMatchesReferenceExactly) {

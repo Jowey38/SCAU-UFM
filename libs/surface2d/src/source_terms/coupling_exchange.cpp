@@ -1,6 +1,5 @@
 #include "surface2d/source_terms/coupling_exchange.hpp"
 
-#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
@@ -23,13 +22,7 @@ ExchangeDepthResult exchange_depth_increment(
     if (!std::isfinite(area) || area <= 0.0) {
         throw std::invalid_argument("exchange cell area must be finite and positive");
     }
-
-    const core::Real raw_increment = volume / (phi_t * area);
-    const core::Real depth_increment = std::max(raw_increment, -h);
-    return ExchangeDepthResult{
-        .depth_increment = depth_increment,
-        .applied_volume = depth_increment * phi_t * area,
-    };
+    return exchange_depth_increment_unchecked(volume, h, phi_t, area);
 }
 
 }  // namespace scau::surface2d

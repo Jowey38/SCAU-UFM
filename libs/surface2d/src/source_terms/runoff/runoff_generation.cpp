@@ -54,53 +54,18 @@ GroundRunoffResult evaluate_ground_runoff(
     if (!std::isfinite(params.depression_storage_capacity) || params.depression_storage_capacity < 0.0) {
         throw std::invalid_argument("depression_storage_capacity must be finite and non-negative");
     }
-
-    const core::Real area_pervious = params.pervious_fraction * inputs.cell_area;
-    const core::Real area_impervious = params.impervious_fraction * inputs.cell_area;
-    const core::Real area_ground = area_pervious + area_impervious;
-    const core::Real rain_depth = inputs.rainfall_rate * dt;
-
-    const core::Real abs_remaining =
-        std::max(core::Real(0.0), params.initial_abstraction_capacity - state.abstraction_filled);
-    const core::Real abs_fill_depth = std::min(abs_remaining, rain_depth);
-    state.abstraction_filled += abs_fill_depth;
-    const core::Real after_abstraction = rain_depth - abs_fill_depth;
-
-    const core::Real dep_remaining =
-        std::max(core::Real(0.0), params.depression_storage_capacity - state.depression_storage_filled);
-    const core::Real dep_fill_depth = std::min(dep_remaining, after_abstraction);
-    state.depression_storage_filled += dep_fill_depth;
-    const core::Real rain_excess = after_abstraction - dep_fill_depth;
-
-    // Couple the cell's existing ponded surface water into the SAME Green-Ampt
-    // call. Surface storage is phi_t * h * A, so pre-scale the ponded depth by
-    // phi_t when forming the capacity offered to the soil. The resulting
-    // infiltrated_depth is PURE LIQUID (no phi_t factor on the recomposed volume).
-    const core::Real surface_depth_equivalent = inputs.surface_depth * inputs.phi_t;
-    const core::Real available_depth = rain_excess + surface_depth_equivalent;
-
-    GroundRunoffResult result;
-    result.abstraction_volume = abs_fill_depth * area_ground;
-    result.depression_storage_delta_volume = dep_fill_depth * area_ground;
-
-    core::Real inf_from_rain_depth = 0.0;
-    core::Real inf_from_ponded_depth = 0.0;
-    if (area_pervious > 0.0) {
-        const auto ga = green_ampt_infiltration_step(
-            params.soil, state.cumulative_infiltration, available_depth, dt, f_inf_floor);
-        state.cumulative_infiltration = ga.cumulative_infiltration;
-        result.ponding_started = ga.ponding_started;
-        // Post-call attribution: rain is consumed first, ponded h covers the rest.
-        inf_from_rain_depth = std::min(ga.infiltrated_depth, rain_excess);
-        inf_from_ponded_depth = ga.infiltrated_depth - inf_from_rain_depth;
+    // The checked entry point ALSO validates the soil params, exactly as the
+    // pre-M284 inline body did through the checked green_ampt call.
+    if (params.pervious_fraction * inputs.cell_area > 0.0) {
+        validate_soil_params(params.soil);
+        if (!std::isfinite(state.cumulative_infiltration) || state.cumulative_infiltration < 0.0) {
+            throw std::invalid_argument("green-ampt cumulative infiltration must be finite and non-negative");
+        }
+        if (!std::isfinite(f_inf_floor) || f_inf_floor <= 0.0) {
+            throw std::invalid_argument("green-ampt f_inf_floor must be finite and positive");
+        }
     }
-
-    const core::Real runoff_pervious_depth = rain_excess - inf_from_rain_depth;
-    result.infiltration_volume = inf_from_rain_depth * area_pervious;
-    result.ponded_infiltration_volume = inf_from_ponded_depth * area_pervious;
-    result.surface_added_volume =
-        runoff_pervious_depth * area_pervious + rain_excess * area_impervious;
-    return result;
+    return evaluate_ground_runoff_unchecked(inputs, params, state, dt, f_inf_floor);
 }
 
 RoofEmitResult evaluate_roof_emit(

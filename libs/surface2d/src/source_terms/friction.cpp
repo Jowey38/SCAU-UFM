@@ -29,29 +29,7 @@ ConservedState apply_manning_friction(
     if (!std::isfinite(conserved.hu) || !std::isfinite(conserved.hv)) {
         throw std::invalid_argument("friction cell momentum must be finite");
     }
-
-    ConservedState updated = conserved;
-    if (conserved.h <= h_min) {
-        updated.hu = 0.0;
-        updated.hv = 0.0;
-        return updated;
-    }
-    if (manning_n == 0.0) {
-        return updated;
-    }
-
-    const core::Real u = conserved.hu / conserved.h;
-    const core::Real v = conserved.hv / conserved.h;
-    const core::Real speed = std::sqrt(u * u + v * v);
-    if (speed == 0.0) {
-        return updated;
-    }
-
-    const core::Real h_pow = std::pow(conserved.h, 4.0 / 3.0);
-    const core::Real denom = 1.0 + dt * gravity * manning_n * manning_n * speed / h_pow;
-    updated.hu /= denom;
-    updated.hv /= denom;
-    return updated;
+    return apply_manning_friction_unchecked(conserved, manning_n, dt, h_min, gravity);
 }
 
 }  // namespace scau::surface2d
