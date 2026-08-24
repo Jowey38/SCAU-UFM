@@ -242,13 +242,16 @@ RuntimeConfig parse_runtime_config_text(const std::string& text) {
             config.surface_river.push_back(std::move(link));
         } else if (key == "drainage_river_link") {
             const auto fields = parse_structured_value(
-                value, key, {"outfall", "location", "q_capacity", "drive_outfall_stage"});
+                value, key, {"outfall", "location", "q_capacity", "drive_outfall_stage", "emitted_volume_injection"});
             DrainageRiverLinkConfig link{};
             link.outfall_name = require_subkey(fields, "outfall", key);
             link.river_location_id = parse_int(require_subkey(fields, "location", key), key);
             link.q_capacity = parse_double(require_subkey(fields, "q_capacity", key), key);
             if (const auto drive = fields.find("drive_outfall_stage"); drive != fields.end()) {
                 link.drive_outfall_stage = parse_bool(drive->second, key);
+            }
+            if (const auto emitted = fields.find("emitted_volume_injection"); emitted != fields.end()) {
+                link.emitted_volume_injection = parse_bool(emitted->second, key);
             }
             config.drainage_river.push_back(std::move(link));
         } else {

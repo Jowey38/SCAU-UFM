@@ -178,6 +178,8 @@ RunLoopResult run_simulation(
     double cumulative_swmm_lateral_volume = 0.0;
     double cumulative_engine_internal_return_volume = 0.0;
     double cumulative_dflowfm_lateral_volume = 0.0;
+    // M278 caller-owned interface buffer ledger (run lifetime).
+    driver_ns::DrainageRiverInterfaceState drainage_river_interface{};
     double cumulative_depression_delta_volume = 0.0;
     summary.whole_system_mass_audit_enabled =
         config.enable_whole_system_mass_audit;
@@ -197,6 +199,8 @@ RunLoopResult run_simulation(
             state, loaded.dpm_fields, geometry, 0.0);
         initial_sample.surface_reference_volume = physical_surface_volume(
             state, loaded.dpm_fields, geometry, config.h_wet);
+        initial_sample.interface_inflight_volume =
+            drainage_river_interface.inflight_volume();
         initial_sample.swmm_storage_volume = hooks.swmm_storage_volume();
         if (hooks.dflowfm_storage_volume) {
             initial_sample.dflowfm_volume = hooks.dflowfm_storage_volume();
@@ -394,6 +398,9 @@ RunLoopResult run_simulation(
             link.river_location_id = link_config.river_location_id;
             link.q_capacity = link_config.q_capacity;
             link.drive_outfall_stage = link_config.drive_outfall_stage;
+            link.injection_mode = link_config.emitted_volume_injection
+                ? driver_ns::DrainageRiverInjectionMode::emitted_volume
+                : driver_ns::DrainageRiverInjectionMode::sampled_rate_legacy;
             tri_config.drainage_river.push_back(link);
         }
 
@@ -404,7 +411,8 @@ RunLoopResult run_simulation(
         driver_ns::ExchangeWriteBackReport write_back{};
         try {
             report = driver_ns::advance_tri_coupling_step(
-                coupling, swmm, dflowfm, tri_config, config.dt_couple, config.h_wet);
+                coupling, swmm, dflowfm, tri_config, drainage_river_interface,
+                config.dt_couple, config.h_wet);
             write_back = driver_ns::apply_exchange_write_back(
                 state, loaded.dpm_fields, geometry, map, cells_before, coupling,
                 loaded.bed_elevations);
@@ -434,8 +442,15 @@ RunLoopResult run_simulation(
         // node overflow returned onto the 2D surface. River spill stays
         // uncorrected on purpose (the driver never debits D-Flow for spill).
         for (const auto& decision : report.interface_decisions) {
-            cumulative_engine_internal_return_volume += decision.v_granted;
-            cumulative_dflowfm_lateral_volume += decision.v_granted;
+            if (decision.source.engine == core::SharedExchangeEngine::river) {
+                // M278 reverse (backwater) debit: the river surrendered this
+                // volume as a negative lateral; mirror both accumulators.
+                cumulative_engine_internal_return_volume -= decision.v_granted;
+                cumulative_dflowfm_lateral_volume -= decision.v_granted;
+            } else {
+                cumulative_engine_internal_return_volume += decision.v_granted;
+                cumulative_dflowfm_lateral_volume += decision.v_granted;
+            }
         }
         for (const auto& decision : report.return_decisions) {
             if (decision.source.engine == core::SharedExchangeEngine::drainage) {
@@ -454,6 +469,9 @@ RunLoopResult run_simulation(
         writeoff_config.writeoff_threshold_steps = config.n_writeoff_steps;
         const core::DeficitWriteoffReport writeoff_report =
             coupling.apply_deficit_writeoff(writeoff_config);
+        // M278: interface buffer accounts age with the same committed-epoch
+        // cadence as the deficit ledger.
+        driver_ns::age_drainage_river_interface_buffers(drainage_river_interface);
 
         // 5. Epoch commit protocol: only a committed coordinator verdict
         // advances the committed-step counter and the rolling window.
@@ -538,6 +556,8 @@ RunLoopResult run_simulation(
                 cumulative_depression_delta_volume;
             current_sample.cumulative_engine_internal_return_volume =
                 cumulative_engine_internal_return_volume;
+            current_sample.interface_inflight_volume =
+                drainage_river_interface.inflight_volume();
             if (hooks.swmm_external_net_volume) {
                 current_sample.swmm_coupling_lateral_volume =
                     cumulative_swmm_lateral_volume;

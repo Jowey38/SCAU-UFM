@@ -23,6 +23,11 @@ struct WholeSystemMassSample {
     double coupling_deficit_volume{0.0};
     std::optional<double> swmm_storage_volume{};
     std::optional<double> dflowfm_volume{};
+    // M278 driver-owned in-flight interface volume: SWMM-emitted boundary
+    // volume buffered but not yet injected into the river MINUS backwater
+    // imports not yet debited from the river. A ledger-owned storage term
+    // (signed), never a tolerance.
+    double interface_inflight_volume{0.0};
     // Complete cumulative external net-volume observations owned by each 1D
     // engine (inflow positive, outflow/loss negative), since engine init.
     // nullopt means the storage is observable but external flux scope is

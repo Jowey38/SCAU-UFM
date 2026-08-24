@@ -53,6 +53,9 @@ struct DrainageRiverLinkConfig {
     int river_location_id{0};
     double q_capacity{0.0};
     bool drive_outfall_stage{true};
+    // M278: opt into the governed emitted-volume interface ledger (the
+    // legacy sampled-rate path is bug-210 and stays audit-guarded).
+    bool emitted_volume_injection{false};
 };
 
 struct RuntimeConfig {
