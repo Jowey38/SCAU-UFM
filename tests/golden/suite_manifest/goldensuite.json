@@ -77,7 +77,7 @@
     "test_path": "tests/golden/cpu_gpu_deterministic_match/",
     "applicable_phase": "Phase 2+",
     "reference_path": "tests/golden/reference/tolerances.md",
-    "ci_gate": false,
+    "ci_gate": true,
     "status": "implemented"
   },
   {
