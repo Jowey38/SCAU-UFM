@@ -9,6 +9,7 @@ target_link_libraries(test_cpu_gpu_deterministic_match
         GTest::gtest_main
 )
 add_test(NAME test_cpu_gpu_deterministic_match COMMAND test_cpu_gpu_deterministic_match)
-# G9 stays ci_gate:false until a blocking GPU CI lane exists (M266 exit
-# conditions; see the M284 evidence doc), so no gating LABELS golden here.
-set_tests_properties(test_cpu_gpu_deterministic_match PROPERTIES LABELS "golden_candidate;cuda;surface2d")
+# G9 active gate (M285): the gpu-cuda-golden self-hosted lane runs this
+# blocking on the governed GPU host; hosted CUDA-off builds take the
+# explicit SKIP path.
+set_tests_properties(test_cpu_gpu_deterministic_match PROPERTIES LABELS "golden;cuda;surface2d")
