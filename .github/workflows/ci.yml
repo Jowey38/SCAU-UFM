@@ -176,6 +176,39 @@ jobs:
       - name: Run real D-Flow FM phase gateway
         run: tools/dflowfm/run_real_goldens.sh build/windows-msvc Debug
 
+  # G9 deterministic CUDA golden on the governed GPU host (M285).
+  # Requires the self-hosted runner with labels [self-hosted, windows, cuda]
+  # (governed Quadro P2200 host; CUDA Toolkit 12.8 pinned via the VS toolset
+  # in the windows-msvc-cuda preset — 13.3 remains rejected for this host,
+  # see the M280/M284 evidence) and repo variable SCAU_CUDA_VCPKG_ROOT.
+  # The job stays skipped until the repository variable SCAU_CUDA_RUNNER is
+  # set to 'enabled'; manifest ci_gate for G9 is promoted only after three
+  # consecutive green runs (same promotion pattern as G11/G16-G18 and G20).
+  gpu-cuda-golden:
+    name: gpu-cuda-golden
+    if: ${{ vars.SCAU_CUDA_RUNNER == 'enabled' }}
+    runs-on: [self-hosted, windows, cuda]
+    env:
+      VCPKG_ROOT: ${{ vars.SCAU_CUDA_VCPKG_ROOT }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare vcpkg binary cache
+        run: mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
+
+      - name: Configure (CUDA 12.8 toolset, SCAU_ENABLE_CUDA=ON)
+        run: cmake --preset windows-msvc-cuda
+
+      - name: Build G9 golden
+        run: cmake --build --preset windows-msvc-cuda --target test_cpu_gpu_deterministic_match
+
+      - name: Run G9 deterministic golden (blocking)
+        run: ctest --test-dir build/windows-msvc-cuda -C Debug -R '^test_cpu_gpu_deterministic_match$' --output-on-failure
+
   goldensuite-manifest-check:
     name: manifest-completeness
     runs-on: ubuntu-22.04
