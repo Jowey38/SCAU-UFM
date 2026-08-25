@@ -1,7 +1,9 @@
 # M282: High-order CVC / arbitrary wet-dry positivity — numerical sandbox plan (Phase D-4 entry)
 
 Date: 2026-08-18
-Status: PLANNED (entry conditions defined; no solver change claimed)
+Status: EXECUTED 2026-08-25 via M286 (sandbox counterexamples recorded; see
+`superpowers/specs/2026-08-25-m286-cvc-wetdry-sandbox-evidence.md`; solver
+wiring stays BLOCKED until a closure passes all five criteria)
 
 ## Scope and current baseline
 
