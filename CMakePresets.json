@@ -38,6 +38,16 @@
         "lhs": "${hostSystemName}",
         "rhs": "Windows"
       }
+    },
+    {
+      "name": "windows-msvc-cuda",
+      "displayName": "Windows MSVC Debug + deterministic CUDA backend (governed GPU host, CUDA 12.8)",
+      "inherits": "windows-msvc",
+      "binaryDir": "${sourceDir}/build/windows-msvc-cuda",
+      "toolset": "cuda=12.8",
+      "cacheVariables": {
+        "SCAU_ENABLE_CUDA": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -49,6 +59,11 @@
     {
       "name": "windows-msvc",
       "configurePreset": "windows-msvc",
+      "configuration": "Debug"
+    },
+    {
+      "name": "windows-msvc-cuda",
+      "configurePreset": "windows-msvc-cuda",
       "configuration": "Debug"
     }
   ],
@@ -68,6 +83,18 @@
     {
       "name": "windows-msvc",
       "configurePreset": "windows-msvc",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "stopOnFailure": false
+      }
+    },
+    {
+      "name": "windows-msvc-cuda",
+      "configurePreset": "windows-msvc-cuda",
       "configuration": "Debug",
       "output": {
         "outputOnFailure": true
