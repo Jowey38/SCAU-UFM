@@ -1,0 +1,26 @@
+# gmsh third-party manifest (M287-A spike governance)
+
+name: gmsh
+version: 4.15.2
+distribution: PyPI wheel "gmsh" (bundled gmsh SDK shared library + Python API)
+license: GPL-2.0-or-later (see third_party/licenses/gmsh-LICENSE-NOTE.md)
+upstream: https://gmsh.info
+
+status: spike-only (spikes/gmsh_meshgen). NOT part of the main CMake graph,
+  NOT linked by any production target, NOT vendored into extern/.
+
+isolation policy:
+  - gmsh is imported only inside the mesh-generation subprocess
+    (spikes/gmsh_meshgen/generate_mesh.py). The subprocess boundary is both
+    the fault-isolation boundary (timeout kill, no partial output) and the
+    GPL license boundary; the C++ core and any future orchestration layer
+    communicate with it exclusively through files (JSON config in,
+    .stcf.nc + reports out).
+  - production adoption (M287-B) must keep the same subprocess isolation or
+    complete a license review before any in-process linking.
+
+determinism policy:
+  - pinned options: Mesh.Algorithm=6, Mesh.RandomSeed=1,
+    General.NumThreads=1, Blossom recombination;
+  - same-platform rerun bitwise output equality is required evidence for
+    every version bump of this manifest.

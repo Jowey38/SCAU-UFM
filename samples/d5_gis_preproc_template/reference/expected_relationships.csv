@@ -1,0 +1,6 @@
+relation_type,source_id,target_id,relation_method,expected_confidence,review_status,notes
+surface_to_swmm,SZ_SYNTH_ROAD_001,J1,explicit_fixture_mapping,high,synthetic_fixture,Replace with authorized source relation
+surface_to_swmm,SZ_SYNTH_ROAD_002,J2,explicit_fixture_mapping,high,synthetic_fixture,Replace with authorized source relation
+roof_to_swmm,BLDG_SYNTH_001,J1,roof_drain_mapping,high,synthetic_fixture,Confirm roof drainage connection
+roof_to_swmm,BLDG_SYNTH_002,J2,roof_drain_mapping,high,synthetic_fixture,Confirm roof drainage connection
+surface_to_dflowfm,TODO_PROVIDER,TODO_PROVIDER,provider_mapping,unresolved,provider_required,Optional river scope

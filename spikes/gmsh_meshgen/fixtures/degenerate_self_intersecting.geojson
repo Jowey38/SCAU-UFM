@@ -1,0 +1,19 @@
+{
+  "type": "FeatureCollection",
+  "name": "m287a_degenerate_building_fixture",
+  "crs": {"type": "name", "properties": {"name": "EPSG:3857"}},
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "building_id": "BLDG_DEGENERATE_BOWTIE",
+        "note": "Deliberately self-intersecting (bowtie) footprint; the generator must reject it fail-closed with a diagnostic, never mesh it.",
+        "synthetic_fixture": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[40,40],[70,70],[70,40],[40,70],[40,40]]]
+      }
+    }
+  ]
+}

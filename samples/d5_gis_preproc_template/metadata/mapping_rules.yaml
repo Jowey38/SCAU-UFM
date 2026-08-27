@@ -1,0 +1,71 @@
+# Physical and spatial mapping decisions. Every TODO_PROVIDER must be approved
+# by the data owner/project authority before a real importer uses it.
+
+semantic_classes:
+  building: {source_classes: [building], target_label: roof_or_building_block}
+  road: {source_classes: [road], target_label: road}
+  grass: {source_classes: [grass], target_label: ground}
+  water: {source_classes: [water], target_label: water}
+
+surface_fields:
+  z_b:
+    source: terrain.dem.elevation
+    operation: cell_area_weighted_sample
+    vertical_transform: TODO_PROVIDER
+  manning_n:
+    source: landcover.class_code
+    operation: approved_lookup_table
+    missing_class: fatal
+  soil_type:
+    source: soil_zones.soil_type
+    operation: cell_area_weighted_majority_or_explicit_override
+    missing_zone: TODO_PROVIDER
+  phi_t:
+    source: TODO_PROVIDER
+    operation: approved_physical_rule
+    rule: TODO_PROVIDER_BUILDING_AND_STORAGE_MAPPING
+  phi_tensor:
+    sources: [TODO_PROVIDER]
+    targets: [phi_xx, phi_xy, phi_yy]
+    operation: approved_tensor_rule
+    rule: TODO_PROVIDER
+  omega_edge:
+    source: building_boundaries_and_openings
+    operation: approved_edge_classification_rule
+    rule: TODO_PROVIDER
+  phi_e_n:
+    source: approved_cell_tensor_or_explicit_field
+    operation: edge_normal_conveyance_assembly
+    rule: TODO_PROVIDER
+  phi_et:
+    source: TODO_PROVIDER
+    operation: approved_tangential_conveyance_rule
+    rule: TODO_PROVIDER
+
+spatial_relations:
+  roof_to_swmm:
+    primary: explicit drain_id_or_swmm_node_id
+    fallback: nearest_candidate_for_review_only
+    max_candidate_distance_m: TODO_PROVIDER
+    high_elevation_difference_m: TODO_PROVIDER
+    final_authority: manual_or_data_owner_confirmed
+  surface_to_swmm:
+    primary: explicit inlet_id_and_swmm_node_id
+    fallback: point_in_cell_then_nearest_candidate_for_review
+    final_authority: manual_or_data_owner_confirmed
+  surface_to_dflowfm:
+    primary: explicit river_boundary_id
+    fallback: spatial_intersection_candidate_for_review_only
+    boundary_direction: TODO_PROVIDER
+    boundary_type: TODO_PROVIDER
+
+geometry_policy:
+  invalid_polygon: fatal_or_provider_approved_repair
+  overlapping_buildings: TODO_PROVIDER
+  building_holes: TODO_PROVIDER
+  boundary_holes: TODO_PROVIDER
+  dem_nodata: fatal_or_provider_approved_fill
+
+runtime_boundary:
+  note: GIS preprocessing may emit mapping/configuration artifacts only.
+  forbidden_here: [Q_limit, V_limit, mass_deficit_account, rollback, replay, arbitration]

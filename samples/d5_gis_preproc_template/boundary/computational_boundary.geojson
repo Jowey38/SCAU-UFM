@@ -1,0 +1,20 @@
+{
+  "type": "FeatureCollection",
+  "name": "d5_synthetic_computational_boundary",
+  "crs": {"type": "name", "properties": {"name": "EPSG:3857"}},
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "boundary_id": "BND_SYNTH_001",
+        "name": "Synthetic 200m x 120m test area",
+        "authorized_for_project_use": false,
+        "synthetic_fixture": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[0,0],[200,0],[200,120],[0,120],[0,0]]]
+      }
+    }
+  ]
+}

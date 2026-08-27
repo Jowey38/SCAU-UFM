@@ -1,0 +1,34 @@
+{
+  "policy_id": "geometry_clean_policy",
+  "policy_version": "0.1.0",
+  "status": "synthetic_template_only",
+  "note": "Every tolerance is explicit and versioned. The importer must refuse any repair not covered by an approved value here (no implicit defaults). Every applied repair must be reported with the object ID, repair kind, and original plus repaired coordinates.",
+  "units": "target_crs_projected_metres",
+  "tolerances": {
+    "simplification_tolerance_m": "TODO_PROVIDER",
+    "snap_distance_m": "TODO_PROVIDER",
+    "sliver_polygon_max_area_m2": "TODO_PROVIDER",
+    "sliver_polygon_max_thinness_ratio": "TODO_PROVIDER",
+    "duplicate_vertex_distance_m": "TODO_PROVIDER",
+    "minimum_ring_area_m2": "TODO_PROVIDER"
+  },
+  "repair_rules": {
+    "self_intersection": "fatal_or_provider_approved_repair",
+    "overlapping_buildings": "TODO_PROVIDER",
+    "unclosed_ring": "fatal",
+    "duplicate_geometry": "TODO_PROVIDER",
+    "geometry_outside_boundary": "clip_and_report",
+    "empty_geometry": "fatal"
+  },
+  "mesh_generation_guards": {
+    "generator_timeout_s": 60,
+    "generator_memory_limit_mb": "TODO_PROVIDER",
+    "on_failure": "raise_MeshGenerationFailed_and_emit_diagnostic_geojson",
+    "partial_mesh_output": "forbidden",
+    "silent_constraint_dropping": "forbidden"
+  },
+  "reporting": {
+    "record_per_repair": ["object_id", "repair_kind", "original_coordinates", "repaired_coordinates", "rule_id"],
+    "unapproved_repair": "fatal"
+  }
+}

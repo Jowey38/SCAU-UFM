@@ -1,0 +1,3 @@
+soil_type,soil_name,K_s,psi_f,theta_s,theta_i,K_s_units,psi_f_units,theta_units,source_or_authority
+0,impervious_or_no_infiltration,0.0,1.0,0.10,0.05,m_per_s,m,dimensionless,synthetic_fixture
+1,synthetic_sandy_loam,1.0e-5,0.12,0.43,0.15,m_per_s,m,dimensionless,synthetic_fixture

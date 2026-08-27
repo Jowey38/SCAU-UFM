@@ -1,0 +1,50 @@
+# Provider-controlled project metadata. Replace every TODO_PROVIDER value.
+# This is a documentation template, not yet a repository-wide production schema.
+project:
+  name: TODO_PROVIDER
+  target_crs: TODO_PROVIDER_EPSG_OR_WKT
+  horizontal_units: metre
+  vertical_units: metre
+  vertical_datum: TODO_PROVIDER
+  time_zone: TODO_PROVIDER
+  epoch_or_reference_time: TODO_PROVIDER
+
+sources:
+  computational_boundary:
+    source_crs: EPSG:3857
+    horizontal_units: metre
+    vertical_units: metre
+    vertical_datum: TODO_PROVIDER
+  dem:
+    source_crs: EPSG:3857
+    horizontal_units: metre
+    vertical_units: metre
+    vertical_datum: TODO_PROVIDER
+    nodata_value: -9999
+  buildings:
+    source_crs: EPSG:3857
+    horizontal_units: metre
+    vertical_units: metre
+    vertical_datum: TODO_PROVIDER
+  landcover:
+    source_crs: EPSG:3857
+    horizontal_units: metre
+    vertical_units: metre
+    vertical_datum: TODO_PROVIDER
+  swmm:
+    coordinate_source: TODO_PROVIDER
+    flow_units: CMS
+    length_units: metre
+    elevation_units: metre
+    time_units: second
+  dflowfm:
+    source_crs: TODO_PROVIDER
+    horizontal_units: metre
+    vertical_units: metre
+    vertical_datum: TODO_PROVIDER
+
+conversion_rules:
+  horizontal: TODO_PROVIDER_OR_NONE
+  vertical: TODO_PROVIDER_OR_NONE
+  time: TODO_PROVIDER_OR_NONE
+  nodata: reject_or_explicit_fill_rule

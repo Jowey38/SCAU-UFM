@@ -1,0 +1,12 @@
+{
+  "type": "FeatureCollection",
+  "name": "d5_synthetic_soil_zones",
+  "crs": {"type": "name", "properties": {"name": "EPSG:3857"}},
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {"soil_type": 1, "soil_name": "synthetic_sandy_loam", "synthetic_fixture": true},
+      "geometry": {"type": "Polygon", "coordinates": [[[0,20],[200,20],[200,120],[0,120],[0,20]]]}
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+dataset,layer,source_field,source_type,source_units,target_field,target_type,target_units,required,conversion_rule,semantic_notes
+boundary,computational_boundary,boundary_id,string,N/A,N/A,string,N/A,true,stable_source_id,Closed polygon identifier
+boundary,computational_boundary,geometry,polygon,projected_units,N/A,polygon,projected_units,true,validate_and_clip,No self-intersection or empty geometry
+DEM,dem,elevation,float,metre,z_b,float,metre,true,cell_sampling_after_vertical_transform,Bare-earth/DSM meaning must be confirmed
+buildings,buildings,building_id,string,N/A,N/A,string,N/A,true,stable_source_id,Must remain stable across source revisions
+buildings,buildings,building_height,float,metre,N/A,float,metre,false,optional_height_rule,State whether this changes z_b
+buildings,buildings,roof_area,float,square_metre,N/A,float,square_metre,false,validate_or_derive,Must agree with geometry within tolerance
+buildings,buildings,drain_id,string,N/A,N/A,string,N/A,false,explicit_relation,Roof drain relation if supplied
+buildings,buildings,swmm_node_id,string,N/A,N/A,string,N/A,false,explicit_relation,Use mapping table when absent
+landcover,landcover,class_code,string,N/A,N/A,string,N/A,true,lookup_table,Must map to semantic class
+landcover,landcover,manning_n,float,second_per_metre_1_3,manning_n,float,second_per_metre_1_3,false,validated_override,Do not silently infer roughness
+landcover,landcover,soil_type,integer,N/A,soil_type,uint8,N/A,false,lookup_table,Must index soil parameter table
+soil,soil_zones,soil_type,integer,N/A,soil_type,uint8,N/A,false,spatial_join,Maximum 16 current schema entries
+soil,soil_parameters,K_s,float,provider_units,N/A,float,provider_units,false,unit_conversion,Units must be provided
+soil,soil_parameters,psi_f,float,provider_units,N/A,float,provider_units,false,unit_conversion,Must be strictly positive
+soil,soil_parameters,theta_s,float,fraction,N/A,float,fraction,false,unit_conversion,Must be <= 1
+soil,soil_parameters,theta_i,float,fraction,N/A,float,fraction,false,unit_conversion,Must be < theta_s
+SWMM,model.inp,node_id,string,N/A,N/A,string,N/A,true,stable_native_id,Must match mapping tables
+SWMM,model.inp,node_elevation,float,project_units,N/A,float,metre,true,unit_conversion,Exchange elevation requires confirmation
+mapping,node_surface_mapping,surface_cell_or_zone_id,string,N/A,N/A,string,N/A,true,stable_relation,Generated mesh IDs may be versioned
+mapping,node_surface_mapping,swmm_node_id,string,N/A,N/A,string,N/A,true,exact_or_reviewed_relation,Do not use proximity alone as final authority
+mapping,roof_drain_mapping,building_id,string,N/A,N/A,string,N/A,true,stable_relation,Building identifier
+mapping,roof_drain_mapping,drain_id,string,N/A,N/A,string,N/A,true,stable_relation,Drain identifier
+mapping,roof_drain_mapping,swmm_node_id,string,N/A,N/A,string,N/A,true,exact_or_reviewed_relation,SWMM target node

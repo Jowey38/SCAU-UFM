@@ -1,0 +1,2 @@
+mapping_id,river_boundary_id,dflowfm_boundary_id,geometry_ref,surface_edge_selector,boundary_type,direction,exchange_elevation_m,confidence,review_status,notes
+MAP_RIVER_SYNTH_001,RB_SYNTH_001,TODO_PROVIDER,TODO_PROVIDER,TODO_PROVIDER,TODO_PROVIDER,TODO_PROVIDER,TODO_PROVIDER,unresolved,provider_required,Fill only from an authorized D-Flow FM case

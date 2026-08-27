@@ -1,0 +1,41 @@
+{
+  "type": "FeatureCollection",
+  "diagnostic_reason": "invalid_input_geometry",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_id": "BLDG_DEGENERATE_BOWTIE",
+        "kind": "building",
+        "violation": "self_intersection"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              40.0,
+              40.0
+            ],
+            [
+              70.0,
+              70.0
+            ],
+            [
+              70.0,
+              40.0
+            ],
+            [
+              40.0,
+              70.0
+            ],
+            [
+              40.0,
+              40.0
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

@@ -41,3 +41,27 @@ endif()
 if(EXISTS "${OUTPUT}.tmp")
     message(FATAL_ERROR "successful generation left a temporary file")
 endif()
+
+execute_process(
+    COMMAND "${PREPROC}" validate --input "${OUTPUT}"
+    RESULT_VARIABLE validate_result
+)
+if(NOT validate_result EQUAL 0)
+    message(FATAL_ERROR "validate rejected a freshly generated case")
+endif()
+
+execute_process(
+    COMMAND "${PREPROC}" validate --input "${OUTPUT}.missing.nc"
+    RESULT_VARIABLE validate_missing_result
+)
+if(validate_missing_result EQUAL 0)
+    message(FATAL_ERROR "validate accepted a missing file")
+endif()
+
+execute_process(
+    COMMAND "${PREPROC}" validate
+    RESULT_VARIABLE validate_noargs_result
+)
+if(validate_noargs_result EQUAL 0)
+    message(FATAL_ERROR "validate without --input unexpectedly succeeded")
+endif()
