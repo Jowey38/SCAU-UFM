@@ -1,0 +1,6 @@
+{
+  "policy_timeout_s": 20,
+  "killed": true,
+  "partial_output_absent": true,
+  "outcome": "MeshGenerationFailed: generator exceeded the policy timeout and was killed"
+}

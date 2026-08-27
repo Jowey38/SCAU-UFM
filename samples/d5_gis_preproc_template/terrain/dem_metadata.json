@@ -1,0 +1,15 @@
+{
+  "dataset_id": "DEM_SYNTH_001",
+  "format": "ESRI ASCII Grid",
+  "source_crs": "EPSG:3857",
+  "target_crs": "TODO_PROVIDER",
+  "horizontal_units": "metre",
+  "vertical_units": "metre",
+  "vertical_datum": "TODO_PROVIDER",
+  "nodata_value": -9999,
+  "interpretation": "synthetic bare-earth DEM",
+  "resolution_m": 40,
+  "extent": [0, 0, 200, 120],
+  "synthetic_fixture": true,
+  "production_requirement": "Provide GeoTIFF/COG or NetCDF plus a complete CRS and vertical-datum declaration."
+}

@@ -1,0 +1,3 @@
+mapping_id,surface_zone_id,inlet_id,swmm_node_id,mapping_method,exchange_elevation_m,candidate_distance_m,confidence,review_status,notes
+MAP_SURF_SYNTH_001,SZ_SYNTH_ROAD_001,INLET_SYNTH_001,J1,explicit_fixture_mapping,10.0,0.0,high,synthetic_fixture,Replace with data-owner-confirmed inlet relation
+MAP_SURF_SYNTH_002,SZ_SYNTH_ROAD_002,INLET_SYNTH_002,J2,explicit_fixture_mapping,9.5,0.0,high,synthetic_fixture,Replace with data-owner-confirmed inlet relation

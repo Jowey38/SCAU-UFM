@@ -1,0 +1,11 @@
+dataset_id,path,kind,source_owner,source_uri,format,format_version,source_crs,target_crs,horizontal_units,vertical_units,vertical_datum,authorized_for_project_use,required,status,notes
+computational_boundary,boundary/computational_boundary.geojson,vector_gis,synthetic_fixture,local://d5-template,GeoJSON,1.0,EPSG:3857,TODO_PROVIDER,metre,metre,TODO_PROVIDER,false,true,synthetic,Replace with authorized closed calculation boundary
+DEM,terrain/dem.asc,raster_dem,synthetic_fixture,local://d5-template,ESRI ASCII Grid,1.0,EPSG:3857,TODO_PROVIDER,metre,metre,TODO_PROVIDER,false,true,synthetic,Production may use GeoTIFF or NetCDF
+buildings,buildings/buildings.geojson,vector_gis,synthetic_fixture,local://d5-template,GeoJSON,1.0,EPSG:3857,TODO_PROVIDER,metre,metre,TODO_PROVIDER,false,true,synthetic,Stable building_id required
+landcover,landcover/landcover.geojson,vector_gis,synthetic_fixture,local://d5-template,GeoJSON,1.0,EPSG:3857,TODO_PROVIDER,metre,metre,TODO_PROVIDER,false,true,synthetic,Class-to-parameter table required
+soil_zones,soil/soil_zones.geojson,vector_gis,synthetic_fixture,local://d5-template,GeoJSON,1.0,EPSG:3857,TODO_PROVIDER,metre,metre,TODO_PROVIDER,false,false,synthetic,Optional if soil is uniform or supplied separately
+soil_parameters,soil/soil_parameters.csv,table,synthetic_fixture,local://d5-template,CSV,1.0,N/A,N/A,N/A,parameter-specific,TODO_PROVIDER,false,false,synthetic,Green-Ampt parameter units must be stated
+SWMM,swmm/model.inp,swmm_5_2_x,synthetic_fixture,local://d5-template,SWMM INP,5.2.x,N/A,N/A,project units,project units,N/A,false,true,synthetic,Provide every referenced external file
+surface_swmm_mapping,swmm/node_surface_mapping.csv,mapping_table,synthetic_fixture,local://d5-template,CSV,1.0,EPSG:3857,TODO_PROVIDER,metre,metre,TODO_PROVIDER,false,true,synthetic,Explicit mapping is required; nearest-neighbor alone is not enough
+roof_swmm_mapping,swmm/roof_drain_mapping.csv,mapping_table,synthetic_fixture,local://d5-template,CSV,1.0,EPSG:3857,TODO_PROVIDER,metre,metre,TODO_PROVIDER,false,true,synthetic,Confirm roof drain semantics
+D-Flow-FM,dflowfm/,dflowfm_bmi_or_native,TODO_PROVIDER,TODO_PROVIDER,MDU/EXT/BC/UGRID,D-Flow FM version,TODO_PROVIDER,TODO_PROVIDER,metre,metre,TODO_PROVIDER,TODO_PROVIDER,false,provider_required_only_if_river_scope,placeholder,Do not fill from synthetic data

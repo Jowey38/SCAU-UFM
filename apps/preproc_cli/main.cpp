@@ -18,12 +18,43 @@ struct Options {
 [[noreturn]] void usage_error(const std::string& message) {
     throw std::invalid_argument(
         message
-        + "\nusage: scau_preproc generate --profile <name> --output <case.stcf.nc> [--force]");
+        + "\nusage: scau_preproc generate --profile <name> --output <case.stcf.nc> [--force]"
+        + "\n       scau_preproc validate --input <case.stcf.nc>");
+}
+
+// Authoritative external check: read_stcf_case re-runs the full STCF v5
+// dataset + UGRID topology validation on load, so a zero exit here certifies
+// the file against the same rules the solver-loading path enforces (M287-A:
+// externally generated meshes are certified through this single validator,
+// never through a re-implemented copy).
+int validate_command(int argc, char** argv) {
+    std::filesystem::path input;
+    for (int index = 2; index < argc; ++index) {
+        const std::string argument = argv[index];
+        if (argument == "--input") {
+            if (!input.empty() || index + 1 >= argc) {
+                usage_error("--input must appear once with a value");
+            }
+            input = argv[++index];
+        } else {
+            usage_error("unknown argument: " + argument);
+        }
+    }
+    if (input.empty()) {
+        usage_error("missing --input");
+    }
+    const auto stcf_case = scau::stcf::read_stcf_case(input);
+    std::cout << "valid STCF v5 UGRID case: " << input.string()
+              << " (nodes=" << stcf_case.topology.node_x.size()
+              << ", faces=" << stcf_case.topology.face_nodes.size()
+              << ", edges=" << stcf_case.topology.edge_nodes.size()
+              << ", soil_entries=" << stcf_case.fields.soil_params.size() << ")\n";
+    return 0;
 }
 
 Options parse_options(int argc, char** argv) {
     if (argc < 2 || std::string(argv[1]) != "generate") {
-        usage_error("expected 'generate' command");
+        usage_error("expected 'generate' or 'validate' command");
     }
     Options options;
     for (int index = 2; index < argc; ++index) {
@@ -94,6 +125,9 @@ void generate(const Options& options) {
 
 int main(int argc, char** argv) {
     try {
+        if (argc >= 2 && std::string(argv[1]) == "validate") {
+            return validate_command(argc, argv);
+        }
         generate(parse_options(argc, argv));
         return 0;
     } catch (const std::exception& error) {

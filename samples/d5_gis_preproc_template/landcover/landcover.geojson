@@ -1,0 +1,22 @@
+{
+  "type": "FeatureCollection",
+  "name": "d5_synthetic_landcover",
+  "crs": {"type": "name", "properties": {"name": "EPSG:3857"}},
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {"class_code": "road", "class_name": "road", "manning_n": 0.015, "impervious": true, "soil_type": 0, "synthetic_fixture": true},
+      "geometry": {"type": "Polygon", "coordinates": [[[0,0],[200,0],[200,20],[0,20],[0,0]]]}
+    },
+    {
+      "type": "Feature",
+      "properties": {"class_code": "grass", "class_name": "grass", "manning_n": 0.030, "impervious": false, "soil_type": 1, "synthetic_fixture": true},
+      "geometry": {"type": "Polygon", "coordinates": [[[0,20],[200,20],[200,120],[0,120],[0,20]]]}
+    },
+    {
+      "type": "Feature",
+      "properties": {"class_code": "water", "class_name": "water", "manning_n": 0.020, "impervious": false, "soil_type": 0, "synthetic_fixture": true},
+      "geometry": {"type": "Polygon", "coordinates": [[[80,75],[115,75],[115,105],[80,105],[80,75]]]}
+    }
+  ]
+}

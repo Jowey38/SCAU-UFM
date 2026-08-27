@@ -1,0 +1,26 @@
+{
+  "synthetic_fixture": true,
+  "calculation_boundary_id": "BND_SYNTH_001",
+  "expected_extent_m": [0, 0, 200, 120],
+  "expected_mesh_type": "mixed_tri_quad",
+  "expected_minimum_cell_count": 1,
+  "expected_maximum_cell_count": "TODO_PROVIDER_AFTER_MESH_POLICY",
+  "expected_required_fields": [
+    "z_b",
+    "phi_t",
+    "phi_xx",
+    "phi_xy",
+    "phi_yy",
+    "manning_n",
+    "soil_type",
+    "omega_edge",
+    "phi_e_n",
+    "phi_et"
+  ],
+  "quality_thresholds": {
+    "minimum_angle_degrees": 10.0,
+    "maximum_aspect_ratio": 20.0,
+    "provider_overrides_allowed": true
+  },
+  "note": "This is an acceptance-template shape, not a golden numerical reference. A real sample must supply a reviewed mesh summary and field coverage targets."
+}
