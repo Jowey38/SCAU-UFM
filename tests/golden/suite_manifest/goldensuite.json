@@ -259,5 +259,14 @@
     "reference_path": "tests/golden/reference/tolerances.md",
     "ci_gate": true,
     "status": "implemented"
+  },
+  {
+    "test_id": "G30",
+    "name": "preproc_gis_synthetic_case",
+    "test_path": "tests/golden/preproc_gis_synthetic_case/",
+    "applicable_phase": "Phase 2+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": true,
+    "status": "implemented"
   }
 ]

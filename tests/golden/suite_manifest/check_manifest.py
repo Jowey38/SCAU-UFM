@@ -44,6 +44,9 @@ REQUIRED = {
     "G27": ("dflowfm_external_net", "implemented", True),
     "G28": ("interface_emitted_volume_conservation", "implemented", True),
     "G29": ("backwater_reverse_debit", "implemented", True),
+    # G30 locks the M287-B GIS preprocessing pipeline fixture (committed
+    # deterministic case; regeneration evidence lives pipeline-side).
+    "G30": ("preproc_gis_synthetic_case", "implemented", True),
 }
 
 
