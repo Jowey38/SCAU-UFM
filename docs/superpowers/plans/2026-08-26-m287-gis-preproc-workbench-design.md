@@ -156,7 +156,7 @@ GoldenTest→manifest/CI"推进）
 | 阶段 | 内容 | 入口条件 | 出口标准 |
 |---|---|---|---|
 | M287-A | 网格剖分 spike：Gmsh（或同等）治理评估，边界+建筑约束剖分 → MeshTopology，合成包驱动 | 无（合成数据） | 剖分结果过 `validate_stcf_case` + quality 报告；第三方治理文件齐备；**超时/退化几何 fail-closed 证据（含故意构造的死锁夹具 + 诊断 GeoJSON 输出）** — **DONE 2026-08-27**，见 `superpowers/specs/2026-08-27-m287a-gmsh-meshgen-spike-evidence.md` |
-| M287-B | PreProc 流水线 v1：A-D 阶段 CLI 化，合成包 → 完整 STCF 案例 | M287-A | 新 golden：`preproc_gis_synthetic_case`（同平台确定性重生成逐位比较 + 写读 roundtrip bitwise）；**geometry_clean_policy 驱动的修复审计报告**；双平台哈希对比实验出证据，定跨平台门禁形态 |
+| M287-B | PreProc 流水线 v1：A-D 阶段 CLI 化，合成包 → 完整 STCF 案例 | M287-A | 新 golden：`preproc_gis_synthetic_case`（同平台确定性重生成逐位比较 + 写读 roundtrip bitwise）；**geometry_clean_policy 驱动的修复审计报告**；双平台哈希对比实验出证据，定跨平台门禁形态 — **DONE 2026-08-27（双平台实验仍 OPEN，待受治理 Linux gmsh 环境）**，见 `superpowers/specs/2026-08-27-m287b-preproc-pipeline-evidence.md` |
 | M287-C | 耦合映射生成器：三条链路候选+确认文件格式+映射报告 | M287-B | 新 golden：映射文件 schema 校验 + 合成包端到端；映射文件被 SimDriver 消费通过 |
 | M287-D | 真实数据绑定 | **M281 解锁（授权样本+格式契约）** | importer spike → 拓扑/字段验证 → STCF 绑定 → 真实小样 golden（M281 既定顺序） |
 | M287-E | QGIS 插件 UI | M287-B 后端契约稳定 | 8 页可用；UI 仅调 CLI；无后端旁路 |
