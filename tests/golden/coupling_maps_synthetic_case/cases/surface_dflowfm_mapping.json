@@ -1,0 +1,8 @@
+{
+  "coupling_mapping_schema_version": 1,
+  "chain": "surface_to_dflowfm",
+  "status": "provider_required",
+  "relations": [],
+  "unresolved_provider_rows": 1,
+  "note": "No authorized river boundary contract in the synthetic package; relations are never invented (M281)."
+}

@@ -220,6 +220,20 @@ def main() -> int:
             })
             return finish("fatal", 2)
 
+    if job.get("coupling_maps", False):
+        from scau_preproc import coupling_maps
+        coupling_dir = output_dir / "coupling"
+        try:
+            report = coupling_maps.generate(package, case_path, coupling_dir)
+            validation["coupling_maps"] = {"status": "ok", "report": report}
+        except SystemExit as error:
+            validation["findings"].append({
+                "severity": "fatal",
+                "code": "CouplingMapGenerationFailed",
+                "detail": f"exit {error.code}",
+            })
+            return finish("fatal", 2)
+
     manifest = {
         "pipeline": "scau_preproc.pipeline",
         "job_config_schema_version": JOB_CONFIG_SCHEMA_VERSION,

@@ -1,0 +1,29 @@
+{
+  "coupling_mapping_schema_version": 1,
+  "chains": {
+    "surface_to_swmm": {
+      "relations": 2,
+      "methods": [
+        "explicit_id_plus_point_in_cell"
+      ],
+      "needs_confirmation": 2
+    },
+    "roof_to_swmm": {
+      "relations": 2,
+      "methods": [
+        "explicit_ids_plus_nearest_centroid_candidate"
+      ],
+      "needs_confirmation": 2
+    },
+    "surface_to_dflowfm": {
+      "relations": 0,
+      "status": "provider_required"
+    }
+  },
+  "simdriver_fragment": "simdriver_links.conf",
+  "placeholders": {
+    "exchange_width_m": 1.0,
+    "priority_weight": 1.0
+  },
+  "runtime_semantics": "none (Q_limit/deficit/arbitration remain CouplingLib-owned)"
+}

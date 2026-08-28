@@ -39,9 +39,11 @@ C2      CIRCULAR  1.0    0      0      0      1
 
 [COORDINATES]
 ;;Node  X-Coord  Y-Coord
-J1      55       55
-J2      135      55
-O1      190      55
+;; street inlets on the road strip (y in [0,20]); roof drains connect to the
+;; same junctions via the roof mapping table, not via node placement.
+J1      55       10
+J2      135      10
+O1      190      10
 
 [REPORT]
 INPUT      NO
