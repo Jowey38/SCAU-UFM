@@ -47,6 +47,9 @@ REQUIRED = {
     # G30 locks the M287-B GIS preprocessing pipeline fixture (committed
     # deterministic case; regeneration evidence lives pipeline-side).
     "G30": ("preproc_gis_synthetic_case", "implemented", True),
+    # G31 locks the M287-C coupling-map generator fixture and its
+    # SimDriver-native fragment consumption.
+    "G31": ("coupling_maps_synthetic_case", "implemented", True),
 }
 
 
