@@ -1,6 +1,7 @@
 [general]
 name=SCAU PreProc Workbench
 qgisMinimumVersion=3.40
+qgisMaximumVersion=4.99
 supportsQt6=yes
 description=Stateless driver UI for the SCAU-UFM GIS preprocessing pipeline (job_config -> scau_preproc.pipeline -> validation reports). Synthetic-package workflows only until D-5 unblocks.
 version=0.1.0
