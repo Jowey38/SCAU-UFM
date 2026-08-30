@@ -159,7 +159,7 @@ GoldenTest→manifest/CI"推进）
 | M287-B | PreProc 流水线 v1：A-D 阶段 CLI 化，合成包 → 完整 STCF 案例 | M287-A | 新 golden：`preproc_gis_synthetic_case`（同平台确定性重生成逐位比较 + 写读 roundtrip bitwise）；**geometry_clean_policy 驱动的修复审计报告**；双平台哈希对比实验出证据，定跨平台门禁形态 — **DONE 2026-08-27（双平台实验仍 OPEN，待受治理 Linux gmsh 环境）**，见 `superpowers/specs/2026-08-27-m287b-preproc-pipeline-evidence.md` |
 | M287-C | 耦合映射生成器：三条链路候选+确认文件格式+映射报告 | M287-B | 新 golden：映射文件 schema 校验 + 合成包端到端；映射文件被 SimDriver 消费通过 — **DONE 2026-08-28**（屋面链路的 SimDriver 接线属后续里程碑），见 `superpowers/specs/2026-08-28-m287c-coupling-maps-evidence.md` |
 | M287-D | 真实数据绑定 | **M281 解锁（授权样本+格式契约）** | importer spike → 拓扑/字段验证 → STCF 绑定 → 真实小样 golden（M281 既定顺序） |
-| M287-E | QGIS 插件 UI | M287-B 后端契约稳定 | 8 页可用；UI 仅调 CLI；无后端旁路 |
+| M287-E | QGIS 插件 UI | M287-B 后端契约稳定 | 8 页可用；UI 仅调 CLI；无后端旁路 — **IN PROGRESS：E1 切片 DONE 2026-08-30**（作业页+运行+findings 表+导出门禁+图层加载，无状态管道合规；余页见证据文档），见 `superpowers/specs/2026-08-30-m287e1-qgis-plugin-evidence.md` |
 | M287-F | 全耦合真实案例 + 发布门禁 | M287-C/D/E | 三模型全耦合案例包 + 全系统质量审计 + GoldenSuite/CI |
 
 关键排序决策：**UI（M287-E）晚于后端契约稳定**，避免界面绑定未定型格式；
