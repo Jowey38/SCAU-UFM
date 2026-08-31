@@ -53,6 +53,17 @@ def write_job_config(job: dict, output_dir: str) -> Path:
     return path
 
 
+def repo_root_valid(repo_root: str) -> bool:
+    """True when repo_root actually contains the pipeline package. The plugin
+    may run from a COPIED profile deployment, so the repo root can never be
+    inferred from __file__ alone; an invalid root must surface as a rendered
+    finding, not a subprocess crash (WinError 267)."""
+    try:
+        return (Path(repo_root) / "python" / "scau_preproc" / "pipeline.py").is_file()
+    except OSError:
+        return False
+
+
 def run_pipeline(
     job_config_path: Path,
     repo_root: str,
@@ -65,6 +76,14 @@ def run_pipeline(
     Never raises on pipeline failure: fail-closed results are data the UI
     must render (fatal findings), not exceptions to swallow.
     """
+    if not repo_root_valid(repo_root):
+        return {
+            "exit_code": -1,
+            "status": "repo_root_invalid",
+            "stderr": "repo root does not contain python/scau_preproc/pipeline.py: "
+                      f"{repo_root!r} - set the SCAU-UFM checkout directory in the dialog",
+            "validation": None,
+        }
     launcher = list(python_launcher or DEFAULT_PYTHON_LAUNCHER)
     command = launcher + ["-m", "scau_preproc.pipeline", str(job_config_path)]
     try:
@@ -80,10 +99,10 @@ def run_pipeline(
     except subprocess.TimeoutExpired:
         exit_code = None
         stderr = f"pipeline exceeded UI timeout ({timeout_s}s) and was killed"
-    except FileNotFoundError as error:
+    except OSError as error:
         return {
             "exit_code": -1,
-            "status": "launcher_missing",
+            "status": "launcher_error",
             "stderr": str(error),
             "validation": None,
         }

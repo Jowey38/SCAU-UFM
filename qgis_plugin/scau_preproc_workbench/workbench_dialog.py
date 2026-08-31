@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from qgis.core import QgsProject, QgsVectorLayer
+from qgis.core import QgsProject, QgsSettings, QgsVectorLayer
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import (
     QCheckBox,
@@ -30,18 +30,33 @@ from . import jobio
 
 
 class WorkbenchDialog(QDialog):
-    def __init__(self, repo_root: str, parent=None) -> None:
+    _SETTINGS_KEY = "scau_preproc_workbench/repo_root"
+
+    def __init__(self, repo_root_hint: str, parent=None) -> None:
         super().__init__(parent)
-        self._repo_root = repo_root
         self.setWindowTitle("SCAU PreProc Workbench (M287-E1)")
-        self.resize(760, 520)
+        self.resize(760, 560)
+
+        # The plugin may run from a copied profile deployment, so the repo
+        # root is user-configured and persisted; the hint is used only when
+        # it actually contains the pipeline package.
+        saved = QgsSettings().value(self._SETTINGS_KEY, "", type=str)
+        initial_root = ""
+        for candidate in (saved, repo_root_hint):
+            if candidate and jobio.repo_root_valid(candidate):
+                initial_root = candidate
+                break
 
         grid = QGridLayout()
-        self._package_edit = QLineEdit(str(Path(repo_root) / "samples/d5_gis_preproc_template"))
+        self._repo_edit = QLineEdit(initial_root)
+        self._package_edit = QLineEdit(
+            str(Path(initial_root) / "samples/d5_gis_preproc_template") if initial_root else "")
         self._output_edit = QLineEdit()
         self._validator_edit = QLineEdit(
-            str(Path(repo_root) / "build/windows-msvc/apps/preproc_cli/Debug/scau_preproc.exe"))
+            str(Path(initial_root) / "build/windows-msvc/apps/preproc_cli/Debug/scau_preproc.exe")
+            if initial_root else "")
         for row, (label, edit) in enumerate((
+            ("SCAU-UFM 仓库根目录", self._repo_edit),
             ("输入包目录", self._package_edit),
             ("输出目录", self._output_edit),
             ("validator CLI（可选）", self._validator_edit),
@@ -112,12 +127,18 @@ class WorkbenchDialog(QDialog):
         if not self._output_edit.text().strip():
             self._show_rows([("fatal", "MissingOutputDir", "请选择输出目录")])
             return
+        repo_root = self._repo_edit.text().strip()
+        if not jobio.repo_root_valid(repo_root):
+            self._show_rows([("fatal", "RepoRootInvalid",
+                              "仓库根目录必须包含 python/scau_preproc/pipeline.py：" + repo_root)])
+            return
+        QgsSettings().setValue(self._SETTINGS_KEY, repo_root)
         job = self._current_job()
         job_path = jobio.write_job_config(job, job["output_dir"])
         self._run_button.setEnabled(False)
         self._run_button.setText("运行中…")
         try:
-            result = jobio.run_pipeline(job_path, self._repo_root)
+            result = jobio.run_pipeline(job_path, repo_root)
         finally:
             self._run_button.setEnabled(True)
             self._run_button.setText("运行流水线")
