@@ -1,0 +1,80 @@
+{
+  "pipeline": "scau_preproc.pipeline",
+  "job_config_schema_version": 1,
+  "started": "2026-09-02T13:25:57",
+  "package_manifest_sha256": "c74e59ace53454a9dd76e8a02b5d1a305ba753a386e5ca6d623923a99732bf77",
+  "geometry_clean_policy_sha256": "fc41ae83aac01707221c0d75df83017dee08da3a034261f0ad7c75b900915b67",
+  "generator_config_sha256": "528c140e67a3df0bcf4a6136c799050bc2fb3137f473819652ac2ed12d4a7b79",
+  "mesh_controls": {
+    "geojson": "H:\\githubcode\\SCAU-UFM\\samples\\d5_gis_preproc_template\\mesh_controls\\mesh_controls.geojson",
+    "geojson_sha256": "b5b1dcf6de376a7a188f6a2c0e396af7642a83c44a6527d2ff0242734b8ea84c"
+  },
+  "case_sha256": "d48253d0b3fc063eb2080baa0c0df9186de4233a69d95db9d38a84ffd9dd27b9",
+  "mesh_quality": {
+    "gmsh_version": "4.15.2",
+    "characteristic_length_m": 8.0,
+    "recombine": true,
+    "nodes": 1113,
+    "edges": 2184,
+    "output": "H:\\scau-b4-out\\g32\\synthetic_city_block_controls.stcf.nc",
+    "output_sha256": "d48253d0b3fc063eb2080baa0c0df9186de4233a69d95db9d38a84ffd9dd27b9",
+    "quality": {
+      "cells": 1070,
+      "triangles": 44,
+      "quadrilaterals": 1026,
+      "min_angle_degrees": 18.958475554922973,
+      "max_edge_length_ratio": 3.1689309084380124,
+      "review_thresholds": {
+        "min_angle_degrees": 10.0,
+        "max_aspect_ratio": 20.0
+      }
+    },
+    "per_cell_diagnostics": {
+      "geojson": "H:\\scau-b4-out\\g32\\mesh_quality_cells.geojson",
+      "diagnostic_only": true,
+      "max_equiangle_skewness": 0.8875,
+      "max_nonorthogonality_deg": 46.1691
+    },
+    "mesh_controls": {
+      "geojson": "H:\\githubcode\\SCAU-UFM\\samples\\d5_gis_preproc_template\\mesh_controls\\mesh_controls.geojson",
+      "geojson_sha256": "b5b1dcf6de376a7a188f6a2c0e396af7642a83c44a6527d2ff0242734b8ea84c",
+      "default_size_m": null,
+      "default_dist_max_m": null,
+      "size_field": "Min(Constant per refinement_region, linear Threshold(Distance) per sized breakline); MeshSizeFromPoints/ExtendFromBoundary/FromCurvature=0",
+      "breaklines": [
+        {
+          "control_id": "BL_ROAD_EDGE",
+          "preserved": true,
+          "mesh_edges_on_breakline": 59
+        },
+        {
+          "control_id": "BL_DIAGONAL",
+          "preserved": true,
+          "mesh_edges_on_breakline": 8
+        },
+        {
+          "control_id": "BL_IN_POND",
+          "preserved": true,
+          "mesh_edges_on_breakline": 15
+        }
+      ],
+      "refinement_regions": [
+        {
+          "control_id": "RR_POND",
+          "size_m": 2.5,
+          "cells_inside": 288,
+          "max_edge_length_inside_m": 3.8250164098468007,
+          "mean_edge_length_inside_m": 2.274592990137645
+        },
+        {
+          "control_id": "RR_BUILDING_1",
+          "size_m": 4.0,
+          "cells_inside": 104,
+          "max_edge_length_inside_m": 4.778408647874277,
+          "mean_edge_length_inside_m": 3.54871500592138
+        }
+      ]
+    }
+  },
+  "reproduce": "py -3 -m scau_preproc.pipeline m287b4_job.json"
+}

@@ -1,0 +1,32 @@
+{
+  "type": "FeatureCollection",
+  "mesh_controls_schema_version": 1,
+  "note": "Synthetic operator-drawn mesh controls for the D-5 template (M287-B4). breakline = embedded polyline preserved as mesh edges (optional size_m/dist_max_m linear refinement); refinement_region = polygon sub-surface meshed at size_m. All coordinates are in the package projected metre frame.",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {"control_id": "BL_ROAD_EDGE", "control_kind": "breakline", "size_m": 3.0, "dist_max_m": 12.0, "synthetic_fixture": true},
+      "geometry": {"type": "LineString", "coordinates": [[10, 20], [190, 20]]}
+    },
+    {
+      "type": "Feature",
+      "properties": {"control_id": "BL_DIAGONAL", "control_kind": "breakline", "synthetic_fixture": true},
+      "geometry": {"type": "LineString", "coordinates": [[15, 85], [35, 100], [60, 110]]}
+    },
+    {
+      "type": "Feature",
+      "properties": {"control_id": "BL_IN_POND", "control_kind": "breakline", "synthetic_fixture": true},
+      "geometry": {"type": "LineString", "coordinates": [[85, 78], [112, 104]]}
+    },
+    {
+      "type": "Feature",
+      "properties": {"control_id": "RR_POND", "control_kind": "refinement_region", "size_m": 2.5, "synthetic_fixture": true},
+      "geometry": {"type": "Polygon", "coordinates": [[[78, 72], [118, 72], [118, 108], [78, 108], [78, 72]]]}
+    },
+    {
+      "type": "Feature",
+      "properties": {"control_id": "RR_BUILDING_1", "control_kind": "refinement_region", "size_m": 4.0, "synthetic_fixture": true},
+      "geometry": {"type": "Polygon", "coordinates": [[[30, 30], [76, 30], [76, 76], [30, 76], [30, 30]]]}
+    }
+  ]
+}

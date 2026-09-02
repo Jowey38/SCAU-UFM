@@ -50,6 +50,9 @@ REQUIRED = {
     # G31 locks the M287-C coupling-map generator fixture and its
     # SimDriver-native fragment consumption.
     "G31": ("coupling_maps_synthetic_case", "implemented", True),
+    # G32 locks the M287-B4 mesh-control fixture (breaklines / refinement
+    # regions preserved as mesh edges; committed deterministic case).
+    "G32": ("preproc_mesh_controls_case", "implemented", True),
 }
 
 

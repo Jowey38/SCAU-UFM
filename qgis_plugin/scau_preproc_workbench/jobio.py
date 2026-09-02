@@ -13,11 +13,28 @@ state boundary, the fault boundary, and the GPL boundary.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
 JOB_CONFIG_SCHEMA_VERSION = 1
+MESH_CONTROLS_SCHEMA_VERSION = 1
 DEFAULT_PYTHON_LAUNCHER = ["py", "-3"]
+
+# Mesh-controls scratch layer contract (mirrors python/scau_preproc/mesh_controls.py).
+MESH_CONTROL_KINDS = ("breakline", "refinement_region")
+MESH_CONTROL_FIELDS = (("control_id", "string"), ("control_kind", "string"),
+                       ("size_m", "double"), ("dist_max_m", "double"))
+
+# Heat-map metrics available in mesh_quality_cells.geojson (E3 workbench page).
+# (property, label, ascending-is-better, class breaks).
+HEATMAP_METRICS = {
+    "equiangle_skewness": ("等角偏斜度 (0 好 → 1 差)", True, (0.25, 0.5, 0.75, 0.9)),
+    "nonorthogonality_deg": ("非正交度 (deg)", True, (15.0, 30.0, 45.0, 60.0)),
+    "min_angle_deg": ("最小内角 (deg)", False, (10.0, 20.0, 30.0, 45.0)),
+    "edge_length_ratio": ("边长比", True, (2.0, 3.0, 5.0, 10.0)),
+    "area_m2": ("单元面积 (m²)", False, (4.0, 16.0, 36.0, 64.0)),
+}
 
 
 def build_job_config(
@@ -30,6 +47,9 @@ def build_job_config(
     determinism_check: bool = True,
     coupling_maps: bool = False,
     validator_cli: str | None = None,
+    mesh_controls_geojson: str | None = None,
+    mesh_controls_default_size_m: float | None = None,
+    mesh_controls_default_dist_max_m: float | None = None,
 ) -> dict:
     job = {
         "job_config_schema_version": JOB_CONFIG_SCHEMA_VERSION,
@@ -43,7 +63,110 @@ def build_job_config(
     }
     if validator_cli:
         job["validator_cli"] = str(Path(validator_cli))
+    if mesh_controls_geojson:
+        controls = {"geojson": str(Path(mesh_controls_geojson))}
+        if mesh_controls_default_size_m is not None:
+            controls["default_size_m"] = float(mesh_controls_default_size_m)
+        if mesh_controls_default_dist_max_m is not None:
+            controls["default_dist_max_m"] = float(mesh_controls_default_dist_max_m)
+        job["mesh_controls"] = controls
     return job
+
+
+def mesh_controls_precheck(geojson_path: str | None, characteristic_length_m: float
+                           ) -> list[tuple[str, str, str]]:
+    """UI-side pre-flight on a mesh-controls GeoJSON, returned as findings rows.
+
+    Only schema/attribute presence is checked here so that the operator gets
+    immediate feedback while drawing; every geometric rule is enforced once,
+    fail-closed, by the generator (single validation authority)."""
+    if not geojson_path:
+        return []
+    path = Path(geojson_path)
+    if not path.is_file():
+        return [("fatal", "MeshControlsMissing", f"mesh controls file not found: {path}")]
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        return [("fatal", "MeshControlsUnreadable", str(error))]
+    rows: list[tuple[str, str, str]] = []
+    if data.get("mesh_controls_schema_version") != MESH_CONTROLS_SCHEMA_VERSION:
+        rows.append(("fatal", "MeshControlsSchema",
+                     f"mesh_controls_schema_version must be {MESH_CONTROLS_SCHEMA_VERSION}"))
+    counts = {kind: 0 for kind in MESH_CONTROL_KINDS}
+    for feature in data.get("features", []):
+        props = feature.get("properties") or {}
+        cid = str(props.get("control_id") or "?")
+        kind = props.get("control_kind")
+        if kind not in counts:
+            rows.append(("fatal", "MeshControlKind", f"{cid}: unknown control_kind {kind!r}"))
+            continue
+        counts[kind] += 1
+        size = props.get("size_m")
+        if kind == "refinement_region" and (size is None or not 0 < float(size) <= characteristic_length_m):
+            rows.append(("fatal", "MeshControlSize",
+                         f"{cid}: refinement_region size_m must be in (0, {characteristic_length_m}]"))
+        if kind == "breakline" and size is not None and not props.get("dist_max_m"):
+            rows.append(("fatal", "MeshControlSize", f"{cid}: sized breakline needs dist_max_m > 0"))
+    rows.append(("pass" if not rows else "info", "MeshControlsSummary",
+                 f"{counts['breakline']} breakline(s), {counts['refinement_region']} "
+                 f"refinement region(s); geometric rules are enforced by the generator"))
+    return rows
+
+
+def mesh_controls_template() -> dict:
+    """Empty controls collection the shell writes when creating a scratch layer."""
+    return {"type": "FeatureCollection",
+            "mesh_controls_schema_version": MESH_CONTROLS_SCHEMA_VERSION,
+            "features": []}
+
+
+def heatmap_classes(metric: str) -> list[tuple[float, float, str]]:
+    """(lower, upper, label) class ranges for a graduated renderer, ordered
+    from best to worst quality so a fixed good->bad colour ramp applies."""
+    if metric not in HEATMAP_METRICS:
+        raise KeyError(metric)
+    _, ascending_is_better, breaks = HEATMAP_METRICS[metric]
+    bounds = [float("-inf"), *breaks, float("inf")]
+    classes = []
+    for lower, upper in zip(bounds[:-1], bounds[1:]):
+        label = (f"< {upper:g}" if lower == float("-inf")
+                 else f">= {lower:g}" if upper == float("inf") else f"{lower:g} – {upper:g}")
+        classes.append((lower, upper, label))
+    return classes if ascending_is_better else classes[::-1]
+
+
+def mesh_quality_summary(job: dict) -> list[tuple[str, str, str]]:
+    """Rows summarising mesh_quality.json (global + per-control report)."""
+    path = Path(job["output_dir"]) / "mesh_quality.json"
+    if not path.is_file():
+        return [("info", "NoMeshQualityReport", "run the pipeline first")]
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        return [("fatal", "MeshQualityUnreadable", str(error))]
+    quality = report.get("quality", {})
+    rows = [("info", "MeshQuality",
+             f"cells={quality.get('cells')} tri={quality.get('triangles')} "
+             f"quad={quality.get('quadrilaterals')} min_angle={quality.get('min_angle_degrees', 0):.2f} "
+             f"max_edge_ratio={quality.get('max_edge_length_ratio', 0):.2f}")]
+    per_cell = report.get("per_cell_diagnostics") or {}
+    if per_cell:
+        rows.append(("info", "PerCellDiagnostics",
+                     f"max_skewness={per_cell.get('max_equiangle_skewness')} "
+                     f"max_nonorthogonality_deg={per_cell.get('max_nonorthogonality_deg')} "
+                     "(display only; certification = validate CLI)"))
+    controls = report.get("mesh_controls")
+    if controls:
+        for line in controls.get("breaklines", []):
+            rows.append(("pass" if line.get("preserved") else "fatal", "BreaklinePreserved",
+                         f"{line['control_id']}: {line.get('mesh_edges_on_breakline')} mesh edges"))
+        for region in controls.get("refinement_regions", []):
+            rows.append(("info", "RefinementRegion",
+                         f"{region['control_id']}: size_m={region['size_m']} "
+                         f"cells={region['cells_inside']} "
+                         f"mean_edge={region.get('mean_edge_length_inside_m') or 0:.3f} m"))
+    return rows
 
 
 def write_job_config(job: dict, output_dir: str) -> Path:
@@ -62,6 +185,17 @@ def repo_root_valid(repo_root: str) -> bool:
         return (Path(repo_root) / "python" / "scau_preproc" / "pipeline.py").is_file()
     except OSError:
         return False
+
+
+def subprocess_env() -> dict[str, str]:
+    """Environment for the SYSTEM python subprocess. The QGIS host exports
+    PYTHONHOME/PYTHONPATH for its bundled interpreter (qgis-bin.env); inherited
+    by `py -3` they make the system interpreter load QGIS's stdlib and die
+    with "SRE module mismatch" before the pipeline writes validation.json."""
+    env = {key: value for key, value in os.environ.items()
+           if key not in ("PYTHONHOME", "PYTHONPATH", "PYTHONNOUSERSITE")}
+    env.setdefault("PYTHONUTF8", "1")
+    return env
 
 
 def run_pipeline(
@@ -93,6 +227,7 @@ def run_pipeline(
             text=True,
             timeout=timeout_s,
             cwd=str(Path(repo_root) / "python"),
+            env=subprocess_env(),
         )
         exit_code: int | None = completed.returncode
         stderr = completed.stderr
@@ -157,5 +292,9 @@ def layer_paths(job: dict) -> dict[str, str]:
         "buildings": package / "buildings/buildings.geojson",
         "landcover": package / "landcover/landcover.geojson",
         "generator_diagnostic": output / "generator.diagnostic.geojson",
+        "mesh_quality_cells": output / "mesh_quality_cells.geojson",
     }
+    controls = (job.get("mesh_controls") or {}).get("geojson")
+    if controls:
+        candidates["mesh_controls"] = Path(controls)
     return {name: str(path) for name, path in candidates.items() if path.is_file()}
