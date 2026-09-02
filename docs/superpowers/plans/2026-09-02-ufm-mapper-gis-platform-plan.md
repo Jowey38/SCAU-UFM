@@ -6,6 +6,8 @@
 的扩展修订，吸收《类似HEC-RAS 中 RAS Mapper的现代化GIS全流程数据加工与处理平台.md》
 （下称"参考蓝图"）的能力清单，并以 2026-09-02 已落地的 M287-A/B/C/E1 证据为基线。
 凡与 v1.1 治理约束（§2）冲突之处，以 v1.1 与主 Spec / 稳定性协议 / 符号表为准。
+上层全景蓝图见 `docs/superpowers/plans/2026-09-02-ufm-mapper-platform-master-plan.md`（v3），
+本文件的差距裁决结论被 v3 全部继承。
 
 ## 1. 定位与总体理念
 
