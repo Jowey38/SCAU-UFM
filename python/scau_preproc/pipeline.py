@@ -6,7 +6,9 @@ Stage A-D orchestration over the file-interchange boundary:
       -> input-package contract checks (manifest, geometry_clean_policy,
          canonical mapping targets)                                [fail-closed]
       -> mesh generation subprocess (meshgen.py; policy timeout kill,
-         atomic output, diagnostic GeoJSON on rejection)
+         atomic output, diagnostic GeoJSON on rejection; optional B4
+         "mesh_controls" breaklines / refinement regions, hashed into the
+         manifest)
       -> optional deterministic re-generation and SHA-256 comparison
       -> authoritative certification via `scau_preproc validate`
       -> pipeline_manifest.json + validation.json reports
@@ -101,13 +103,38 @@ def check_package_contract(package: Path) -> dict:
     }
 
 
+def resolve_mesh_controls(job: dict, job_path: Path) -> dict | None:
+    """Normalizes the optional job_config "mesh_controls" block (B4). The
+    GeoJSON path is resolved relative to the job_config; a missing file is a
+    fail-closed contract error (never silently meshed without controls)."""
+    block = job.get("mesh_controls")
+    if not block:
+        return None
+    if not isinstance(block, dict) or not block.get("geojson"):
+        raise PipelineError("job_config mesh_controls must be an object with a geojson path")
+    geojson = Path(block["geojson"])
+    if not geojson.is_absolute():
+        geojson = (job_path.parent / geojson).resolve()
+    if not geojson.is_file():
+        raise PipelineError(f"mesh_controls geojson not found: {geojson}")
+    resolved = {"geojson": str(geojson)}
+    for key in ("default_size_m", "default_dist_max_m"):
+        if block.get(key) is not None:
+            value = block[key]
+            if not isinstance(value, (int, float)) or value <= 0:
+                raise PipelineError(f"mesh_controls {key} must be a positive number")
+            resolved[key] = float(value)
+    return resolved
+
+
 def run_generator(config_path: Path, timeout_s: float) -> tuple[int | None, str]:
     try:
         completed = subprocess.run(
-            [sys.executable, str(Path(__file__).with_name("meshgen.py")), str(config_path)],
+            [sys.executable, "-m", "scau_preproc.meshgen", str(config_path)],
             capture_output=True,
             text=True,
             timeout=timeout_s,
+            cwd=str(Path(__file__).resolve().parents[1]),
         )
         return completed.returncode, completed.stderr
     except subprocess.TimeoutExpired:
@@ -125,6 +152,7 @@ def main() -> int:
     started = time.strftime("%Y-%m-%dT%H:%M:%S")
 
     policy_audit = check_package_contract(package)
+    mesh_controls = resolve_mesh_controls(job, job_path)
     case_path = output_dir / job.get("case_name", "case.stcf.nc")
     diagnostics_path = output_dir / "generator.diagnostic.geojson"
     generator_config = {
@@ -132,9 +160,12 @@ def main() -> int:
         "output": str(case_path),
         "diagnostics": str(diagnostics_path),
         "report": str(output_dir / "mesh_quality.json"),
+        "quality_cells": str(output_dir / "mesh_quality_cells.geojson"),
         "characteristic_length_m": job.get("characteristic_length_m", 8.0),
         "recombine": job.get("recombine", True),
     }
+    if mesh_controls:
+        generator_config["mesh_controls"] = mesh_controls
     generator_config_path = output_dir / "generator.config.json"
     generator_config_path.write_text(json.dumps(generator_config, indent=2), encoding="utf-8")
 
@@ -167,12 +198,22 @@ def main() -> int:
         })
         return finish("fatal", 3)
     if returncode != 0:
-        validation["findings"].append({
+        detail = stderr.strip().splitlines()[-1] if stderr.strip() else f"exit {returncode}"
+        finding = {
             "severity": "fatal",
-            "code": "MeshGenerationFailed",
-            "detail": stderr.strip().splitlines()[-1] if stderr.strip() else f"exit {returncode}",
+            "code": "MeshControlsRejected" if detail.startswith("MeshControlsRejected:")
+            else "MeshGenerationFailed",
+            "detail": detail,
             "diagnostic": str(diagnostics_path) if diagnostics_path.exists() else None,
-        })
+        }
+        if diagnostics_path.exists():
+            diagnostic = json.loads(diagnostics_path.read_text(encoding="utf-8"))
+            finding["objects"] = [
+                {key: feature.get("properties", {}).get(key)
+                 for key in ("feature_id", "kind", "violation")}
+                for feature in diagnostic.get("features", [])
+            ]
+        validation["findings"].append(finding)
         return finish("fatal", 2)
 
     case_sha = sha256_of(case_path)
@@ -185,6 +226,7 @@ def main() -> int:
         repeat_config["output"] = str(repeat_dir / case_path.name)
         repeat_config["diagnostics"] = str(repeat_dir / "generator.diagnostic.geojson")
         repeat_config["report"] = str(repeat_dir / "mesh_quality.json")
+        repeat_config["quality_cells"] = str(repeat_dir / "mesh_quality_cells.geojson")
         repeat_config_path = repeat_dir / "generator.config.json"
         repeat_config_path.write_text(json.dumps(repeat_config, indent=2), encoding="utf-8")
         repeat_rc, repeat_err = run_generator(repeat_config_path, timeout_s)
@@ -243,6 +285,10 @@ def main() -> int:
             package / "metadata/geometry_clean_policy.json"
         ),
         "generator_config_sha256": sha256_of(generator_config_path),
+        "mesh_controls": None if not mesh_controls else {
+            **mesh_controls,
+            "geojson_sha256": sha256_of(Path(mesh_controls["geojson"])),
+        },
         "case_sha256": case_sha,
         "mesh_quality": json.loads((output_dir / "mesh_quality.json").read_text(encoding="utf-8")),
         "reproduce": f"py -3 -m scau_preproc.pipeline {job_path.name}",

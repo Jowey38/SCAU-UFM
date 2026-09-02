@@ -39,6 +39,10 @@ buildings/
   buildings.geojson
 landcover/
   landcover.geojson
+mesh_controls/
+  mesh_controls.geojson       Optional operator-drawn breaklines / refinement regions
+                              (mesh_controls_schema_version 1; referenced from
+                              job_config "mesh_controls", never auto-discovered).
 soil/
   soil_zones.geojson
   soil_parameters.csv

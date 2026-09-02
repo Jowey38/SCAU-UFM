@@ -11,6 +11,14 @@ repairs): self-intersecting or unclosed rings abort with exit 2 and a
 diagnostic GeoJSON naming the offending features. Certification of the
 generated case remains exclusively `scau_preproc validate` (the authoritative
 C++ read path); nothing here re-implements the validator.
+
+M287-B4 mesh controls (config key "mesh_controls"): operator-drawn breaklines
+and refinement regions (mesh_controls.py contract) drive gmsh embedded curves
+and size fields; breaklines are asserted post-mesh to survive as mesh-edge
+chains; a per-cell diagnostic GeoJSON feeds the QGIS heat map. Without the
+key, generation is byte-identical to pipeline v1.
+
+Run as `py -3 -m scau_preproc.meshgen <generator.config.json>`.
 """
 
 from __future__ import annotations
@@ -22,6 +30,8 @@ import math
 import os
 import sys
 from pathlib import Path
+
+from scau_preproc import mesh_controls
 
 FILL = -1
 
@@ -135,12 +145,59 @@ def reject_invalid_polygons(polygons: list[dict], kind: str, diagnostics_path: P
         raise SystemExit(2)
 
 
+def control_ring(control: dict) -> list[tuple[float, float]]:
+    points = control["points"]
+    return points if control["control_kind"] == "refinement_region" else points + points[::-1]
+
+
+def reject_mesh_controls(error, controls: list[dict], diagnostics_path: Path) -> None:
+    by_id = {c["control_id"]: c for c in controls}
+    entries = []
+    for violation in error.violations:
+        control = by_id.get(violation["control_id"])
+        entries.append({
+            "feature_id": violation["control_id"],
+            "kind": f"mesh_control:{control['control_kind']}" if control else "mesh_control",
+            "violation": violation["violation"],
+            "detail": violation.get("detail"),
+            "ring": control_ring(control) if control else None,
+        })
+    write_diagnostic_geojson(diagnostics_path, entries, reason="invalid_mesh_controls")
+    print(f"MeshControlsRejected: {error}; diagnostic written to {diagnostics_path}",
+          file=sys.stderr)
+    raise SystemExit(2)
+
+
+def region_size_report(controls, membership, mesh, topology) -> list[dict]:
+    node_x, node_y = mesh["node_x"], mesh["node_y"]
+    faces = mesh["faces"]
+    edge_length = [
+        math.hypot(node_x[b] - node_x[a], node_y[b] - node_y[a]) for a, b in topology["edge_nodes"]
+    ]
+    reports = []
+    for control in controls:
+        if control["control_kind"] != "refinement_region":
+            continue
+        inside = [i for i, owner in enumerate(membership) if owner == control["control_id"]]
+        edges = sorted({e for i in inside for e in topology["face_edges"][i] if e >= 0})
+        lengths = [edge_length[e] for e in edges]
+        reports.append({
+            "control_id": control["control_id"],
+            "size_m": control["size_m"],
+            "cells_inside": len(inside),
+            "max_edge_length_inside_m": max(lengths) if lengths else None,
+            "mean_edge_length_inside_m": sum(lengths) / len(lengths) if lengths else None,
+        })
+    return reports
+
+
 def write_diagnostic_geojson(path: Path, entries: list[dict], reason: str) -> None:
     features = [
         {
             "type": "Feature",
             "properties": {k: v for k, v in entry.items() if k != "ring"},
-            "geometry": {"type": "Polygon", "coordinates": [[list(xy) for xy in entry["ring"]]]},
+            "geometry": None if not entry.get("ring") else {
+                "type": "Polygon", "coordinates": [[list(xy) for xy in entry["ring"]]]},
         }
         for entry in entries
     ]
@@ -155,8 +212,19 @@ def write_diagnostic_geojson(path: Path, entries: list[dict], reason: str) -> No
 # --- meshing -----------------------------------------------------------------
 
 
-def build_mesh(boundary: dict, holes: list[dict], lc: float, recombine: bool) -> dict:
+def build_mesh(boundary: dict, holes: list[dict], lc: float, recombine: bool,
+               controls: list[dict] | None = None, ownership: dict | None = None) -> dict:
+    """Constrained gmsh meshing. With `controls` (validated mesh_controls),
+    refinement regions become plane sub-surfaces carrying a Constant size
+    field, breaklines are embedded curves (optionally with a linear Threshold
+    size field); `ownership` (from validate_mesh_controls) tells which surface
+    owns each building hole / breakline. Without controls the call path is
+    byte-for-byte the pipeline-v1 behaviour (G30 fixture)."""
     import gmsh
+
+    controls = controls or []
+    regions = [c for c in controls if c["control_kind"] == "refinement_region"]
+    breaklines = [c for c in controls if c["control_kind"] == "breakline"]
 
     gmsh.initialize()
     try:
@@ -166,22 +234,76 @@ def build_mesh(boundary: dict, holes: list[dict], lc: float, recombine: bool) ->
         gmsh.option.setNumber("Mesh.RandomSeed", 1)
         gmsh.model.add("m287a")
 
-        def add_loop(ring: list[tuple[float, float]]) -> int:
-            point_tags = [
-                gmsh.model.geo.addPoint(x, y, 0.0, lc) for x, y in ring[:-1]
+        def add_polyline(points: list[tuple[float, float]], closed: bool, size: float) -> list[int]:
+            point_tags = [gmsh.model.geo.addPoint(x, y, 0.0, size) for x, y in points]
+            count = len(point_tags)
+            pairs = [(i, (i + 1) % count) for i in range(count)] if closed else [
+                (i, i + 1) for i in range(count - 1)
             ]
-            line_tags = [
-                gmsh.model.geo.addLine(point_tags[i], point_tags[(i + 1) % len(point_tags)])
-                for i in range(len(point_tags))
-            ]
-            return gmsh.model.geo.addCurveLoop(line_tags)
+            return [gmsh.model.geo.addLine(point_tags[i], point_tags[j]) for i, j in pairs]
 
-        outer_loop = add_loop(boundary["outer"])
-        hole_loops = [add_loop(hole["outer"]) for hole in holes]
-        surface = gmsh.model.geo.addPlaneSurface([outer_loop] + hole_loops)
+        def add_loop(ring: list[tuple[float, float]], size: float = lc) -> tuple[int, list[int]]:
+            line_tags = add_polyline(ring[:-1], True, size)
+            return gmsh.model.geo.addCurveLoop(line_tags), line_tags
+
+        outer_loop, _ = add_loop(boundary["outer"])
+        hole_loops = [add_loop(hole["outer"])[0] for hole in holes]
+        region_loops = [add_loop(region["points"], region["size_m"])[0] for region in regions]
+        hole_owner = ownership["hole_region"] if ownership else [None] * len(holes)
+        surfaces = [gmsh.model.geo.addPlaneSurface(
+            [outer_loop] + region_loops
+            + [hole_loops[i] for i, owner in enumerate(hole_owner) if owner is None]
+        )]
+        for region_index, region_loop in enumerate(region_loops):
+            surfaces.append(gmsh.model.geo.addPlaneSurface(
+                [region_loop]
+                + [hole_loops[i] for i, owner in enumerate(hole_owner) if owner == region_index]
+            ))
         gmsh.model.geo.synchronize()
+
+        breakline_curves: list[list[int]] = []
+        breakline_owner = ownership["breakline_region"] if ownership else [None] * len(breaklines)
+        for line, owner in zip(breaklines, breakline_owner):
+            size = line["size_m"] if line["size_m"] is not None else lc
+            curves = add_polyline(line["points"], False, size)
+            breakline_curves.append(curves)
+            gmsh.model.geo.synchronize()
+            target = surfaces[0] if owner is None else surfaces[owner + 1]
+            gmsh.model.mesh.embed(1, curves, 2, target)
+
+        size_fields = []
+        for region_index, region in enumerate(regions):
+            field = gmsh.model.mesh.field.add("Constant")
+            gmsh.model.mesh.field.setNumbers(field, "SurfacesList", [surfaces[region_index + 1]])
+            gmsh.model.mesh.field.setNumber(field, "VIn", region["size_m"])
+            gmsh.model.mesh.field.setNumber(field, "VOut", lc)
+            size_fields.append(field)
+        for line, curves in zip(breaklines, breakline_curves):
+            if line["size_m"] is None:
+                continue
+            distance = gmsh.model.mesh.field.add("Distance")
+            gmsh.model.mesh.field.setNumbers(distance, "CurvesList", curves)
+            gmsh.model.mesh.field.setNumber(distance, "Sampling", 200)
+            threshold = gmsh.model.mesh.field.add("Threshold")
+            gmsh.model.mesh.field.setNumber(threshold, "InField", distance)
+            gmsh.model.mesh.field.setNumber(threshold, "SizeMin", line["size_m"])
+            gmsh.model.mesh.field.setNumber(threshold, "SizeMax", lc)
+            gmsh.model.mesh.field.setNumber(threshold, "DistMin", 0.0)
+            gmsh.model.mesh.field.setNumber(threshold, "DistMax", line["dist_max_m"])
+            gmsh.model.mesh.field.setNumber(threshold, "Sigmoid", 0)
+            size_fields.append(threshold)
+        if size_fields:
+            combined = gmsh.model.mesh.field.add("Min")
+            gmsh.model.mesh.field.setNumbers(combined, "FieldsList", size_fields)
+            gmsh.model.mesh.field.setAsBackgroundMesh(combined)
+            # Size fields are the single source of element size (gmsh guidance).
+            gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
+            gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
+            gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
+
         if recombine:
-            gmsh.model.mesh.setRecombine(2, surface)
+            for surface in surfaces:
+                gmsh.model.mesh.setRecombine(2, surface)
             gmsh.option.setNumber("Mesh.RecombinationAlgorithm", 1)  # Blossom
         gmsh.model.mesh.generate(2)
 
@@ -429,8 +551,24 @@ def main() -> int:
     reject_invalid_polygons(boundary, "boundary", diagnostics)
     reject_invalid_polygons(buildings, "building", diagnostics)
 
+    controls_config = config.get("mesh_controls") or {}
+    controls: list[dict] = []
+    ownership = None
+    if controls_config.get("geojson"):
+        try:
+            controls = mesh_controls.load_mesh_controls(
+                Path(controls_config["geojson"]),
+                controls_config.get("default_size_m"),
+                controls_config.get("default_dist_max_m"),
+            )
+            ownership = mesh_controls.validate_mesh_controls(
+                controls, boundary[0]["outer"], [b["outer"] for b in buildings], lc
+            )
+        except mesh_controls.MeshControlError as error:
+            reject_mesh_controls(error, controls, diagnostics)
+
     try:
-        mesh = build_mesh(boundary[0], buildings, lc, recombine)
+        mesh = build_mesh(boundary[0], buildings, lc, recombine, controls, ownership)
     except SystemExit:
         raise
     except Exception as error:  # gmsh failure -> diagnostic, no partial output
@@ -438,7 +576,9 @@ def main() -> int:
             diagnostics,
             [{"feature_id": boundary[0]["id"], "kind": "boundary", "ring": boundary[0]["outer"]}]
             + [{"feature_id": b["id"], "kind": "building_constraint", "ring": b["outer"]}
-               for b in buildings],
+               for b in buildings]
+            + [{"feature_id": c["control_id"], "kind": f"mesh_control:{c['control_kind']}",
+                "ring": control_ring(c)} for c in controls],
             reason=f"gmsh_failure: {error}",
         )
         print(f"MeshGenerationFailed: gmsh error ({error}); diagnostic at {diagnostics}", file=sys.stderr)
@@ -452,11 +592,42 @@ def main() -> int:
         )
         for face in mesh["faces"]
     ]
+
+    controls_report = None
+    membership = None
+    if controls:
+        try:
+            breakline_reports = mesh_controls.assert_breaklines_preserved(
+                controls, mesh["node_x"], mesh["node_y"], topology["edge_nodes"]
+            )
+        except mesh_controls.MeshControlError as error:
+            reject_mesh_controls(error, controls, diagnostics)
+        membership = mesh_controls.region_membership(controls, centroids)
+        controls_report = {
+            "geojson": str(controls_config["geojson"]),
+            "geojson_sha256": hashlib.sha256(
+                Path(controls_config["geojson"]).read_bytes()).hexdigest(),
+            "default_size_m": controls_config.get("default_size_m"),
+            "default_dist_max_m": controls_config.get("default_dist_max_m"),
+            "size_field": "Min(Constant per refinement_region, "
+                          "linear Threshold(Distance) per sized breakline); "
+                          "MeshSizeFromPoints/ExtendFromBoundary/FromCurvature=0",
+            "breaklines": breakline_reports,
+            "refinement_regions": region_size_report(controls, membership, mesh, topology),
+        }
+
     dem = load_ascii_grid(package / "terrain/dem.asc")
     landcover = load_geojson_polygons(package / "landcover/landcover.geojson", "class_code")
     fields = assign_fields(centroids, dem, landcover, package / "soil/soil_parameters.csv")
 
     write_stcf_case(output, topology, mesh["node_x"], mesh["node_y"], fields)
+
+    cell_rows = mesh_controls.cell_diagnostics(
+        mesh["node_x"], mesh["node_y"], mesh["faces"],
+        topology["edge_nodes"], topology["edge_faces"], membership,
+    )
+    cells_path = Path(config.get("quality_cells", output.with_suffix(".quality_cells.geojson")))
+    mesh_controls.write_cell_diagnostics_geojson(cells_path, cell_rows)
 
     report = {
         "gmsh_version": mesh["gmsh_version"],
@@ -467,6 +638,13 @@ def main() -> int:
         "output": str(output),
         "output_sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
         "quality": quality_report(mesh["node_x"], mesh["node_y"], mesh["faces"]),
+        "per_cell_diagnostics": {
+            "geojson": str(cells_path),
+            "diagnostic_only": True,
+            "max_equiangle_skewness": max(r["equiangle_skewness"] for r in cell_rows),
+            "max_nonorthogonality_deg": max(r["nonorthogonality_deg"] for r in cell_rows),
+        },
+        "mesh_controls": controls_report,
     }
     report_path = Path(config.get("report", output.with_suffix(".quality.json")))
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
