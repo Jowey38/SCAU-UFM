@@ -38,7 +38,7 @@
 | 拓扑辅助 | 管道端点吸附节点自动填 from/to；长度按几何自动或手填；孤立节点/悬空管段检测 | 河段端点吸附节点；分叉/汇流节点度数检测；自相交/重叠检测 |
 | 受治理写出 | `swmm/model.inp`（限定节集合）| `dflowfm/<case>_net.nc` + `<case>.mdu` 模板 + `authoring_manifest.json` |
 | 写出后校验 | 回读 `.inp` 图等价 + 真实 `SwmmEngine` open/parse 干跑 | UGRID 拓扑回读 + （自托管 lane）真实 DLL `initialize` 干跑 |
-| 与耦合链集成 | 标注 `surface_inlet` / `roof_drain` 的节点 → `node_surface_mapping.csv` / `roof_drain_mapping.csv` **候选**（`confidence: review`） | `surface_interface_candidate` → `surface_dflowfm_mapping.json` 候选（`boundary_type/direction/ID = provider_required`） |
+| 与耦合链集成 | 作者化节点走 **C5 空间候选模式**（v3 §8.2）：单元包含 → 候选、屋面按质心近邻，全部 `confidence: review`；`coupling_role` 只用于过滤/着色，不改变候选语义 | `surface_interface_candidate` → `surface_dflowfm_mapping.json` 候选（`boundary_type/direction/ID = provider_required`） |
 
 ### 1.2 不纳入（红线）
 
@@ -163,7 +163,7 @@ finding `RiverHydraulicsProviderRequired`），但允许"几何冒烟运行"产�
 | `apps/preproc_cli` 新子命令 | `swmm-parse`、`ugrid1d-validate` | C++ 权威侧：真实 SWMM 解析干跑；UGRID 1D 拓扑校验（唯一一份） |
 | QGIS **P10 管网工作台** | `workbench_dialog.py` + `jobio.py` | 三个草稿层（junction/outfall/conduit）；吸附；从 `.inp` 导入；保存 → GeoJSON；写出 + 校验结果行；耦合角色着色 |
 | QGIS **P11 河网草绘** | 同上 | 三个草稿层（river_node/river_branch/surface_interface_candidate）；吸附；保存 → GeoJSON；导出 net/mdu；`provider_required` 计数灯 |
-| E4 耦合编辑器扩展 | 同上 | "新建链接"：作者化节点 → 拖到 2D 单元；产生候选进入 C4 确认；不绕过确认 |
+| E4 耦合编辑器 | 同上 | "新建链接"归 E4 本体（任意 1D 节点，不限作者化）；候选进入 C4 确认；不绕过确认 |
 
 UI 纪律不变：逻辑先落 `jobio.py` 纯层；页面零计算状态；每页离屏冒烟脚本。
 
@@ -175,19 +175,18 @@ UI 纪律不变：逻辑先落 `jobio.py` 纯层；页面零计算状态；每�
 |---|---|---|---|
 | **N1-A `.inp` 白名单 IO + 语义比较** | `inp_io.py` 读写；D-5 样例 `model.inp` 导入→导出语义等价；非白名单节 fatal | — | 单元测试 + round-trip golden 候选 `swmm_inp_roundtrip`（逐位确定性写出；语义等价） |
 | **N1-B 作者化写出器 + 引擎解析** | `swmm_author.py`；`scau_preproc swmm-parse`（真实 SwmmEngine）；`authoring.json`；模式互斥与原件保护 | N1-A | golden `swmm_authored_network_parse`：合成作者化网络 → `.inp` → 真实 SWMM 5.2.4 open 成功且节点/管段数、坐标、底高一致；负向：子汇水节出现 → fatal |
-| **N1-C 耦合候选生成** | `coupling_role` 节点 → 映射 CSV 候选（containment 复核复用 M287-C C++ 路径） | N1-B、C4 | 候选全部 `review`；C4 确认后 SimDriver 消费（复用 G31 断言） |
+| **N1-C 耦合候选生成** | 作者化节点复用 C5 空间候选模式（无独立实现）；`coupling_role` 作过滤/着色 | N1-B、C5 | 候选全部 `review`；C4 确认后 SimDriver 消费（复用 G31 断言） |
 | **N1-D P10 管网工作台页** | 草稿层、吸附、导入、保存、写出、结果行 | N1-B | 离屏冒烟：绘 3 井 1 排放 3 管 → 写出 → 引擎解析 ok → 导入回图层等价 |
 | **N2-A 河网草绘契约 + UGRID 写出** | `river_sketch.geojson` 校验；`dflowfm_author.py` 通用化写出 `_net.nc`；`ugrid1d-validate` | — | golden 候选 `dflowfm_sketched_network_roundtrip`：草绘 → net.nc → C++ 回读拓扑一致 + 逐位确定性 |
 | **N2-B MDU 模板 + provider_required 门禁** | 模板写出；`authoring_manifest.json`；导出禁用逻辑；（自托管）真实 DLL `initialize` 干跑 | N2-A | 负向：占位未填 → 导出禁用；自托管 lane 干跑 ok（`golden_candidate`，非门禁，G11 模式） |
 | **N2-C 交界候选 → 映射候选** | `surface_interface_candidate` → `surface_dflowfm_mapping.json`（`provider_required` 字段显式） | N2-A、C3 | 与 C3 合并：provider/确认文件补齐后升级；无补齐保持 `provider_required` 负向测试 |
 | **N2-D P11 河网草绘页** | 草稿层、吸附、保存、导出、占位计数灯 | N2-B | 离屏冒烟 |
-| **E4+ 新建链接** | 编辑器支持作者化节点 → 单元拖拽新建候选 | E4、N1-C | 新建链接必经 C4 确认；冒烟 |
 
 ### 4.1 排期建议（并入 v3 §8.8 关键路径）
 
 ```text
 主线：C4 ─► E4 ─► B6 ─► E5 ─► (C2, C3) ─► M287-F
-N1：  N1-A ─► N1-B ─► N1-C(需 C4) ─► N1-D ─► E4+       （N1-A/B 可与 C4/E4 并行）
+N1：  N1-A ─► N1-B ─► N1-C(复用 C5) ─► N1-D             （N1-A/B 可与 C4/C5/E4 并行；新建链接归 E4 本体）
 N2：  N2-A ─► N2-B ─► N2-D；N2-C 等 C3 provider 契约     （N2-A 可与 B2/B3 并行）
 B6 导出器须消费 N1/N2 的模式与 provider_required 语义 → N1-B、N2-B 应在 B6 定版前完成契约。
 ```
