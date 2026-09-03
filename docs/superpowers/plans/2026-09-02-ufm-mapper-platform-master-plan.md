@@ -172,13 +172,13 @@ metadata/crs_policy.json                 # B2：目标 CRS（EPSG/WKT）、proj 
 metadata/terrain_condition_policy.json   # B3：调理授权（fill/enforce/modify）、算法与参数版本、审计要求
 metadata/dpm_rule_table.json             # B5：规则表格式（先行）；值随 D-5 批准
 metadata/soil_lut.json                   # B5：soil_type → K_s/psi_f/theta_s/theta_i（替代 CSV 或与之并存需裁决）
-coupling/confirmed/<mapping_id>.json     # C4：{confirmed_by, timestamp, candidate_sha256, decision: accept|reject|retarget|create, target}
+coupling/confirmed/<mapping_id>.json     # C4 ✔：confirmation_schema_version=1 {chain, mapping_id, decision: accept|reject|retarget|create, candidate_sha256, confirmed_by, timestamp, target}
 swmm/drainage_network.geojson            # N1：drainage_network_schema_version = 1（井/排放口/管道 + 白名单 OPTIONS）
 swmm/model.inp.authoring.json            # N1：{mode: authored|external, 哈希, writer_version, engine_parse}
 dflowfm/river_sketch.geojson             # N2：river_sketch_schema_version = 1（节点/河段/交界候选）
 dflowfm/<case>_net.nc + <case>.mdu       # N2：UGRID 1D 网络 + 模板（水力键 TODO_PROVIDER）
 dflowfm/authoring_manifest.json          # N2：provider_required 清单（非空即导出禁用）
-coupling/effective_links.json            # C4：合并后的最终链接（只由 E' 产出）
+coupling/effective_links.json            # C4 ✔：合并后的最终链接（只由 E' 产出）+ effective/simdriver_links.conf
 case/manifest 扩展                       # B6：pipeline_manifest.json 增 package_files[{path, sha256}] + reproduce[]
 project.ufm.json                         # E7：工程索引（输入包、作业列表、最近产物、UI 状态快照——可再生、非权威）
 results/<run_id>/surface_timeseries.nc   # M288-A：CF/UGRID 时序（h, eta, hu, hv, wet_mask）
@@ -206,7 +206,7 @@ results/<run_id>/timeseries/<point_id>.csv
   "terrain_condition": {"policy": "metadata/terrain_condition_policy.json"},      // B3
   "field_derivation": {"dpm_rule_table": "...", "soil_lut": "..."},               // B5
   "coupling_maps": true,
-  "confirmations_dir": "coupling/confirmed",                                      // C4
+  "confirmations_dir": "coupling/confirmed",                                      // C4 ✔（缺省 = 输入包 coupling/confirmed/）
   "export_case": {"target_dir": "case/", "require_all_confirmed": true},         // B6
   "drainage_network": {"mode": "authored", "geojson": "...", "generate_coupling_candidates": true}, // N1
   "river_sketch": {"geojson": "...", "case_name": "river", "dll_smoke": false}     // N2
@@ -278,12 +278,13 @@ UI 纪律（全切片强制）：每页只做"渲染选择 → job_config → �
 | M287-C | 三链路映射生成器 + SimDriver 消费 | G31 | 2026-08-28 evidence |
 | M287-E1 | QGIS 作业页 | — | 2026-08-30 evidence |
 | **M287-B4 + E3** | 网格控制 + 网格工作台 | **G32** | 2026-09-02 evidence |
+| **M287-C4** | 耦合确认契约 + 阶段 E'（effective links、漂移检测、review 门禁） | **G33** | 2026-09-04 evidence |
 
 ### 8.2 阶段 I ——"候选 → 确认 → 固化"闭环（当前主线，下一步）
 
 | 切片 | 内容 | 依赖 | 出口标准 / Gate 候选 |
 |---|---|---|---|
-| **C4 确认契约** | `coupling/confirmed/*.json` schema；E' 合并阶段；候选哈希漂移检测；`effective_links.json` → `simdriver_links.conf` | C ✔ | golden：确认覆盖候选 + 漂移触发 review + SimDriver 冷启动消费 effective 链接 |
+| **C4 确认契约** | `coupling/confirmed/*.json` schema；E' 合并阶段；候选哈希漂移检测；`effective_links.json` → `effective/simdriver_links.conf` | C ✔ | **DONE 2026-09-04（G33 `ci_gate:true`）**：`superpowers/specs/2026-09-04-m287-c4-confirmation-contract-evidence.md` |
 | **C5 空间候选模式** | 映射模式 `explicit_ids` / `spatial_candidates` / `mixed`（互斥声明进 `job_config.coupling_maps.mode`，记录进 `mapping_report.json` 与 manifest）：无显式表时对每个 SWMM 节点按单元包含生成候选（落孔洞仍 fatal、边界外 review）；屋面按建筑质心→最近节点（距离阈值版本化）；显式表部分覆盖时表内 `high`、表外 `review` 分别计数；`exchange_elevation_m` 取单元 `z_b` 并标注 `placeholder_source`；全部 `needs_confirmation`，SimDriver 在未确认前拒绝消费 | C4 | golden：合成包移除映射 CSV → 全 review 候选；C4 确认后消费与 G31 断言一致；负向：节点落孔洞 fatal、未确认候选被 SimDriver 拒绝 |
 | **E4 耦合编辑器** | P6 页：连线图层、review 标红、确认/拒绝/改目标写契约文件；**新建链接**（任意 1D 节点拖到 2D 单元 → `decision: create` 候选，必经确认）；不改生成器输出 | C4, C5 | 离屏冒烟；headless `jobio` 测试；确认文件与契约 schema 一致 |
 | **E2 数据目录树 + P1/P3** | 分组树、状态灯、finding → 对象定位、字段映射下拉 | A 报告已含对象 ID | 离屏冒烟；三类状态灯断言 |
@@ -354,7 +355,7 @@ M288-A(设计评审可在 B6 后并行启动) ─► M288-B ─► M288-C ─►
 M287-D 独立等待 M281；B7 独立实验
 ```
 
-建议下一切片：**C4 → C5 → E4**（确认契约 → 空间候选模式 → 耦合编辑器）——它们
+建议下一切片（C4 已落地）：**C5 → E4**（确认契约 → 空间候选模式 → 耦合编辑器）——它们
 是导出门禁语义完整的前提，也是 RAS Mapper "SA/2D Connections 手动确认"体验的对应物。
 
 ---

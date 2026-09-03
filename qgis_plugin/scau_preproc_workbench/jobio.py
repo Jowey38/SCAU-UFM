@@ -50,6 +50,7 @@ def build_job_config(
     mesh_controls_geojson: str | None = None,
     mesh_controls_default_size_m: float | None = None,
     mesh_controls_default_dist_max_m: float | None = None,
+    confirmations_dir: str | None = None,
 ) -> dict:
     job = {
         "job_config_schema_version": JOB_CONFIG_SCHEMA_VERSION,
@@ -70,6 +71,8 @@ def build_job_config(
         if mesh_controls_default_dist_max_m is not None:
             controls["default_dist_max_m"] = float(mesh_controls_default_dist_max_m)
         job["mesh_controls"] = controls
+    if confirmations_dir:
+        job["confirmations_dir"] = str(Path(confirmations_dir))
     return job
 
 
@@ -273,14 +276,34 @@ def findings_rows(validation: dict | None) -> list[tuple[str, str, str]]:
         determinism = validation.get("determinism", {}).get("bitwise_identical_reruns")
         rows.append(("pass", "PipelineOk",
                      f"status={validation.get('status')}, bitwise_reruns={determinism}"))
+    rows.extend(confirmation_rows(validation))
     return rows
 
 
 def exportable(validation: dict | None) -> bool:
-    """Export gate: only a clean 'ok' validation may be exported (plan page 8)."""
+    """Export gate (plan page 8): only a clean 'ok' validation may be exported.
+    A 'review' status (e.g. unconfirmed coupling candidates or confirmation
+    drift, M287-C4) closes the gate just like a fatal finding."""
     return bool(validation) and validation.get("status") == "ok" and not [
-        f for f in validation.get("findings", []) if f.get("severity") == "fatal"
+        f for f in validation.get("findings", []) if f.get("severity") in ("fatal", "review")
     ]
+
+
+def confirmation_rows(validation: dict | None) -> list[tuple[str, str, str]]:
+    """Rows summarising the C4 confirmation merge (stage E')."""
+    if not validation or "coupling_confirmations" not in validation:
+        return []
+    report = validation["coupling_confirmations"]
+    rows = [("pass" if report.get("status") == "complete" else "review", "CouplingConfirmations",
+             f"status={report.get('status')} unconfirmed={report.get('unconfirmed_total')} "
+             f"dir={report.get('confirmations_dir') or '(none)'}")]
+    for chain, counts in (report.get("chains") or {}).items():
+        rows.append(("info", "ConfirmationChain",
+                     f"{chain}: candidates={counts.get('candidates')} accepted={counts.get('accepted')} "
+                     f"retargeted={counts.get('retargeted')} rejected={counts.get('rejected')} "
+                     f"created={counts.get('created')} unconfirmed={counts.get('unconfirmed')} "
+                     f"drifted={counts.get('drifted')}"))
+    return rows
 
 
 def layer_paths(job: dict) -> dict[str, str]:
@@ -293,6 +316,7 @@ def layer_paths(job: dict) -> dict[str, str]:
         "landcover": package / "landcover/landcover.geojson",
         "generator_diagnostic": output / "generator.diagnostic.geojson",
         "mesh_quality_cells": output / "mesh_quality_cells.geojson",
+        "effective_links": output / "coupling/effective_links.json",
     }
     controls = (job.get("mesh_controls") or {}).get("geojson")
     if controls:

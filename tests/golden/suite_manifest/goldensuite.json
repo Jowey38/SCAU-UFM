@@ -286,5 +286,14 @@
     "reference_path": "tests/golden/reference/tolerances.md",
     "ci_gate": true,
     "status": "implemented"
+  },
+  {
+    "test_id": "G33",
+    "name": "coupling_confirmations_synthetic_case",
+    "test_path": "tests/golden/coupling_confirmations_synthetic_case/",
+    "applicable_phase": "Phase 2+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": true,
+    "status": "implemented"
   }
 ]

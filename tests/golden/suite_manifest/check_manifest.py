@@ -53,6 +53,9 @@ REQUIRED = {
     # G32 locks the M287-B4 mesh-control fixture (breaklines / refinement
     # regions preserved as mesh edges; committed deterministic case).
     "G32": ("preproc_mesh_controls_case", "implemented", True),
+    # G33 locks the M287-C4 confirmation contract merge (effective links from
+    # candidates + operator decisions; committed fixture).
+    "G33": ("coupling_confirmations_synthetic_case", "implemented", True),
 }
 
 

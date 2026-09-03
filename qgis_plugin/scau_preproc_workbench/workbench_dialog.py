@@ -127,6 +127,8 @@ class WorkbenchDialog(QDialog):
         self._determinism_check = QCheckBox("确定性复跑校验")
         self._determinism_check.setChecked(True)
         self._coupling_check = QCheckBox("生成耦合映射（阶段 E）")
+        self._confirmations_edit = QLineEdit()
+        self._confirmations_edit.setPlaceholderText("确认目录（可选；默认使用输入包 coupling/confirmed/）")
         options = QHBoxLayout()
         options.addWidget(QLabel("特征长度"))
         options.addWidget(self._lc_spin)
@@ -134,10 +136,17 @@ class WorkbenchDialog(QDialog):
         options.addWidget(self._determinism_check)
         options.addWidget(self._coupling_check)
         options.addStretch()
+        confirmations = QHBoxLayout()
+        confirmations.addWidget(QLabel("耦合确认目录"))
+        confirmations.addWidget(self._confirmations_edit)
+        browse_conf = QPushButton("...")
+        browse_conf.clicked.connect(lambda: self._browse(self._confirmations_edit, True))
+        confirmations.addWidget(browse_conf)
 
         layout = QVBoxLayout(page)
         layout.addLayout(grid)
         layout.addLayout(options)
+        layout.addLayout(confirmations)
         layout.addStretch()
         return page
 
@@ -243,6 +252,7 @@ class WorkbenchDialog(QDialog):
             mesh_controls_geojson=self._controls_path(),
             mesh_controls_default_size_m=default_size,
             mesh_controls_default_dist_max_m=default_dist,
+            confirmations_dir=self._confirmations_edit.text().strip() or None,
         )
 
     def _show_rows(self, rows) -> None:
@@ -293,14 +303,15 @@ class WorkbenchDialog(QDialog):
         self._show_rows(rows)
         can_export = jobio.exportable(result.get("validation"))
         self._export_label.setText(
-            "导出门禁：允许 (status=ok)" if can_export else "导出门禁：禁止（存在 fatal/未完成）")
+            "导出门禁：允许 (status=ok)" if can_export
+            else "导出门禁：禁止（存在 fatal / review / 未确认耦合候选）")
 
     def _load_layers(self) -> None:
         job = self._current_job()
         loaded = []
         for name, path in jobio.layer_paths(job).items():
-            if name == "mesh_quality_cells":
-                continue  # rendered through the heat-map action
+            if name in ("mesh_quality_cells", "effective_links"):
+                continue  # heat map has its own action; effective_links is tabular (E4 page)
             layer = QgsVectorLayer(path, f"scau_{name}", "ogr")
             if layer.isValid():
                 QgsProject.instance().addMapLayer(layer)
