@@ -11,6 +11,8 @@ Stage A-D orchestration over the file-interchange boundary:
          manifest)
       -> optional deterministic re-generation and SHA-256 comparison
       -> authoritative certification via `scau_preproc validate`
+      -> optional coupling candidates (stage E) + operator confirmations
+         merge (stage E', C4: effective_links.json; unconfirmed => review)
       -> pipeline_manifest.json + validation.json reports
 
 The pipeline never repairs geometry, never derives DPM physics beyond the
@@ -19,7 +21,8 @@ semantics. UI layers must drive exactly this entry point (stateless
 job_config -> reports contract; M287 plan section 3).
 
 Usage: py -3 -m scau_preproc.pipeline <job_config.json>
-Exit codes: 0 ok; 2 fail-closed (contract/geometry/validation); 3 timeout.
+Exit codes: 0 ok or review (status field distinguishes; review = pipeline complete but
+export gate closed, e.g. unconfirmed coupling candidates); 2 fail-closed; 3 timeout.
 """
 
 from __future__ import annotations
@@ -125,6 +128,23 @@ def resolve_mesh_controls(job: dict, job_path: Path) -> dict | None:
                 raise PipelineError(f"mesh_controls {key} must be a positive number")
             resolved[key] = float(value)
     return resolved
+
+
+def resolve_confirmations_dir(job: dict, job_path: Path, package: Path) -> Path | None:
+    """Optional job_config "confirmations_dir" (C4): relative paths resolve
+    against the job_config; when absent, the package's own
+    coupling/confirmed/ is used if it exists. An explicitly configured but
+    missing directory is a contract error (never silently 'no confirmations')."""
+    configured = job.get("confirmations_dir")
+    if configured:
+        directory = Path(configured)
+        if not directory.is_absolute():
+            directory = (job_path.parent / directory).resolve()
+        if not directory.is_dir():
+            raise PipelineError(f"confirmations_dir not found: {directory}")
+        return directory
+    default = package / "coupling" / "confirmed"
+    return default if default.is_dir() else None
 
 
 def run_generator(config_path: Path, timeout_s: float) -> tuple[int | None, str]:
@@ -262,8 +282,9 @@ def main() -> int:
             })
             return finish("fatal", 2)
 
+    confirmations_dir = None
     if job.get("coupling_maps", False):
-        from scau_preproc import coupling_maps
+        from scau_preproc import confirmations, coupling_maps
         coupling_dir = output_dir / "coupling"
         try:
             report = coupling_maps.generate(package, case_path, coupling_dir)
@@ -275,6 +296,40 @@ def main() -> int:
                 "detail": f"exit {error.code}",
             })
             return finish("fatal", 2)
+
+        # Stage E' (C4): merge operator confirmations into the effective links.
+        # Candidates that nobody confirmed are NOT effective and keep the run
+        # at status "review" (export gate closed); stale confirmations are
+        # reported as ConfirmationDrift and ignored.
+        confirmations_dir = resolve_confirmations_dir(job, job_path, package)
+        try:
+            merged = confirmations.run(
+                coupling_dir, confirmations_dir,
+                cell_count=int(json.loads(
+                    (output_dir / "mesh_quality.json").read_text(encoding="utf-8")
+                )["quality"]["cells"]),
+            )
+        except confirmations.ConfirmationError as error:
+            validation["findings"].append({
+                "severity": "fatal",
+                "code": "ConfirmationInvalid",
+                "detail": str(error),
+                "diagnostic": str(error.path) if error.path else None,
+            })
+            return finish("fatal", 2)
+        validation["findings"].extend(merged["findings"])
+        validation["coupling_confirmations"] = {
+            **merged["report"],
+            "confirmations_dir": str(confirmations_dir) if confirmations_dir else None,
+            **merged["paths"],
+        }
+        if merged["report"]["unconfirmed_total"] > 0:
+            validation["findings"].append({
+                "severity": "review",
+                "code": "CouplingCandidatesUnconfirmed",
+                "detail": f"{merged['report']['unconfirmed_total']} coupling candidate(s) await "
+                          "operator confirmation (coupling/confirmed/*.json); export gate closed",
+            })
 
     manifest = {
         "pipeline": "scau_preproc.pipeline",
@@ -293,10 +348,18 @@ def main() -> int:
         "mesh_quality": json.loads((output_dir / "mesh_quality.json").read_text(encoding="utf-8")),
         "reproduce": f"py -3 -m scau_preproc.pipeline {job_path.name}",
     }
+    if confirmations_dir is not None:
+        manifest["confirmations"] = {
+            "dir": str(confirmations_dir),
+            "files_sha256": {
+                path.name: sha256_of(path) for path in sorted(confirmations_dir.glob("*.json"))
+            },
+        }
     (output_dir / "pipeline_manifest.json").write_text(
         json.dumps(manifest, indent=2), encoding="utf-8"
     )
-    return finish("ok", 0)
+    has_review = any(f.get("severity") == "review" for f in validation["findings"])
+    return finish("review" if has_review else "ok", 0)
 
 
 if __name__ == "__main__":

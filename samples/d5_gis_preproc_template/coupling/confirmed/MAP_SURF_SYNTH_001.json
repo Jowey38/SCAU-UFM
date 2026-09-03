@@ -1,0 +1,10 @@
+{
+  "confirmation_schema_version": 1,
+  "confirmed_by": "synthetic_fixture_operator",
+  "timestamp": "2026-09-03T10:00:00",
+  "chain": "surface_to_swmm",
+  "mapping_id": "MAP_SURF_SYNTH_001",
+  "decision": "accept",
+  "candidate_sha256": "1312f6fef73f9be48e7f1ff638b301e9d26a8f527d77c1c998aac6495a42653e",
+  "note": "Synthetic fixture: inlet J1 accepted as generated."
+}

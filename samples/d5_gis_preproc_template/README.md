@@ -39,6 +39,9 @@ buildings/
   buildings.geojson
 landcover/
   landcover.geojson
+coupling/
+  confirmed/*.json            Operator decisions on coupling candidates (M287-C4 contract v1:
+                              accept / reject / retarget / create with candidate hash).
 mesh_controls/
   mesh_controls.geojson       Optional operator-drawn breaklines / refinement regions
                               (mesh_controls_schema_version 1; referenced from

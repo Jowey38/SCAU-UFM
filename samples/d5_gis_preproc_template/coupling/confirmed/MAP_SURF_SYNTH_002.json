@@ -1,0 +1,14 @@
+{
+  "confirmation_schema_version": 1,
+  "confirmed_by": "synthetic_fixture_operator",
+  "timestamp": "2026-09-03T10:00:00",
+  "chain": "surface_to_swmm",
+  "mapping_id": "MAP_SURF_SYNTH_002",
+  "decision": "retarget",
+  "candidate_sha256": "27784814716e761941fca82562e70fa7f2c30f4948a5cb4151379c0236e8bdba",
+  "target": {
+    "cell_index": 50,
+    "exchange_elevation_m": 9.6
+  },
+  "note": "Synthetic fixture: operator moves the J2 exchange cell to the adjacent road cell to the south-east and lifts the crest to 9.6 m."
+}

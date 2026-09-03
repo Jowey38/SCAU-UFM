@@ -1,0 +1,9 @@
+{
+  "confirmation_schema_version": 1,
+  "confirmed_by": "synthetic_fixture_operator",
+  "timestamp": "2026-09-03T10:00:00",
+  "chain": "roof_to_swmm",
+  "mapping_id": "MAP_ROOF_SYNTH_002",
+  "decision": "accept",
+  "candidate_sha256": "9983e18e70ec3483c3cbed076767a37902cabc5dbb444b1f5e37b72871c62487"
+}

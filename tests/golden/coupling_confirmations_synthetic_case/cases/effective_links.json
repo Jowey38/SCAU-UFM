@@ -1,0 +1,104 @@
+{
+  "effective_links_schema_version": 1,
+  "status": "complete",
+  "unconfirmed_total": 0,
+  "confirmations_loaded": 4,
+  "chains": {
+    "surface_to_swmm": {
+      "candidates": 2,
+      "accepted": 1,
+      "retargeted": 1,
+      "rejected": 0,
+      "created": 0,
+      "unconfirmed": 0,
+      "drifted": 0
+    },
+    "roof_to_swmm": {
+      "candidates": 2,
+      "accepted": 1,
+      "retargeted": 0,
+      "rejected": 1,
+      "created": 0,
+      "unconfirmed": 0,
+      "drifted": 0
+    }
+  },
+  "placeholders": {
+    "exchange_width_m": 1.0,
+    "priority_weight": 1.0
+  },
+  "runtime_semantics": "none (Q_limit/deficit/arbitration remain CouplingLib-owned)",
+  "sources": {
+    "confirmations_dir": "H:\\githubcode\\SCAU-UFM\\samples\\d5_gis_preproc_template\\coupling\\confirmed",
+    "confirmation_files": {
+      "MAP_ROOF_SYNTH_001.json": "56728c83a58bd3d36266ba2439e34d7b2fcb94c9e1ecc752ec9c1f14facc44d0",
+      "MAP_ROOF_SYNTH_002.json": "9b1a52b75363d9543307fa33e505e9ec44608970b493264bc54a1a8042b1ac09",
+      "MAP_SURF_SYNTH_001.json": "83a4cf368f0a454cd259ed87bcce352839d78b75ff1eb19c9dc4e98251e0d3b0",
+      "MAP_SURF_SYNTH_002.json": "4a500fcdfc6506d1643519b206b4e274533854cd67af3017e923ba349ce8adb7"
+    },
+    "candidate_files": {
+      "surface_swmm_mapping.json": "552bac9eb1936a239b9dc676b34b23de3b4159ef5bb2048bf0837fde8caf965f",
+      "roof_drain_mapping.json": "51446de857926734eec52c55356379f80813abc6c328146c97da3559d72ceed2"
+    }
+  },
+  "links": {
+    "surface_to_swmm": [
+      {
+        "mapping_id": "MAP_SURF_SYNTH_001",
+        "surface_zone_id": "SZ_SYNTH_ROAD_001",
+        "inlet_id": "INLET_SYNTH_001",
+        "swmm_node_id": "J1",
+        "cell_index": 379,
+        "node_x": 55.0,
+        "node_y": 10.0,
+        "exchange_elevation_m": 10.0,
+        "method": "explicit_id_plus_point_in_cell",
+        "confidence": "confirmed",
+        "review_status": "confirmed",
+        "decision": "accept",
+        "candidate_sha256": "1312f6fef73f9be48e7f1ff638b301e9d26a8f527d77c1c998aac6495a42653e",
+        "confirmed_by": "synthetic_fixture_operator",
+        "confirmed_at": "2026-09-03T10:00:00",
+        "confirmation_file": "MAP_SURF_SYNTH_001.json"
+      },
+      {
+        "mapping_id": "MAP_SURF_SYNTH_002",
+        "surface_zone_id": "SZ_SYNTH_ROAD_002",
+        "inlet_id": "INLET_SYNTH_002",
+        "swmm_node_id": "J2",
+        "cell_index": 50,
+        "node_x": 135.0,
+        "node_y": 10.0,
+        "exchange_elevation_m": 9.6,
+        "method": "explicit_id_plus_point_in_cell+operator_retarget",
+        "confidence": "confirmed",
+        "review_status": "confirmed",
+        "decision": "retarget",
+        "candidate_sha256": "27784814716e761941fca82562e70fa7f2c30f4948a5cb4151379c0236e8bdba",
+        "confirmed_by": "synthetic_fixture_operator",
+        "confirmed_at": "2026-09-03T10:00:00",
+        "confirmation_file": "MAP_SURF_SYNTH_002.json"
+      }
+    ],
+    "roof_to_swmm": [
+      {
+        "mapping_id": "MAP_ROOF_SYNTH_002",
+        "building_id": "BLDG_SYNTH_002",
+        "roof_drain_id": "RD_SYNTH_002",
+        "swmm_node_id": "J2",
+        "overflow_target_cell_index": 408,
+        "candidate_distance_m": 18.486404798442646,
+        "catchment_area_m2": 900.0,
+        "exchange_elevation_m": 9.5,
+        "method": "explicit_ids_plus_nearest_centroid_candidate",
+        "confidence": "confirmed",
+        "review_status": "confirmed",
+        "decision": "accept",
+        "candidate_sha256": "9983e18e70ec3483c3cbed076767a37902cabc5dbb444b1f5e37b72871c62487",
+        "confirmed_by": "synthetic_fixture_operator",
+        "confirmed_at": "2026-09-03T10:00:00",
+        "confirmation_file": "MAP_ROOF_SYNTH_002.json"
+      }
+    ]
+  }
+}

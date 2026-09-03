@@ -104,3 +104,24 @@ class HeatmapTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ConfirmationRowsTests(unittest.TestCase):
+    def test_review_status_closes_export_gate(self):
+        review = {"status": "review", "findings": [
+            {"severity": "review", "code": "CouplingCandidatesUnconfirmed", "detail": "4"}]}
+        self.assertFalse(jobio.exportable(review))
+        self.assertTrue(jobio.exportable({"status": "ok", "findings": []}))
+        self.assertFalse(jobio.exportable({"status": "ok", "findings": [{"severity": "review"}]}))
+
+    def test_confirmation_rows_and_job_config(self):
+        validation = {"status": "ok", "findings": [], "coupling_confirmations": {
+            "status": "complete", "unconfirmed_total": 0, "confirmations_dir": "/pkg/coupling/confirmed",
+            "chains": {"surface_to_swmm": {"candidates": 2, "accepted": 1, "retargeted": 1, "rejected": 0,
+                                           "created": 0, "unconfirmed": 0, "drifted": 0}}}}
+        rows = jobio.findings_rows(validation)
+        self.assertEqual([r[1] for r in rows], ["PipelineOk", "CouplingConfirmations", "ConfirmationChain"])
+        self.assertEqual(rows[1][0], "pass")
+        self.assertEqual(jobio.confirmation_rows({"status": "ok"}), [])
+        job = jobio.build_job_config("pkg", "out", confirmations_dir="c/confirmed")
+        self.assertEqual(job["confirmations_dir"], str(Path("c/confirmed")))
