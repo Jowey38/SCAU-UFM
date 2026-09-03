@@ -56,7 +56,7 @@ E1（作业页）、**B4 + E3（网格控制 + 网格工作台，G32）**；Gold
 | Geometry：河道中心线/结构（几何） | **N2 河网草绘**：节点/河段/地表交界候选 → UGRID 1D 网络 + MDU 模板；水力参数 `provider_required` | 未做 | N2 |
 | Geometry：断面/糙率/边界水力参数 | 归 D-Flow FM 原生工具或 provider；平台只留显式占位并阻断导出 | 不做 | — |
 | 1D 管网建模（SWMM 编辑器等价物） | **N1 管网作者化**：井/排放口/管道图层 ↔ 受治理 `.inp` 写出 + 真实引擎解析；既有 `.inp` 导入编辑 | 未做 | N1 |
-| SA/2D Connections（1D↔2D 连接） | 三链路耦合映射 + 确认契约 + 编辑器；作者化节点标注 `coupling_role` 自动产候选；编辑器新建链接（必经确认） | 候选 DONE；确认/编辑 = C4/E4；新建 = N1-C/E4+ | C4/E4/N1-C |
+| SA/2D Connections（1D↔2D 连接） | 三链路耦合映射 + 确认契约 + 编辑器；无显式表时空间候选模式（全 review）；编辑器新建链接（必经确认）；作者化节点复用同一路径 | 候选 DONE；确认/空间候选/编辑 = C4/C5/E4 | C4/C5/E4 |
 | Projection 管理 | CRS 治理重投影（米制直角，拒绝 lat/lon） | rejection-only | B2 |
 | Results：Depth/WSE/Velocity/Arrival Time/Duration 栅格与动画 | 时序 NetCDF 契约 + `scau_results` CLI + 结果页 | 完全缺失 | M288 |
 | Profile Lines / Time series plots | 断面/点时序抽取 | 缺失 | M288-B/C |
@@ -284,7 +284,8 @@ UI 纪律（全切片强制）：每页只做"渲染选择 → job_config → �
 | 切片 | 内容 | 依赖 | 出口标准 / Gate 候选 |
 |---|---|---|---|
 | **C4 确认契约** | `coupling/confirmed/*.json` schema；E' 合并阶段；候选哈希漂移检测；`effective_links.json` → `simdriver_links.conf` | C ✔ | golden：确认覆盖候选 + 漂移触发 review + SimDriver 冷启动消费 effective 链接 |
-| **E4 耦合编辑器** | P6 页：连线图层、review 标红、确认/拒绝/改目标写契约文件；不改生成器输出 | C4 | 离屏冒烟；headless `jobio` 测试；确认文件与契约 schema 一致 |
+| **C5 空间候选模式** | 映射模式 `explicit_ids` / `spatial_candidates` / `mixed`（互斥声明进 `job_config.coupling_maps.mode`，记录进 `mapping_report.json` 与 manifest）：无显式表时对每个 SWMM 节点按单元包含生成候选（落孔洞仍 fatal、边界外 review）；屋面按建筑质心→最近节点（距离阈值版本化）；显式表部分覆盖时表内 `high`、表外 `review` 分别计数；`exchange_elevation_m` 取单元 `z_b` 并标注 `placeholder_source`；全部 `needs_confirmation`，SimDriver 在未确认前拒绝消费 | C4 | golden：合成包移除映射 CSV → 全 review 候选；C4 确认后消费与 G31 断言一致；负向：节点落孔洞 fatal、未确认候选被 SimDriver 拒绝 |
+| **E4 耦合编辑器** | P6 页：连线图层、review 标红、确认/拒绝/改目标写契约文件；**新建链接**（任意 1D 节点拖到 2D 单元 → `decision: create` 候选，必经确认）；不改生成器输出 | C4, C5 | 离屏冒烟；headless `jobio` 测试；确认文件与契约 schema 一致 |
 | **E2 数据目录树 + P1/P3** | 分组树、状态灯、finding → 对象定位、字段映射下拉 | A 报告已含对象 ID | 离屏冒烟；三类状态灯断言 |
 
 ### 8.3 阶段 II —— 输入治理与真实字段（可与阶段 I 并行）
@@ -311,13 +312,12 @@ UI 纪律（全切片强制）：每页只做"渲染选择 → job_config → �
 |---|---|---|---|
 | **N1-A** `.inp` 白名单 IO | 读写 + 语义比较；非白名单节 fatal | — | `swmm_inp_roundtrip` 候选 |
 | **N1-B** 作者化写出器 | `swmm_author` + `scau_preproc swmm-parse`（真实 SwmmEngine 干跑）；模式互斥、原件保护 | N1-A | `swmm_authored_network_parse`（可门禁：SWMM 已嵌入） |
-| **N1-C** 耦合候选生成 | `coupling_role` 节点 → 映射 CSV 候选（review） | N1-B, C4 | C4 确认后 SimDriver 消费 |
+| **N1-C** 耦合候选生成 | 作者化节点直接复用 C5 空间候选模式（`coupling_role` 仅作过滤/着色） | N1-B, C5 | C4 确认后 SimDriver 消费 |
 | **N1-D** P10 管网工作台页 | 草稿层/吸附/导入/写出 | N1-B | 离屏冒烟 |
 | **N2-A** 河网草绘契约 + UGRID 写出 | `river_sketch.geojson`；`dflowfm_author`；`ugrid1d-validate` | — | `dflowfm_sketched_network_roundtrip` 候选 |
 | **N2-B** MDU 模板 + provider_required 门禁 | 模板；`authoring_manifest`；导出禁用；自托管 DLL 干跑 | N2-A | 负向门禁；DLL 干跑 `golden_candidate` |
 | **N2-C** 交界候选 → 映射候选 | 并入 C3 | N2-A, C3 | `provider_required` 负向保持 |
 | **N2-D** P11 河网草绘页 | 草稿层/吸附/导出/占位灯 | N2-B | 离屏冒烟 |
-| **E4+** 新建链接 | 作者化节点 → 单元拖拽建候选，必经 C4 | E4, N1-C | 冒烟 |
 
 ### 8.5 阶段 IV —— 耦合链路接线（按 CouplingLib 就绪度插入）
 
@@ -344,18 +344,18 @@ UI 纪律（全切片强制）：每页只做"渲染选择 → job_config → �
 ### 8.8 关键路径与并行建议
 
 ```text
-C4 ─► E4 ─► B6 ─► E5 ─► (C2, C3) ─► M287-F
+C4 ─► C5 ─► E4 ─► B6 ─► E5 ─► (C2, C3) ─► M287-F
  │            ▲
  └─ E2 ──────┘        B2 ─► B3 ─┐
                       B5 ─► E5a ┘ (并行于 C4/E4；在 B6 前汇合)
-N1-A ─► N1-B ─► N1-C(需 C4) ─► N1-D ─► E4+   （N1-A/B 与 C4/E4 并行；N1-B 契约先于 B6 定版）
+N1-A ─► N1-B ─► N1-C(复用 C5) ─► N1-D        （N1-A/B 与 C4/C5/E4 并行；N1-B 契约先于 B6 定版）
 N2-A ─► N2-B ─► N2-D；N2-C 等 C3               （N2-A 与 B2/B3 并行）
 M288-A(设计评审可在 B6 后并行启动) ─► M288-B ─► M288-C ─► M287-F
 M287-D 独立等待 M281；B7 独立实验
 ```
 
-建议下一切片：**C4 + E4**（确认契约 + 耦合编辑器）——它是导出门禁语义完整的
-前提，也是 RAS Mapper "SA/2D Connections 手动确认"体验的对应物。
+建议下一切片：**C4 → C5 → E4**（确认契约 → 空间候选模式 → 耦合编辑器）——它们
+是导出门禁语义完整的前提，也是 RAS Mapper "SA/2D Connections 手动确认"体验的对应物。
 
 ---
 
