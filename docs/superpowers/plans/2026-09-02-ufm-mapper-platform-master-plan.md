@@ -6,6 +6,8 @@
 - 本文件 = **平台全景蓝图**（产品定义、能力矩阵、架构、契约、阶段、里程碑、验收）；
 - `2026-09-02-ufm-mapper-gis-platform-plan.md`（v2）= 参考蓝图与现状的**差距裁决**，其裁决结论本文件全部继承；
 - `2026-08-26-m287-gis-preproc-workbench-design.md`（v1.1）= 前处理工作台**治理约束与原始设计**；
+- `2026-09-03-ufm-mapper-1d-network-authoring-plan.md`（N 系列）= 项目方 2026-09-03 选定的范围扩展：
+  SWMM 管网作者化 + D-Flow FM 河网草绘，其治理修订（§5）已并入本文件；
 - 凡冲突处，以主 Spec / 稳定性协议 / 符号表 > v1.1 §2 治理约束 > v2 裁决 > 本文件为序。
 
 ---
@@ -51,8 +53,10 @@ E1（作业页）、**B4 + E3（网格控制 + 网格工作台，G32）**；Gold
 | Infiltration layer | soil → Green-Ampt LUT | 占位 | B5 |
 | 2D Flow Area + Breaklines + Refinement Regions | `mesh_controls.geojson`（breakline / refinement_region） | **DONE（G32）** | — |
 | Mesh 质量检查（cell 尺寸、边角） | `mesh_quality.json` + `mesh_quality_cells.geojson` 热力图 | **DONE（E3）** | — |
-| Geometry：河道中心线/断面/结构 | 由 D-Flow FM 原生几何承载；UFM 只做边界映射 | provider_required | C3 |
-| SA/2D Connections（1D↔2D 连接） | 三链路耦合映射 + 确认契约 + 编辑器 | 候选 DONE；确认/编辑 = C4/E4 | C4/E4 |
+| Geometry：河道中心线/结构（几何） | **N2 河网草绘**：节点/河段/地表交界候选 → UGRID 1D 网络 + MDU 模板；水力参数 `provider_required` | 未做 | N2 |
+| Geometry：断面/糙率/边界水力参数 | 归 D-Flow FM 原生工具或 provider；平台只留显式占位并阻断导出 | 不做 | — |
+| 1D 管网建模（SWMM 编辑器等价物） | **N1 管网作者化**：井/排放口/管道图层 ↔ 受治理 `.inp` 写出 + 真实引擎解析；既有 `.inp` 导入编辑 | 未做 | N1 |
+| SA/2D Connections（1D↔2D 连接） | 三链路耦合映射 + 确认契约 + 编辑器；作者化节点标注 `coupling_role` 自动产候选；编辑器新建链接（必经确认） | 候选 DONE；确认/编辑 = C4/E4；新建 = N1-C/E4+ | C4/E4/N1-C |
 | Projection 管理 | CRS 治理重投影（米制直角，拒绝 lat/lon） | rejection-only | B2 |
 | Results：Depth/WSE/Velocity/Arrival Time/Duration 栅格与动画 | 时序 NetCDF 契约 + `scau_results` CLI + 结果页 | 完全缺失 | M288 |
 | Profile Lines / Time series plots | 断面/点时序抽取 | 缺失 | M288-B/C |
@@ -110,7 +114,9 @@ E1（作业页）、**B4 + E3（网格控制 + 网格工作台，G32）**；Gold
 | `terrain_condition`（B3） | `python/scau_preproc/terrain_condition.py` | 待建 |
 | `field_derivation`（B5：soil LUT、DPM 规则表） | `python/scau_preproc/field_derivation.py` | 待建（当前占位在 meshgen.assign_fields） |
 | `confirmations`（C4） | `python/scau_preproc/confirmations.py` | 待建 |
-| `case_export`（B6） | `python/scau_preproc/case_export.py` | 待建 |
+| `case_export`（B6） | `python/scau_preproc/case_export.py` | 待建（须消费 N1 模式与 N2 `provider_required`） |
+| `inp_io` / `swmm_author`（N1） | `python/scau_preproc/` + `scau_preproc swmm-parse` | 待建 |
+| `dflowfm_author`（N2） | `python/scau_preproc/`（从 `tools/dflowfm/generate_single_reach_1d.py` 提炼）+ `scau_preproc ugrid1d-validate` | 待建 |
 | `scau_results` CLI（M288-B） | `python/scau_results/` 或 `apps/results_cli` | 待建 |
 | 权威校验 | `apps/preproc_cli`（`generate/validate`）、`libs/stcf`、`libs/mesh` | DONE；B6 需 `validate --case-dir` |
 | QGIS 插件 | `qgis_plugin/scau_preproc_workbench/`（`jobio.py` 纯层） | E1/E3 DONE |
@@ -166,7 +172,12 @@ metadata/crs_policy.json                 # B2：目标 CRS（EPSG/WKT）、proj 
 metadata/terrain_condition_policy.json   # B3：调理授权（fill/enforce/modify）、算法与参数版本、审计要求
 metadata/dpm_rule_table.json             # B5：规则表格式（先行）；值随 D-5 批准
 metadata/soil_lut.json                   # B5：soil_type → K_s/psi_f/theta_s/theta_i（替代 CSV 或与之并存需裁决）
-coupling/confirmed/<mapping_id>.json     # C4：{confirmed_by, timestamp, candidate_sha256, decision: accept|reject|retarget, target}
+coupling/confirmed/<mapping_id>.json     # C4：{confirmed_by, timestamp, candidate_sha256, decision: accept|reject|retarget|create, target}
+swmm/drainage_network.geojson            # N1：drainage_network_schema_version = 1（井/排放口/管道 + 白名单 OPTIONS）
+swmm/model.inp.authoring.json            # N1：{mode: authored|external, 哈希, writer_version, engine_parse}
+dflowfm/river_sketch.geojson             # N2：river_sketch_schema_version = 1（节点/河段/交界候选）
+dflowfm/<case>_net.nc + <case>.mdu       # N2：UGRID 1D 网络 + 模板（水力键 TODO_PROVIDER）
+dflowfm/authoring_manifest.json          # N2：provider_required 清单（非空即导出禁用）
 coupling/effective_links.json            # C4：合并后的最终链接（只由 E' 产出）
 case/manifest 扩展                       # B6：pipeline_manifest.json 增 package_files[{path, sha256}] + reproduce[]
 project.ufm.json                         # E7：工程索引（输入包、作业列表、最近产物、UI 状态快照——可再生、非权威）
@@ -196,7 +207,9 @@ results/<run_id>/timeseries/<point_id>.csv
   "field_derivation": {"dpm_rule_table": "...", "soil_lut": "..."},               // B5
   "coupling_maps": true,
   "confirmations_dir": "coupling/confirmed",                                      // C4
-  "export_case": {"target_dir": "case/", "require_all_confirmed": true}          // B6
+  "export_case": {"target_dir": "case/", "require_all_confirmed": true},         // B6
+  "drainage_network": {"mode": "authored", "geojson": "...", "generate_coupling_candidates": true}, // N1
+  "river_sketch": {"geojson": "...", "case_name": "river", "dll_smoke": false}     // N2
 }
 ```
 
@@ -220,6 +233,8 @@ UI 纪律（全切片强制）：每页只做"渲染选择 → job_config → �
 | P7 | 质量门禁 | 全量报告浏览器（import/terrain/topology/field/coupling/reproducibility 分页）；fatal/review/pass 计数；点击定位 | 全部报告 | — | E5 |
 | P8 | 导出与复现 | 一键 Run Pipeline；导出按钮在 fatal/未确认时禁用（复用 `jobio.exportable`）；显示可复现命令与包哈希 | B6 导出器 | B6 | E5 |
 | P9 | 结果制图 | 时间轴播放；深度/流速分级渲染；点击取时序；与 SWMM `.out`/D-Flow map 只读联看 | M288-A/B 产物 | M288-B | M288-C |
+| P10 | 管网工作台 | junction/outfall/conduit 草稿层；端点吸附；`.inp` 导入；保存 → `drainage_network.geojson` → 写出 + 真实引擎解析结果行；耦合角色着色 | N1 产物 | N1-B | N1-D |
+| P11 | 河网草绘 | river_node/river_branch/surface_interface_candidate 草稿层；吸附；导出 net/mdu；`provider_required` 计数灯 | N2 产物 | N2-B | N2-D |
 | — | 打包收口 | 图标、翻译、Plugin Reloader 说明、QGIS 3.40/4.x 双轨冒烟清单、`project.ufm.json` | — | E2–E5 | E6/E7 |
 
 ---
@@ -290,6 +305,20 @@ UI 纪律（全切片强制）：每页只做"渲染选择 → job_config → �
 | **B7 双平台确定性** | 受治理 Linux gmsh（third_party 治理）；跨平台哈希实验 | — | 证据决定门禁形态："逐位一致"或"记录在案的 1e-12 容差" |
 | **E6/E7 打包收口** | 图标、翻译、双轨冒烟清单；`project.ufm.json` 工程索引 | E2–E5 | 双版本 QGIS 冒烟清单勾完 |
 
+### 8.4b 阶段 III' —— 1D 网络作者化（N 系列；详见 `2026-09-03-ufm-mapper-1d-network-authoring-plan.md`）
+
+| 切片 | 内容 | 依赖 | 出口标准 / Gate 候选 |
+|---|---|---|---|
+| **N1-A** `.inp` 白名单 IO | 读写 + 语义比较；非白名单节 fatal | — | `swmm_inp_roundtrip` 候选 |
+| **N1-B** 作者化写出器 | `swmm_author` + `scau_preproc swmm-parse`（真实 SwmmEngine 干跑）；模式互斥、原件保护 | N1-A | `swmm_authored_network_parse`（可门禁：SWMM 已嵌入） |
+| **N1-C** 耦合候选生成 | `coupling_role` 节点 → 映射 CSV 候选（review） | N1-B, C4 | C4 确认后 SimDriver 消费 |
+| **N1-D** P10 管网工作台页 | 草稿层/吸附/导入/写出 | N1-B | 离屏冒烟 |
+| **N2-A** 河网草绘契约 + UGRID 写出 | `river_sketch.geojson`；`dflowfm_author`；`ugrid1d-validate` | — | `dflowfm_sketched_network_roundtrip` 候选 |
+| **N2-B** MDU 模板 + provider_required 门禁 | 模板；`authoring_manifest`；导出禁用；自托管 DLL 干跑 | N2-A | 负向门禁；DLL 干跑 `golden_candidate` |
+| **N2-C** 交界候选 → 映射候选 | 并入 C3 | N2-A, C3 | `provider_required` 负向保持 |
+| **N2-D** P11 河网草绘页 | 草稿层/吸附/导出/占位灯 | N2-B | 离屏冒烟 |
+| **E4+** 新建链接 | 作者化节点 → 单元拖拽建候选，必经 C4 | E4, N1-C | 冒烟 |
+
 ### 8.5 阶段 IV —— 耦合链路接线（按 CouplingLib 就绪度插入）
 
 | 切片 | 内容 | 依赖 | 出口标准 / Gate 候选 |
@@ -319,6 +348,8 @@ C4 ─► E4 ─► B6 ─► E5 ─► (C2, C3) ─► M287-F
  │            ▲
  └─ E2 ──────┘        B2 ─► B3 ─┐
                       B5 ─► E5a ┘ (并行于 C4/E4；在 B6 前汇合)
+N1-A ─► N1-B ─► N1-C(需 C4) ─► N1-D ─► E4+   （N1-A/B 与 C4/E4 并行；N1-B 契约先于 B6 定版）
+N2-A ─► N2-B ─► N2-D；N2-C 等 C3               （N2-A 与 B2/B3 并行）
 M288-A(设计评审可在 B6 后并行启动) ─► M288-B ─► M288-C ─► M287-F
 M287-D 独立等待 M281；B7 独立实验
 ```
@@ -338,15 +369,17 @@ M287-D 独立等待 M281；B7 独立实验
 4. 每个产物可追溯到输入哈希、配置哈希、确认文件哈希与精确复现命令；
 5. GoldenSuite 覆盖：G30/G32（网格）、C4/B6/C2/C3/M288 各自 golden 均 `ci_gate:true`
    且三处 manifest 同步；
-6. 平台全程不实现/不配置任何运行时交换、仲裁、账本语义；结果层不做物理量再计算。
+6. 平台全程不实现/不配置任何运行时交换、仲裁、账本语义；结果层不做物理量再计算；
+7. 作者化 1D 网络（N1/N2）产物模式与哈希进入清单；作者化 `.inp` 必过真实引擎解析；河网水力占位未补齐时导出禁用。
 
 ---
 
 ## 10. 明确不做（继承 v1.1 §9 / v2 §9，增补）
 
 - 不做 WebGIS 第二前端（远期可选）；
-- 不做通用 GIS 编辑器（几何编辑用 QGIS 原生工具，平台只消费保存后的文件）；
-- 不实现 1D 河道几何/断面建模（归 D-Flow FM 原生工具）；
+- 不做通用 GIS 编辑器（几何编辑用 QGIS 原生工具，平台只消费保存后的文件；N 系列只提供白名单元素/属性的草稿层与写出器）；
+- 不实现 1D 河道**水力**建模（断面/糙率/边界水力参数/初始条件归 D-Flow FM 原生工具或 provider；几何草绘由 N2 纳入，水力字段 `provider_required` 阻断导出）；
+- 不在作者化 SWMM `.inp` 中生成任何产流节（SUBCATCHMENTS/RAINGAGES/INFILTRATION）——城市产流归 Surface2D（M247）；
 - 不在 UI 持有 CLI 之外的私有后端协议；
 - 不以空间近邻作为耦合关系最终权威；
 - 不在授权样本到位前声明真实城市数据支持；
