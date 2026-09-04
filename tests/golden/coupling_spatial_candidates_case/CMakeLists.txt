@@ -1,0 +1,18 @@
+add_executable(test_coupling_spatial_candidates_case
+    test_coupling_spatial_candidates_case.cpp
+)
+target_compile_definitions(test_coupling_spatial_candidates_case
+    PRIVATE
+        SCAU_COUPLING_SPATIAL_CASE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/cases"
+        SCAU_COUPLING_MAPS_CASE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../coupling_maps_synthetic_case/cases"
+        SCAU_PREPROC_GIS_CASE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../preproc_gis_synthetic_case/cases")
+target_link_libraries(test_coupling_spatial_candidates_case
+    PRIVATE
+        scau::sim_driver
+        scau::surface2d
+        scau::stcf
+        scau::warnings
+        GTest::gtest_main
+)
+add_test(NAME test_coupling_spatial_candidates_case COMMAND test_coupling_spatial_candidates_case)
+set_tests_properties(test_coupling_spatial_candidates_case PROPERTIES LABELS golden)

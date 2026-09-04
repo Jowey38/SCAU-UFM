@@ -125,3 +125,20 @@ class ConfirmationRowsTests(unittest.TestCase):
         self.assertEqual(jobio.confirmation_rows({"status": "ok"}), [])
         job = jobio.build_job_config("pkg", "out", confirmations_dir="c/confirmed")
         self.assertEqual(job["confirmations_dir"], str(Path("c/confirmed")))
+
+
+class CouplingModeTests(unittest.TestCase):
+    def test_mode_block_and_rows(self):
+        self.assertIs(jobio.build_job_config("p", "o", coupling_maps=True)["coupling_maps"], True)
+        job = jobio.build_job_config("p", "o", coupling_maps=True, coupling_mode="spatial_candidates",
+                                     roof_node_max_distance_m=30)
+        self.assertEqual(job["coupling_maps"], {"mode": "spatial_candidates", "roof_node_max_distance_m": 30.0})
+        self.assertNotIn("mode", str(jobio.build_job_config("p", "o", coupling_maps=False, coupling_mode="mixed")))
+        with self.assertRaises(ValueError):
+            jobio.build_job_config("p", "o", coupling_maps=True, coupling_mode="nearest_wins")
+        rows = jobio.coupling_mode_rows({"coupling_maps": {"report": {"mode": "mixed", "mode_parameters": {"roof_node_max_distance_m": 50.0},
+            "chains": {"surface_to_swmm": {"relations": 2, "methods": ["a", "b"], "by_confidence": {"high": 1, "review": 1}},
+                       "surface_to_dflowfm": {"relations": 0}}}}})
+        self.assertEqual([r[1] for r in rows], ["CouplingMode", "CouplingChainCandidates"])
+        self.assertIn("high=1 review=1", rows[1][2])
+        self.assertEqual(jobio.coupling_mode_rows(None), [])

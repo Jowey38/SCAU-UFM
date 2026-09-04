@@ -1,0 +1,35 @@
+{
+  "coupling_mapping_schema_version": 1,
+  "chain": "surface_to_swmm",
+  "status": "candidates_ready",
+  "relations": [
+    {
+      "mapping_id": "SPATIAL_SURF_J1",
+      "surface_zone_id": null,
+      "inlet_id": null,
+      "swmm_node_id": "J1",
+      "cell_index": 379,
+      "node_x": 55.0,
+      "node_y": 10.0,
+      "exchange_elevation_m": 10.4,
+      "exchange_elevation_source": "placeholder:cell_z_b",
+      "method": "spatial_point_in_cell_candidate",
+      "confidence": "review",
+      "review_status": "needs_confirmation"
+    },
+    {
+      "mapping_id": "SPATIAL_SURF_J2",
+      "surface_zone_id": null,
+      "inlet_id": null,
+      "swmm_node_id": "J2",
+      "cell_index": 234,
+      "node_x": 135.0,
+      "node_y": 10.0,
+      "exchange_elevation_m": 10.7,
+      "exchange_elevation_source": "placeholder:cell_z_b",
+      "method": "spatial_point_in_cell_candidate",
+      "confidence": "review",
+      "review_status": "needs_confirmation"
+    }
+  ]
+}

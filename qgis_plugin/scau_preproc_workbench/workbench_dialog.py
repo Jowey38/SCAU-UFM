@@ -127,6 +127,13 @@ class WorkbenchDialog(QDialog):
         self._determinism_check = QCheckBox("确定性复跑校验")
         self._determinism_check.setChecked(True)
         self._coupling_check = QCheckBox("生成耦合映射（阶段 E）")
+        self._coupling_mode = QComboBox()
+        for mode, label in jobio.COUPLING_MODES:
+            self._coupling_mode.addItem(label, mode)
+        self._roof_distance_spin = QDoubleSpinBox()
+        self._roof_distance_spin.setRange(0.1, 10000.0)
+        self._roof_distance_spin.setValue(jobio.DEFAULT_ROOF_NODE_MAX_DISTANCE_M)
+        self._roof_distance_spin.setSuffix(" m")
         self._confirmations_edit = QLineEdit()
         self._confirmations_edit.setPlaceholderText("确认目录（可选；默认使用输入包 coupling/confirmed/）")
         options = QHBoxLayout()
@@ -136,6 +143,12 @@ class WorkbenchDialog(QDialog):
         options.addWidget(self._determinism_check)
         options.addWidget(self._coupling_check)
         options.addStretch()
+        coupling = QHBoxLayout()
+        coupling.addWidget(QLabel("耦合映射模式"))
+        coupling.addWidget(self._coupling_mode)
+        coupling.addWidget(QLabel("屋面→检查井最大距离"))
+        coupling.addWidget(self._roof_distance_spin)
+        coupling.addStretch()
         confirmations = QHBoxLayout()
         confirmations.addWidget(QLabel("耦合确认目录"))
         confirmations.addWidget(self._confirmations_edit)
@@ -146,6 +159,7 @@ class WorkbenchDialog(QDialog):
         layout = QVBoxLayout(page)
         layout.addLayout(grid)
         layout.addLayout(options)
+        layout.addLayout(coupling)
         layout.addLayout(confirmations)
         layout.addStretch()
         return page
@@ -253,6 +267,8 @@ class WorkbenchDialog(QDialog):
             mesh_controls_default_size_m=default_size,
             mesh_controls_default_dist_max_m=default_dist,
             confirmations_dir=self._confirmations_edit.text().strip() or None,
+            coupling_mode=self._coupling_mode.currentData(),
+            roof_node_max_distance_m=self._roof_distance_spin.value(),
         )
 
     def _show_rows(self, rows) -> None:
