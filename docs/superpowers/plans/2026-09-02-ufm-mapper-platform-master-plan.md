@@ -207,7 +207,7 @@ results/<run_id>/timeseries/<point_id>.csv
   "field_derivation": {"dpm_rule_table": "...", "soil_lut": "..."},               // B5
   "coupling_maps": true | {"mode": "explicit_ids|spatial_candidates|mixed", "roof_node_max_distance_m": 50.0},  // C5 ✔
   "confirmations_dir": "coupling/confirmed",                                      // C4 ✔（缺省 = 输入包 coupling/confirmed/）
-  "export_case": {"target_dir": "case/", "require_all_confirmed": true},         // B6
+  "export_case": {"target_dir": "case/", "force": false, "engine_mode": "mock", "end_time": 600.0},  // B6 ✔（门禁：ok + effective complete）
   "drainage_network": {"mode": "authored", "geojson": "...", "generate_coupling_candidates": true}, // N1
   "river_sketch": {"geojson": "...", "case_name": "river", "dll_smoke": false}     // N2
 }
@@ -281,6 +281,7 @@ UI 纪律（全切片强制）：每页只做"渲染选择 → job_config → �
 | **M287-C4** | 耦合确认契约 + 阶段 E'（effective links、漂移检测、review 门禁） | **G33** | 2026-09-04 evidence |
 | **M287-C5** | 空间候选模式（explicit_ids / spatial_candidates / mixed；全 review） | **G34** | 2026-09-04 evidence |
 | **M287-E4** | 耦合关系编辑器（P6：状态着色连线图层、accept/reject/retarget/create/undo → C4 文件） | — | 2026-09-04 evidence |
+| **M287-B6** | 案例包导出器（阶段 F：门禁 + 原子组装 + `simdriver/run.conf` + 包级清单；E5 导出按钮） | **G35** | 2026-09-05 evidence |
 
 ### 8.2 阶段 I ——"候选 → 确认 → 固化"闭环（当前主线，下一步）
 
@@ -306,7 +307,8 @@ UI 纪律（全切片强制）：每页只做"渲染选择 → job_config → �
 
 | 切片 | 内容 | 依赖 | 出口标准 / Gate 候选 |
 |---|---|---|---|
-| **B6 案例包导出器** | 组装 `case/`；先全量 C++ 校验（`validate --case-dir`）后原子 rename；`swmm/model.inp`、`dflowfm/*` 原样复制；包级 SHA-256 + 可复现命令 | C4 | golden：导出包被 `validate` + SimDriver 冷启动直接消费；重复导出逐位一致 |
+| **B6 案例包导出器** | 组装 `case/`；先全量 C++ 校验（`validate --case-dir`）后原子 rename；`swmm/model.inp`、`dflowfm/*` 原样复制；包级 SHA-256 + 可复现命令 | C4 | **DONE 2026-09-05（G35 `ci_gate:true`）**：`superpowers/specs/2026-09-05-m287-b6-case-export-evidence.md`；已知限制：SimDriver run loop 仅三模型，surface+SWMM 包可冷启动但不可运行（待 C3 或驱动双模型模式） |
+
 | **E5 门禁与导出中心** | P7 + P8：报告浏览器分页；导出禁用逻辑；一键导出 | B6 | 离屏冒烟：fatal/未确认 → 禁用；ok → 导出成功 |
 | **B7 双平台确定性** | 受治理 Linux gmsh（third_party 治理）；跨平台哈希实验 | — | 证据决定门禁形态："逐位一致"或"记录在案的 1e-12 容差" |
 | **E6/E7 打包收口** | 图标、翻译、双轨冒烟清单；`project.ufm.json` 工程索引 | E2–E5 | 双版本 QGIS 冒烟清单勾完 |
@@ -359,7 +361,7 @@ M288-A(设计评审可在 B6 后并行启动) ─► M288-B ─► M288-C ─►
 M287-D 独立等待 M281；B7 独立实验
 ```
 
-阶段 I 已全部落地（C4/C5/E4）；建议下一切片：**B6 案例包导出器 + E5 门禁与导出中心**（E2 可并行）（确认契约 → 空间候选模式 → 耦合编辑器）——它们
+阶段 I（C4/C5/E4）与 B6 已落地；建议下一切片：**E5 门禁与导出中心（报告浏览器）+ E2 数据目录树**，并行推进 **B5 字段派生格式** / **B2 CRS**；运行导出包需 **驱动双模型模式或 C3**（新增决策项）（确认契约 → 空间候选模式 → 耦合编辑器）——它们
 是导出门禁语义完整的前提，也是 RAS Mapper "SA/2D Connections 手动确认"体验的对应物。
 
 ---
@@ -416,3 +418,4 @@ M287-D 独立等待 M281；B7 独立实验
 | 时序输出格式 | CF/UGRID NetCDF / 自定义二进制 | NetCDF（与 STCF 同栈） |
 | 结果栅格化 | GeoTIFF（GDAL）/ 仅 NetCDF | 两者，GeoTIFF 可选 |
 | 跨平台门禁口径 | 逐位 / 1e-12 容差 | 由 B7 证据决定 |
+| 导出包的可运行性（B6 发现） | 驱动增加 surface+SWMM 双模型 run 模式 / 等 C3 河网链接 | 建议驱动侧增加双模型模式（独立切片，需 golden），C3 仍按 provider 就绪度推进 |

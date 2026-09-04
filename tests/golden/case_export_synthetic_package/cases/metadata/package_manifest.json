@@ -1,0 +1,56 @@
+{
+  "package_id": "scau_ufm_d5_gis_preproc_template",
+  "package_version": "0.1.0",
+  "status": "synthetic_template_only",
+  "d5_unblocked": false,
+  "synthetic_data": true,
+  "authorization_required": true,
+  "target_crs": "TODO_PROVIDER: EPSG code or WKT",
+  "vertical_datum": "TODO_PROVIDER",
+  "horizontal_units": "metre",
+  "vertical_units": "metre",
+  "time_zone": "TODO_PROVIDER",
+  "canonical_targets": [
+    "node_x",
+    "node_y",
+    "face_nodes",
+    "edge_nodes",
+    "phi_t",
+    "phi_xx",
+    "phi_xy",
+    "phi_yy",
+    "manning_n",
+    "z_b",
+    "soil_type",
+    "omega_edge",
+    "phi_e_n",
+    "phi_et"
+  ],
+  "datasets": [
+    {"id": "computational_boundary", "path": "boundary/computational_boundary.geojson", "kind": "vector_gis", "required": true, "synthetic": true},
+    {"id": "dem", "path": "terrain/dem.asc", "metadata": "terrain/dem_metadata.json", "kind": "raster_dem", "required": true, "synthetic": true},
+    {"id": "buildings", "path": "buildings/buildings.geojson", "kind": "vector_gis", "required": true, "synthetic": true},
+    {"id": "landcover", "path": "landcover/landcover.geojson", "kind": "vector_gis", "required": true, "synthetic": true},
+    {"id": "geometry_clean_policy", "path": "metadata/geometry_clean_policy.json", "kind": "policy", "required": true, "synthetic": true},
+    {"id": "soil_zones", "path": "soil/soil_zones.geojson", "kind": "vector_gis", "required": false, "synthetic": true},
+    {"id": "soil_parameters", "path": "soil/soil_parameters.csv", "kind": "table", "required": false, "synthetic": true},
+    {"id": "swmm", "path": "swmm/model.inp", "kind": "swmm_5_2_x", "required": true, "synthetic": true},
+    {"id": "surface_swmm_mapping", "path": "swmm/node_surface_mapping.csv", "kind": "mapping_table", "required": true, "synthetic": true},
+    {"id": "roof_swmm_mapping", "path": "swmm/roof_drain_mapping.csv", "kind": "mapping_table", "required": true, "synthetic": true},
+    {"id": "dflowfm", "path": "dflowfm/", "kind": "dflowfm_bmi_or_native", "required": false, "synthetic": false}
+  ],
+  "expected_outputs": [
+    "validated STCF v5 / CF-UGRID NetCDF case",
+    "mesh quality report",
+    "field validation report",
+    "surface-to-SWMM mapping report",
+    "roof-to-SWMM mapping report",
+    "optional surface-to-D-Flow-FM mapping report",
+    "provenance and reproducibility report"
+  ],
+  "notes": [
+    "Synthetic fixtures are not evidence of real-city importer support.",
+    "Do not infer phi_t, tensor fields, omega_edge, or phi_e_n without an approved physical mapping rule.",
+    "Runtime Q_limit, deficit, rollback, replay, and arbitration remain CouplingLib responsibilities."
+  ]
+}

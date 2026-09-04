@@ -48,7 +48,7 @@
   糙率、初始水位、边界水力参数不生成数值，只留显式占位。
 - **不推断河道边界类型/方向/ID**（v1.1 §5）；交界线只是几何候选。
 - **不做 SWMM 全节集合**：一期只写 `TITLE/OPTIONS/JUNCTIONS/OUTFALLS/CONDUITS/
-  XSECTIONS/COORDINATES/REPORT/END`（与 D-5 样例一致）；`STORAGE/ORIFICES/WEIRS/
+  XSECTIONS/COORDINATES/REPORT`（与 D-5 样例一致；SWMM 5.2 无 `[END]` 节，样例中的 `[END]` 已于 B6 冷启动证据中被真实引擎拒绝并删除）；`STORAGE/ORIFICES/WEIRS/
   PUMPS/CONTROLS/CURVES/TIMESERIES` 为第二期显式白名单扩展，未白名单的节出现即 fatal。
 - **不声明真实城市管网/河网支持**（M281 未解锁前全部为合成/作者化数据）。
 - **不做 SWMM 或 D-Flow FM 的运行控制界面**（运行归 SimDriver）。

@@ -1,0 +1,10 @@
+{
+  "confirmation_schema_version": 1,
+  "confirmed_by": "synthetic_fixture_operator",
+  "timestamp": "2026-09-03T10:00:00",
+  "chain": "roof_to_swmm",
+  "mapping_id": "MAP_ROOF_SYNTH_001",
+  "decision": "reject",
+  "candidate_sha256": "1d90ef355c4a8958aa825507fb1e56e69cc06e5b6bce2eaa65fc2e78fbf22166",
+  "note": "Synthetic fixture: roof drain 1 not connected in this scenario."
+}

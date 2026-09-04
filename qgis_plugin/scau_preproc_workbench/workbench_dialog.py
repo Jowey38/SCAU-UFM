@@ -90,10 +90,17 @@ class WorkbenchDialog(QDialog):
         self._load_button = QPushButton("加载图层")
         self._load_button.clicked.connect(self._load_layers)
         self._export_label = QLabel("导出门禁：未运行")
+        self._export_button = QPushButton("导出案例包")
+        self._export_button.setEnabled(False)
+        self._export_button.clicked.connect(self._export_case)
+        self._export_target_edit = QLineEdit()
+        self._export_target_edit.setPlaceholderText("案例包目标目录（B6）")
         buttons = QHBoxLayout()
         buttons.addWidget(self._run_button)
         buttons.addWidget(self._load_button)
         buttons.addWidget(self._export_label)
+        buttons.addWidget(self._export_target_edit)
+        buttons.addWidget(self._export_button)
         buttons.addStretch()
 
         self._findings = QTableWidget(0, 3)
@@ -560,6 +567,26 @@ class WorkbenchDialog(QDialog):
         self._export_label.setText(
             "导出门禁：允许 (status=ok)" if can_export
             else "导出门禁：禁止（存在 fatal / review / 未确认耦合候选）")
+        self._export_button.setEnabled(can_export)
+
+    def _export_case(self) -> None:
+        """B6: re-runs the pipeline with export_case so the exporter's own gate
+        (validation status, effective links complete, hashes) decides; the UI
+        never assembles the package itself."""
+        target = self._export_target_edit.text().strip()
+        if not target:
+            self._show_rows([("fatal", "MissingExportTarget", "请填写案例包目标目录")])
+            return
+        repo_root = self._repo_edit.text().strip()
+        job = self._current_job()
+        job["export_case"] = {"target_dir": target, "force": True}
+        job_path = jobio.write_job_config(job, job["output_dir"])
+        result = jobio.run_pipeline(job_path, repo_root)
+        rows = jobio.findings_rows(result.get("validation"))
+        if result.get("stderr") and result.get("validation") is None:
+            rows.insert(0, ("fatal", result["status"], result["stderr"][-2000:]))
+        self._show_rows(rows)
+        self._export_button.setEnabled(jobio.exportable(result.get("validation")))
 
     def _load_layers(self) -> None:
         job = self._current_job()
