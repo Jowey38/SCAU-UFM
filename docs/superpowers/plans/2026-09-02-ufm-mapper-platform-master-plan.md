@@ -229,7 +229,7 @@ UI 纪律（全切片强制）：每页只做"渲染选择 → job_config → �
 | P3 | 字段映射 | 源字段 → canonical 目标（下拉只允许 canonical 集合） | `manifest.canonical_targets`、`field_dictionary.csv` | — | E2 |
 | P4 | 网格工作台（✔） | 草稿层绘制 → `mesh_controls.geojson`；热力图；诊断层 | 已落地 | — | E3 ✔ |
 | P5 | 语义与物理参数表 | 浏览/编辑 soil LUT、Manning LUT、DPM 规则表（编辑即写新版本文件，不改原文件） | `soil_lut.json`、`dpm_rule_table.json` | B5 | E5a |
-| P6 | 耦合关系编辑器 | 地图高亮 1D 节点↔2D 单元连线；`review` 标红；确认/拒绝/改目标 → 写 `coupling/confirmed/*.json` | 映射 JSON、确认契约 | C4 | E4 |
+| P6 | 耦合关系编辑器（✔） | 地图高亮 1D 节点↔2D 单元连线；`review` 标红；确认/拒绝/改目标/新建/撤销 → 写 `coupling/confirmed/*.json` | 映射 JSON、确认契约 | C4 | E4 ✔ |
 | P7 | 质量门禁 | 全量报告浏览器（import/terrain/topology/field/coupling/reproducibility 分页）；fatal/review/pass 计数；点击定位 | 全部报告 | — | E5 |
 | P8 | 导出与复现 | 一键 Run Pipeline；导出按钮在 fatal/未确认时禁用（复用 `jobio.exportable`）；显示可复现命令与包哈希 | B6 导出器 | B6 | E5 |
 | P9 | 结果制图 | 时间轴播放；深度/流速分级渲染；点击取时序；与 SWMM `.out`/D-Flow map 只读联看 | M288-A/B 产物 | M288-B | M288-C |
@@ -280,6 +280,7 @@ UI 纪律（全切片强制）：每页只做"渲染选择 → job_config → �
 | **M287-B4 + E3** | 网格控制 + 网格工作台 | **G32** | 2026-09-02 evidence |
 | **M287-C4** | 耦合确认契约 + 阶段 E'（effective links、漂移检测、review 门禁） | **G33** | 2026-09-04 evidence |
 | **M287-C5** | 空间候选模式（explicit_ids / spatial_candidates / mixed；全 review） | **G34** | 2026-09-04 evidence |
+| **M287-E4** | 耦合关系编辑器（P6：状态着色连线图层、accept/reject/retarget/create/undo → C4 文件） | — | 2026-09-04 evidence |
 
 ### 8.2 阶段 I ——"候选 → 确认 → 固化"闭环（当前主线，下一步）
 
@@ -288,7 +289,8 @@ UI 纪律（全切片强制）：每页只做"渲染选择 → job_config → �
 | **C4 确认契约** | `coupling/confirmed/*.json` schema；E' 合并阶段；候选哈希漂移检测；`effective_links.json` → `effective/simdriver_links.conf` | C ✔ | **DONE 2026-09-04（G33 `ci_gate:true`）**：`superpowers/specs/2026-09-04-m287-c4-confirmation-contract-evidence.md` |
 | **C5 空间候选模式** | 映射模式 `explicit_ids` / `spatial_candidates` / `mixed`（互斥声明进 `job_config.coupling_maps.mode`，记录进 `mapping_report.json` 与 manifest）：无显式表时对每个 SWMM 节点按单元包含生成候选（落孔洞仍 fatal、边界外 review）；屋面按建筑质心→最近节点（距离阈值版本化）；显式表部分覆盖时表内 `high`、表外 `review` 分别计数；`exchange_elevation_m` 取单元 `z_b` 并标注 `placeholder_source`；全部 `needs_confirmation`，SimDriver 在未确认前拒绝消费 | C4 | **DONE 2026-09-04（G34 `ci_gate:true`）**：`superpowers/specs/2026-09-04-m287-c5-spatial-candidates-evidence.md` |
 
-| **E4 耦合编辑器** | P6 页：连线图层、review 标红、确认/拒绝/改目标写契约文件；**新建链接**（任意 1D 节点拖到 2D 单元 → `decision: create` 候选，必经确认）；不改生成器输出 | C4, C5 | 离屏冒烟；headless `jobio` 测试；确认文件与契约 schema 一致 |
+| **E4 耦合编辑器** | P6 页：连线图层、review 标红、确认/拒绝/改目标写契约文件；**新建链接**（任意 1D 节点拖到 2D 单元 → `decision: create` 候选，必经确认）；不改生成器输出 | C4, C5 | **DONE 2026-09-04**：`superpowers/specs/2026-09-04-m287-e4-coupling-editor-evidence.md`（契约由 G33 锁定；离屏冒烟全闭环） |
+
 | **E2 数据目录树 + P1/P3** | 分组树、状态灯、finding → 对象定位、字段映射下拉 | A 报告已含对象 ID | 离屏冒烟；三类状态灯断言 |
 
 ### 8.3 阶段 II —— 输入治理与真实字段（可与阶段 I 并行）
@@ -357,7 +359,7 @@ M288-A(设计评审可在 B6 后并行启动) ─► M288-B ─► M288-C ─►
 M287-D 独立等待 M281；B7 独立实验
 ```
 
-建议下一切片（C4/C5 已落地）：**E4**（确认契约 → 空间候选模式 → 耦合编辑器）——它们
+阶段 I 已全部落地（C4/C5/E4）；建议下一切片：**B6 案例包导出器 + E5 门禁与导出中心**（E2 可并行）（确认契约 → 空间候选模式 → 耦合编辑器）——它们
 是导出门禁语义完整的前提，也是 RAS Mapper "SA/2D Connections 手动确认"体验的对应物。
 
 ---

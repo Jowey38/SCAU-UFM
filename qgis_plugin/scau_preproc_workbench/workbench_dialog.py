@@ -17,10 +17,14 @@ import json
 from pathlib import Path
 
 from qgis.core import (
+    QgsCategorizedSymbolRenderer,
     QgsCoordinateReferenceSystem,
     QgsFillSymbol,
     QgsGraduatedSymbolRenderer,
+    QgsLineSymbol,
+    QgsMarkerSymbol,
     QgsProject,
+    QgsRendererCategory,
     QgsRendererRange,
     QgsSettings,
     QgsVectorLayer,
@@ -37,6 +41,7 @@ from qgis.PyQt.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QSpinBox,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -48,6 +53,12 @@ from . import jobio
 
 # Fixed good -> bad ramp (5 classes) shared by every heat-map metric.
 HEATMAP_COLOURS = ("#1a9850", "#91cf60", "#fee08b", "#fc8d59", "#d73027")
+# Coupling-editor status colours (E4): review/unconfirmed red, confirmed green,
+# retargeted blue, rejected grey, drifted orange.
+STATUS_COLOURS = {"unconfirmed": "#d73027", "accepted": "#1a9850", "retargeted": "#1f78b4",
+                  "rejected": "#9e9e9e", "drifted": "#ff7f00"}
+EDITOR_COLUMNS = ("chain", "mapping_id", "swmm_node_id", "building_id", "candidate_cell_index",
+                  "cell_index", "exchange_elevation_m", "confidence", "status", "decision_file")
 
 
 class WorkbenchDialog(QDialog):
@@ -56,7 +67,7 @@ class WorkbenchDialog(QDialog):
 
     def __init__(self, repo_root_hint: str, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("SCAU PreProc Workbench (M287-E1/E3)")
+        self.setWindowTitle("SCAU PreProc Workbench (M287-E1/E3/E4)")
         self.resize(820, 640)
 
         # The plugin may run from a copied profile deployment, so the repo
@@ -72,6 +83,7 @@ class WorkbenchDialog(QDialog):
         tabs = QTabWidget()
         tabs.addTab(self._build_job_page(initial_root), "作业")
         tabs.addTab(self._build_mesh_page(), "网格工作台")
+        tabs.addTab(self._build_coupling_page(), "耦合编辑器")
 
         self._run_button = QPushButton("运行流水线")
         self._run_button.clicked.connect(self._run)
@@ -228,6 +240,233 @@ class WorkbenchDialog(QDialog):
         layout.addWidget(hint)
         layout.addStretch()
         return page
+
+    _OPERATOR_KEY = "scau_preproc_workbench/operator"
+    _EDITOR_LAYER_PREFIX = "scau_coupling_"
+
+    def _build_coupling_page(self) -> QWidget:
+        page = QWidget()
+        top = QGridLayout()
+        self._operator_edit = QLineEdit(QgsSettings().value(self._OPERATOR_KEY, "", type=str))
+        self._operator_edit.setPlaceholderText("确认者标识（写入 confirmed_by）")
+        top.addWidget(QLabel("确认者"), 0, 0)
+        top.addWidget(self._operator_edit, 0, 1)
+        refresh = QPushButton("刷新候选 / 加载连线图层")
+        refresh.clicked.connect(self._load_coupling_layers)
+        top.addWidget(refresh, 0, 2)
+
+        self._coupling_table = QTableWidget(0, len(EDITOR_COLUMNS))
+        self._coupling_table.setHorizontalHeaderLabels(list(EDITOR_COLUMNS))
+        self._coupling_table.horizontalHeader().setStretchLastSection(True)
+        self._coupling_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._coupling_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self._coupling_table.itemSelectionChanged.connect(self._highlight_selected_candidate)
+
+        self._target_cell_spin = QSpinBox()
+        self._target_cell_spin.setRange(0, 10_000_000)
+        self._target_crest_spin = QDoubleSpinBox()
+        self._target_crest_spin.setDecimals(3)
+        self._target_crest_spin.setRange(-1000.0, 10000.0)
+        self._target_crest_spin.setSpecialValueText("（保留候选值）")
+        self._target_crest_spin.setValue(-1000.0)
+        pick = QPushButton("取地图选中单元")
+        pick.clicked.connect(self._pick_selected_cell)
+        self._note_edit = QLineEdit()
+        self._note_edit.setPlaceholderText("备注（可选）")
+        target = QHBoxLayout()
+        target.addWidget(QLabel("目标单元"))
+        target.addWidget(self._target_cell_spin)
+        target.addWidget(pick)
+        target.addWidget(QLabel("交换高程"))
+        target.addWidget(self._target_crest_spin)
+        target.addWidget(self._note_edit)
+
+        actions = QHBoxLayout()
+        for label, decision in (("确认 (accept)", "accept"), ("拒绝 (reject)", "reject"),
+                                ("改目标 (retarget)", "retarget")):
+            button = QPushButton(label)
+            button.clicked.connect(lambda _=False, d=decision: self._decide(d))
+            actions.addWidget(button)
+        undo = QPushButton("撤销决策")
+        undo.clicked.connect(self._undo_decision)
+        actions.addWidget(undo)
+        actions.addStretch()
+
+        create = QHBoxLayout()
+        self._create_chain = QComboBox()
+        for chain in jobio.COUPLING_CHAINS:
+            self._create_chain.addItem(chain, chain)
+        self._create_id = QLineEdit()
+        self._create_id.setPlaceholderText("新 mapping_id")
+        self._create_node = QLineEdit()
+        self._create_node.setPlaceholderText("swmm_node_id")
+        self._create_building = QLineEdit()
+        self._create_building.setPlaceholderText("building_id（roof 链）")
+        create_button = QPushButton("新建链接 (create) ← 目标单元/高程")
+        create_button.clicked.connect(self._create_link)
+        for widget in (QLabel("新建"), self._create_chain, self._create_id, self._create_node,
+                       self._create_building, create_button):
+            create.addWidget(widget)
+
+        hint = QLabel(
+            "所有决策写入 C4 确认文件（默认输入包 coupling/confirmed/，或作业页指定目录），"
+            "生成器候选文件永不修改。红=待确认/review，绿=已确认，蓝=已改目标，灰=已拒绝，橙=候选已漂移。"
+            "写入后重新“运行流水线”即可看到有效链接与导出门禁变化。")
+        hint.setWordWrap(True)
+
+        layout = QVBoxLayout(page)
+        layout.addLayout(top)
+        layout.addWidget(self._coupling_table)
+        layout.addLayout(target)
+        layout.addLayout(actions)
+        layout.addLayout(create)
+        layout.addWidget(hint)
+        return page
+
+    # --- coupling editor actions --------------------------------------------
+
+    def _write_editor_geojson(self, name: str, collection: dict) -> str:
+        directory = Path(self._current_job()["output_dir"]) / "coupling" / "editor"
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / f"{name}.geojson"
+        path.write_text(json.dumps(collection), encoding="utf-8")
+        return str(path)
+
+    def _status_renderer(self, geometry: str) -> QgsCategorizedSymbolRenderer:
+        categories = []
+        for status, colour in STATUS_COLOURS.items():
+            if geometry == "line":
+                symbol = QgsLineSymbol.createSimple({"color": colour, "width": "0.8"})
+            elif geometry == "point":
+                symbol = QgsMarkerSymbol.createSimple({"color": colour, "size": "3",
+                                                       "outline_color": "#000000"})
+            else:
+                symbol = QgsFillSymbol.createSimple({"color": colour + "66", "outline_color": colour,
+                                                     "outline_width": "0.6"})
+            categories.append(QgsRendererCategory(status, symbol, status))
+        return QgsCategorizedSymbolRenderer("status", categories)
+
+    def _load_coupling_layers(self) -> None:
+        job = self._current_job()
+        if not job["output_dir"]:
+            self._show_rows([("fatal", "MissingOutputDir", "请先在作业页选择输出目录")])
+            return
+        layers = jobio.build_coupling_link_layers(job)
+        project = QgsProject.instance()
+        for layer in list(project.mapLayers().values()):
+            if layer.name().startswith(self._EDITOR_LAYER_PREFIX):
+                project.removeMapLayer(layer.id())
+        for name, geometry in (("cells", "fill"), ("links", "line"), ("nodes", "point")):
+            path = self._write_editor_geojson(name, layers[name])
+            layer = QgsVectorLayer(path, f"{self._EDITOR_LAYER_PREFIX}{name}", "ogr")
+            if layer.isValid():
+                layer.setRenderer(self._status_renderer(geometry))
+                project.addMapLayer(layer)
+        self._fill_coupling_table(layers)
+        self._show_rows(jobio.coupling_editor_rows(job))
+
+    def _fill_coupling_table(self, layers: dict) -> None:
+        rows = [f["properties"] for f in layers["cells"]["features"]]
+        seen = {(r["chain"], r["mapping_id"]) for r in rows}
+        for f in layers["nodes"]["features"]:
+            key = (f["properties"]["chain"], f["properties"]["mapping_id"])
+            if key not in seen:
+                rows.append(f["properties"])
+                seen.add(key)
+        rows.sort(key=lambda r: (r["chain"], r["mapping_id"]))
+        self._coupling_table.setRowCount(len(rows))
+        for r, props in enumerate(rows):
+            for c, key in enumerate(EDITOR_COLUMNS):
+                item = QTableWidgetItem("" if props.get(key) is None else str(props[key]))
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                self._coupling_table.setItem(r, c, item)
+
+    def _selected_candidate(self) -> tuple[str, str] | None:
+        row = self._coupling_table.currentRow()
+        if row < 0:
+            return None
+        return (self._coupling_table.item(row, 0).text(), self._coupling_table.item(row, 1).text())
+
+    def _highlight_selected_candidate(self) -> None:
+        selected = self._selected_candidate()
+        if not selected:
+            return
+        chain, mapping_id = selected
+        expression = f'"chain" = \'{chain}\' AND "mapping_id" = \'{mapping_id}\''
+        for layer in QgsProject.instance().mapLayers().values():
+            if layer.name().startswith(self._EDITOR_LAYER_PREFIX) and isinstance(layer, QgsVectorLayer):
+                layer.selectByExpression(expression)
+
+    def _pick_selected_cell(self) -> None:
+        """cell_id of the first selected feature of a quality-cells (heat map)
+        layer: the operator clicks the target cell on the map."""
+        for layer in QgsProject.instance().mapLayers().values():
+            if isinstance(layer, QgsVectorLayer) and layer.name().startswith("scau_mesh_quality"):
+                for feature in layer.selectedFeatures():
+                    self._target_cell_spin.setValue(int(feature["cell_id"]))
+                    self._show_rows([("info", "TargetCellPicked",
+                                      f"cell {feature['cell_id']} from {layer.name()}")])
+                    return
+        self._show_rows([("info", "NoCellSelected", "先加载质量热力图并在地图上选中一个单元")])
+
+    def _operator(self) -> str:
+        operator = self._operator_edit.text().strip()
+        if operator:
+            QgsSettings().setValue(self._OPERATOR_KEY, operator)
+        return operator
+
+    def _crest_override(self) -> float | None:
+        value = self._target_crest_spin.value()
+        return None if value <= self._target_crest_spin.minimum() else value
+
+    def _decide(self, decision: str) -> None:
+        selected = self._selected_candidate()
+        if not selected:
+            self._show_rows([("fatal", "NoCandidateSelected", "先在表中选择一个候选")])
+            return
+        chain, mapping_id = selected
+        target = None
+        if decision == "retarget":
+            target = {"cell_index": self._target_cell_spin.value()}
+            if self._crest_override() is not None:
+                target["exchange_elevation_m"] = self._crest_override()
+        try:
+            path = jobio.write_decision(self._current_job(), chain, mapping_id, decision,
+                                        confirmed_by=self._operator(), target=target,
+                                        note=self._note_edit.text().strip())
+        except ValueError as error:
+            self._show_rows([("fatal", "DecisionRejected", str(error))])
+            return
+        self._load_coupling_layers()
+        self._show_rows([("info", "DecisionWritten", f"{decision} {chain}/{mapping_id} -> {path}")]
+                        + jobio.coupling_editor_rows(self._current_job()))
+
+    def _undo_decision(self) -> None:
+        selected = self._selected_candidate()
+        if not selected:
+            self._show_rows([("fatal", "NoCandidateSelected", "先在表中选择一个候选")])
+            return
+        removed = jobio.remove_decision(self._current_job(), selected[1])
+        self._load_coupling_layers()
+        self._show_rows([("info", "DecisionRemoved" if removed else "NoDecisionFile", selected[1])]
+                        + jobio.coupling_editor_rows(self._current_job()))
+
+    def _create_link(self) -> None:
+        crest = self._crest_override()
+        if crest is None:
+            self._show_rows([("fatal", "CreateRejected", "新建链接必须给出交换高程")])
+            return
+        try:
+            path = jobio.write_create_decision(
+                self._current_job(), self._create_chain.currentData(), self._create_id.text(),
+                confirmed_by=self._operator(), swmm_node_id=self._create_node.text(),
+                cell_index=self._target_cell_spin.value(), exchange_elevation_m=crest,
+                building_id=self._create_building.text().strip() or None,
+                note=self._note_edit.text().strip())
+        except ValueError as error:
+            self._show_rows([("fatal", "CreateRejected", str(error))])
+            return
+        self._show_rows([("info", "LinkCreated", f"create -> {path}（重新运行流水线后生效）")])
 
     # --- helpers ------------------------------------------------------------
 

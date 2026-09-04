@@ -343,6 +343,248 @@ def confirmation_rows(validation: dict | None) -> list[tuple[str, str, str]]:
     return rows
 
 
+# --- E4 coupling editor (pure layer) ------------------------------------------
+
+CONFIRMATION_SCHEMA_VERSION = 1
+COUPLING_CHAINS = ("surface_to_swmm", "roof_to_swmm")
+COUPLING_DECISIONS = ("accept", "reject", "retarget", "create")
+_CHAIN_FILES = {"surface_to_swmm": "surface_swmm_mapping.json", "roof_to_swmm": "roof_drain_mapping.json"}
+
+
+def candidate_sha256(relation: dict) -> str:
+    """Canonical candidate hash (MUST match scau_preproc.confirmations)."""
+    import hashlib
+    payload = json.dumps(relation, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _cell_key(chain: str) -> str:
+    return "cell_index" if chain == "surface_to_swmm" else "overflow_target_cell_index"
+
+
+def load_candidates(job: dict) -> dict[str, list[dict]]:
+    """Generator candidates per chain from <output>/coupling (empty if absent)."""
+    coupling = Path(job["output_dir"]) / "coupling"
+    result: dict[str, list[dict]] = {}
+    for chain, name in _CHAIN_FILES.items():
+        path = coupling / name
+        try:
+            result[chain] = json.loads(path.read_text(encoding="utf-8")).get("relations", []) if path.is_file() else []
+        except (OSError, ValueError):
+            result[chain] = []
+    return result
+
+
+def confirmations_dir_for(job: dict) -> Path:
+    """Where the editor writes decisions: job_config.confirmations_dir, else the
+    package's coupling/confirmed/ (the pipeline default)."""
+    configured = job.get("confirmations_dir")
+    if configured:
+        return Path(configured)
+    return Path(job["package"]) / "coupling" / "confirmed"
+
+
+def load_decisions(confirmations_dir: Path) -> dict[tuple[str, str], dict]:
+    """(chain, mapping_id) -> decision file content (+ _file)."""
+    decisions: dict[tuple[str, str], dict] = {}
+    if not Path(confirmations_dir).is_dir():
+        return decisions
+    for path in sorted(Path(confirmations_dir).glob("*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict) and data.get("chain") in COUPLING_CHAINS and data.get("mapping_id"):
+            decisions[(data["chain"], data["mapping_id"])] = {**data, "_file": path.name}
+    return decisions
+
+
+def candidate_status(relation: dict, decision: dict | None) -> str:
+    """unconfirmed | accepted | retargeted | rejected | drifted."""
+    if decision is None:
+        return "unconfirmed"
+    if decision.get("candidate_sha256") != candidate_sha256(relation):
+        return "drifted"
+    return {"accept": "accepted", "reject": "rejected", "retarget": "retargeted"}.get(
+        decision.get("decision"), "unconfirmed")
+
+
+def load_cell_geometries(job: dict) -> dict[int, list]:
+    """cell_id -> ring from mesh_quality_cells.geojson (display geometry only)."""
+    path = Path(job["output_dir"]) / "mesh_quality_cells.geojson"
+    if not path.is_file():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return {int(f["properties"]["cell_id"]): f["geometry"]["coordinates"][0]
+            for f in data.get("features", []) if f.get("geometry")}
+
+
+def _centroid(ring: list) -> tuple[float, float]:
+    points = ring[:-1] if ring and ring[0] == ring[-1] else ring
+    return sum(p[0] for p in points) / len(points), sum(p[1] for p in points) / len(points)
+
+
+def build_coupling_link_layers(job: dict) -> dict:
+    """Editor layers as GeoJSON dicts: links (LineString node->cell), nodes
+    (Point) and cells (Polygon), each tagged with chain / mapping_id /
+    confidence / status so the shell can colour review in red and confirmed
+    in green. Roof source geometry is the building centroid (when known)."""
+    candidates = load_candidates(job)
+    decisions = load_decisions(confirmations_dir_for(job))
+    cells = load_cell_geometries(job)
+    buildings: dict[str, tuple[float, float]] = {}
+    buildings_path = Path(job["package"]) / "buildings/buildings.geojson"
+    if buildings_path.is_file():
+        for f in json.loads(buildings_path.read_text(encoding="utf-8")).get("features", []):
+            if f.get("geometry", {}).get("type") == "Polygon":
+                buildings[str(f["properties"].get("building_id"))] = _centroid(f["geometry"]["coordinates"][0])
+
+    links, nodes, cell_features = [], [], []
+    summary = {"unconfirmed": 0, "accepted": 0, "retargeted": 0, "rejected": 0, "drifted": 0}
+    for chain, relations in candidates.items():
+        cell_key = _cell_key(chain)
+        for relation in relations:
+            decision = decisions.get((chain, relation["mapping_id"]))
+            status = candidate_status(relation, decision)
+            summary[status] += 1
+            cell_id = relation.get(cell_key)
+            if status == "retargeted" and decision and isinstance(decision.get("target"), dict):
+                cell_id = decision["target"].get("cell_index", cell_id)
+            if chain == "surface_to_swmm":
+                source = (relation.get("node_x"), relation.get("node_y"))
+            else:
+                source = buildings.get(str(relation.get("building_id")), (None, None))
+            props = {
+                "chain": chain,
+                "mapping_id": relation["mapping_id"],
+                "swmm_node_id": relation.get("swmm_node_id"),
+                "building_id": relation.get("building_id"),
+                "cell_index": cell_id,
+                "candidate_cell_index": relation.get(cell_key),
+                "exchange_elevation_m": relation.get("exchange_elevation_m"),
+                "method": relation.get("method"),
+                "confidence": relation.get("confidence"),
+                "status": status,
+                "decision_file": decision.get("_file") if decision else None,
+            }
+            ring = cells.get(cell_id) if cell_id is not None else None
+            if ring:
+                cell_features.append({"type": "Feature", "properties": props,
+                                      "geometry": {"type": "Polygon", "coordinates": [ring]}})
+            if source[0] is not None:
+                nodes.append({"type": "Feature", "properties": props,
+                              "geometry": {"type": "Point", "coordinates": [source[0], source[1]]}})
+                if ring:
+                    cx, cy = _centroid(ring)
+                    links.append({"type": "Feature", "properties": props,
+                                  "geometry": {"type": "LineString",
+                                               "coordinates": [[source[0], source[1]], [cx, cy]]}})
+    def collection(features):
+        return {"type": "FeatureCollection", "features": features}
+    return {"links": collection(links), "nodes": collection(nodes), "cells": collection(cell_features),
+            "summary": summary}
+
+
+def write_decision(job: dict, chain: str, mapping_id: str, decision: str, *,
+                   confirmed_by: str, target: dict | None = None, note: str = "") -> Path:
+    """Writes one C4 confirmation file for a generator candidate. The
+    candidate hash is computed from the CURRENT candidate file so the decision
+    binds to what the operator saw; the pipeline detects later drift."""
+    if chain not in COUPLING_CHAINS:
+        raise ValueError(f"unknown chain {chain!r}")
+    if decision not in ("accept", "reject", "retarget"):
+        raise ValueError(f"write_decision handles accept/reject/retarget, got {decision!r}")
+    if not confirmed_by.strip():
+        raise ValueError("confirmed_by must not be empty")
+    relation = next((r for r in load_candidates(job).get(chain, []) if r["mapping_id"] == mapping_id), None)
+    if relation is None:
+        raise ValueError(f"no candidate {chain}/{mapping_id} in the current output")
+    payload = {
+        "confirmation_schema_version": CONFIRMATION_SCHEMA_VERSION,
+        "chain": chain,
+        "mapping_id": mapping_id,
+        "decision": decision,
+        "candidate_sha256": candidate_sha256(relation),
+        "confirmed_by": confirmed_by.strip(),
+        "timestamp": _now_iso(),
+    }
+    if decision == "retarget":
+        if not target or not isinstance(target.get("cell_index"), int):
+            raise ValueError("retarget needs target.cell_index")
+        payload["target"] = {"cell_index": int(target["cell_index"])}
+        if target.get("exchange_elevation_m") is not None:
+            payload["target"]["exchange_elevation_m"] = float(target["exchange_elevation_m"])
+    if note:
+        payload["note"] = note
+    return _write_confirmation(confirmations_dir_for(job), f"{mapping_id}.json", payload)
+
+
+def write_create_decision(job: dict, chain: str, mapping_id: str, *, confirmed_by: str,
+                          swmm_node_id: str, cell_index: int, exchange_elevation_m: float,
+                          building_id: str | None = None, note: str = "") -> Path:
+    """Writes a C4 `create` decision (operator-authored link, no candidate)."""
+    if chain not in COUPLING_CHAINS:
+        raise ValueError(f"unknown chain {chain!r}")
+    if not mapping_id.strip() or not confirmed_by.strip() or not swmm_node_id.strip():
+        raise ValueError("mapping_id, confirmed_by and swmm_node_id must not be empty")
+    if any(r["mapping_id"] == mapping_id for r in load_candidates(job).get(chain, [])):
+        raise ValueError(f"{mapping_id} is an existing candidate; use accept/retarget instead")
+    if chain == "roof_to_swmm" and not building_id:
+        raise ValueError("roof create needs building_id")
+    target = {"cell_index": int(cell_index), "swmm_node_id": swmm_node_id.strip(),
+              "exchange_elevation_m": float(exchange_elevation_m)}
+    if building_id:
+        target["building_id"] = building_id
+    payload = {
+        "confirmation_schema_version": CONFIRMATION_SCHEMA_VERSION,
+        "chain": chain,
+        "mapping_id": mapping_id.strip(),
+        "decision": "create",
+        "candidate_sha256": None,
+        "confirmed_by": confirmed_by.strip(),
+        "timestamp": _now_iso(),
+        "target": target,
+    }
+    if note:
+        payload["note"] = note
+    return _write_confirmation(confirmations_dir_for(job), f"{mapping_id.strip()}.json", payload)
+
+
+def remove_decision(job: dict, mapping_id: str) -> bool:
+    path = confirmations_dir_for(job) / f"{mapping_id}.json"
+    if path.is_file():
+        path.unlink()
+        return True
+    return False
+
+
+def _now_iso() -> str:
+    import time
+    return time.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def _write_confirmation(directory: Path, name: str, payload: dict) -> Path:
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / name
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp.replace(path)
+    return path
+
+
+def coupling_editor_rows(job: dict) -> list[tuple[str, str, str]]:
+    layers = build_coupling_link_layers(job)
+    s = layers["summary"]
+    total = sum(s.values())
+    if total == 0:
+        return [("info", "NoCouplingCandidates", "run the pipeline with coupling maps first")]
+    severity = "pass" if s["unconfirmed"] == 0 and s["drifted"] == 0 else "review"
+    return [(severity, "CouplingEditor",
+             f"candidates={total} unconfirmed={s['unconfirmed']} accepted={s['accepted']} "
+             f"retargeted={s['retargeted']} rejected={s['rejected']} drifted={s['drifted']} "
+             f"dir={confirmations_dir_for(job)}")]
+
+
 def layer_paths(job: dict) -> dict[str, str]:
     """Map-visualizable artifacts for the QGIS shell (existence-checked)."""
     package = Path(job["package"])
