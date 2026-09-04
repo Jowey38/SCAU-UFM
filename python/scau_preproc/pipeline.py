@@ -130,6 +130,29 @@ def resolve_mesh_controls(job: dict, job_path: Path) -> dict | None:
     return resolved
 
 
+def resolve_coupling_maps(job: dict) -> dict | None:
+    """job_config "coupling_maps": false/absent -> None; true -> explicit_ids
+    (v1 behaviour); object {"mode": explicit_ids|spatial_candidates|mixed,
+    "roof_node_max_distance_m": float} -> C5 modes (validated here so the
+    mode is a declared contract, recorded in the report and manifest)."""
+    block = job.get("coupling_maps", False)
+    if block is False or block is None:
+        return None
+    from scau_preproc import coupling_maps
+    if block is True:
+        return {"mode": "explicit_ids",
+                "roof_node_max_distance_m": coupling_maps.DEFAULT_ROOF_NODE_MAX_DISTANCE_M}
+    if not isinstance(block, dict):
+        raise PipelineError("job_config coupling_maps must be true/false or an object")
+    mode = block.get("mode", "explicit_ids")
+    if mode not in coupling_maps.MODES:
+        raise PipelineError(f"coupling_maps.mode must be one of {coupling_maps.MODES}, got {mode!r}")
+    distance = block.get("roof_node_max_distance_m", coupling_maps.DEFAULT_ROOF_NODE_MAX_DISTANCE_M)
+    if isinstance(distance, bool) or not isinstance(distance, (int, float)) or distance <= 0:
+        raise PipelineError("coupling_maps.roof_node_max_distance_m must be a positive number")
+    return {"mode": mode, "roof_node_max_distance_m": float(distance)}
+
+
 def resolve_confirmations_dir(job: dict, job_path: Path, package: Path) -> Path | None:
     """Optional job_config "confirmations_dir" (C4): relative paths resolve
     against the job_config; when absent, the package's own
@@ -283,17 +306,25 @@ def main() -> int:
             return finish("fatal", 2)
 
     confirmations_dir = None
-    if job.get("coupling_maps", False):
+    coupling_options = resolve_coupling_maps(job)
+    if coupling_options is not None:
         from scau_preproc import confirmations, coupling_maps
         coupling_dir = output_dir / "coupling"
         try:
-            report = coupling_maps.generate(package, case_path, coupling_dir)
+            report = coupling_maps.generate(
+                package, case_path, coupling_dir,
+                mode=coupling_options["mode"],
+                roof_node_max_distance_m=coupling_options["roof_node_max_distance_m"],
+            )
             validation["coupling_maps"] = {"status": "ok", "report": report}
+            # C5: spatial-candidate findings (nodes without a cell, roofs
+            # without a junction in range) are review items of the run.
+            validation["findings"].extend(report.get("findings", []))
         except SystemExit as error:
             validation["findings"].append({
                 "severity": "fatal",
                 "code": "CouplingMapGenerationFailed",
-                "detail": f"exit {error.code}",
+                "detail": getattr(error, "message", None) or f"exit {error.code}",
             })
             return finish("fatal", 2)
 
@@ -348,6 +379,8 @@ def main() -> int:
         "mesh_quality": json.loads((output_dir / "mesh_quality.json").read_text(encoding="utf-8")),
         "reproduce": f"py -3 -m scau_preproc.pipeline {job_path.name}",
     }
+    if coupling_options is not None:
+        manifest["coupling_maps"] = coupling_options
     if confirmations_dir is not None:
         manifest["confirmations"] = {
             "dir": str(confirmations_dir),

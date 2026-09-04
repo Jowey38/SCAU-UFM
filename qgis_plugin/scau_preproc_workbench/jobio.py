@@ -21,6 +21,14 @@ JOB_CONFIG_SCHEMA_VERSION = 1
 MESH_CONTROLS_SCHEMA_VERSION = 1
 DEFAULT_PYTHON_LAUNCHER = ["py", "-3"]
 
+# Coupling mapping modes (mirrors python/scau_preproc/coupling_maps.MODES, C5).
+COUPLING_MODES = (
+    ("explicit_ids", "显式 ID 表（CSV 权威，缺表 fatal）"),
+    ("spatial_candidates", "纯空间候选（无表；全部 review 待确认）"),
+    ("mixed", "混合（表内 high，表外空间候选 review）"),
+)
+DEFAULT_ROOF_NODE_MAX_DISTANCE_M = 50.0
+
 # Mesh-controls scratch layer contract (mirrors python/scau_preproc/mesh_controls.py).
 MESH_CONTROL_KINDS = ("breakline", "refinement_region")
 MESH_CONTROL_FIELDS = (("control_id", "string"), ("control_kind", "string"),
@@ -51,6 +59,8 @@ def build_job_config(
     mesh_controls_default_size_m: float | None = None,
     mesh_controls_default_dist_max_m: float | None = None,
     confirmations_dir: str | None = None,
+    coupling_mode: str = "explicit_ids",
+    roof_node_max_distance_m: float | None = None,
 ) -> dict:
     job = {
         "job_config_schema_version": JOB_CONFIG_SCHEMA_VERSION,
@@ -62,6 +72,13 @@ def build_job_config(
         "determinism_check": bool(determinism_check),
         "coupling_maps": bool(coupling_maps),
     }
+    if coupling_maps and (coupling_mode != "explicit_ids" or roof_node_max_distance_m is not None):
+        if coupling_mode not in {mode for mode, _ in COUPLING_MODES}:
+            raise ValueError(f"unknown coupling mode {coupling_mode!r}")
+        block = {"mode": coupling_mode}
+        if roof_node_max_distance_m is not None:
+            block["roof_node_max_distance_m"] = float(roof_node_max_distance_m)
+        job["coupling_maps"] = block
     if validator_cli:
         job["validator_cli"] = str(Path(validator_cli))
     if mesh_controls_geojson:
@@ -276,6 +293,7 @@ def findings_rows(validation: dict | None) -> list[tuple[str, str, str]]:
         determinism = validation.get("determinism", {}).get("bitwise_identical_reruns")
         rows.append(("pass", "PipelineOk",
                      f"status={validation.get('status')}, bitwise_reruns={determinism}"))
+    rows.extend(coupling_mode_rows(validation))
     rows.extend(confirmation_rows(validation))
     return rows
 
@@ -287,6 +305,25 @@ def exportable(validation: dict | None) -> bool:
     return bool(validation) and validation.get("status") == "ok" and not [
         f for f in validation.get("findings", []) if f.get("severity") in ("fatal", "review")
     ]
+
+
+def coupling_mode_rows(validation: dict | None) -> list[tuple[str, str, str]]:
+    """Rows summarising the coupling-map generator report (mode + per-chain
+    confidence split, C5)."""
+    report = ((validation or {}).get("coupling_maps") or {}).get("report")
+    if not report:
+        return []
+    rows = [("info", "CouplingMode",
+             f"mode={report.get('mode', 'explicit_ids')} "
+             f"params={report.get('mode_parameters') or {}}")]
+    for chain, counts in (report.get("chains") or {}).items():
+        if chain == "surface_to_dflowfm":
+            continue
+        split = counts.get("by_confidence") or {}
+        rows.append(("info", "CouplingChainCandidates",
+                     f"{chain}: relations={counts.get('relations')} high={split.get('high', 0)} "
+                     f"review={split.get('review', 0)} methods={','.join(counts.get('methods', []))}"))
+    return rows
 
 
 def confirmation_rows(validation: dict | None) -> list[tuple[str, str, str]]:

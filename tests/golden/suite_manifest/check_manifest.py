@@ -56,6 +56,9 @@ REQUIRED = {
     # G33 locks the M287-C4 confirmation contract merge (effective links from
     # candidates + operator decisions; committed fixture).
     "G33": ("coupling_confirmations_synthetic_case", "implemented", True),
+    # G34 locks the M287-C5 spatial-candidate mapping mode (review-only
+    # candidates from containment / nearest junction; committed fixture).
+    "G34": ("coupling_spatial_candidates_case", "implemented", True),
 }
 
 
