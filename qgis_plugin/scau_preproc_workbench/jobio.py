@@ -61,6 +61,8 @@ def build_job_config(
     confirmations_dir: str | None = None,
     coupling_mode: str = "explicit_ids",
     roof_node_max_distance_m: float | None = None,
+    export_target_dir: str | None = None,
+    export_options: dict | None = None,
 ) -> dict:
     job = {
         "job_config_schema_version": JOB_CONFIG_SCHEMA_VERSION,
@@ -90,6 +92,8 @@ def build_job_config(
         job["mesh_controls"] = controls
     if confirmations_dir:
         job["confirmations_dir"] = str(Path(confirmations_dir))
+    if export_target_dir:
+        job["export_case"] = {"target_dir": str(Path(export_target_dir)), **(export_options or {})}
     return job
 
 
@@ -295,6 +299,7 @@ def findings_rows(validation: dict | None) -> list[tuple[str, str, str]]:
                      f"status={validation.get('status')}, bitwise_reruns={determinism}"))
     rows.extend(coupling_mode_rows(validation))
     rows.extend(confirmation_rows(validation))
+    rows.extend(export_rows(validation))
     return rows
 
 
@@ -570,6 +575,15 @@ def _write_confirmation(directory: Path, name: str, payload: dict) -> Path:
     tmp.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     tmp.replace(path)
     return path
+
+
+def export_rows(validation: dict | None) -> list[tuple[str, str, str]]:
+    """Rows for the B6 export stage result (pipeline stage F)."""
+    export = (validation or {}).get("case_export")
+    if not export:
+        return []
+    return [("pass", "CaseExported",
+             f"{export.get('files')} files -> {export.get('target_dir')} package_hash={str(export.get('package_hash'))[:16]}...")]
 
 
 def coupling_editor_rows(job: dict) -> list[tuple[str, str, str]]:

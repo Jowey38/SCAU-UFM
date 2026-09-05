@@ -59,6 +59,9 @@ REQUIRED = {
     # G34 locks the M287-C5 spatial-candidate mapping mode (review-only
     # candidates from containment / nearest junction; committed fixture).
     "G34": ("coupling_spatial_candidates_case", "implemented", True),
+    # G35 locks the M287-B6 exported case package (manifest hashes, effective-
+    # only run.conf, SimDriver cold start with the real embedded SWMM engine).
+    "G35": ("case_export_synthetic_package", "implemented", True),
 }
 
 

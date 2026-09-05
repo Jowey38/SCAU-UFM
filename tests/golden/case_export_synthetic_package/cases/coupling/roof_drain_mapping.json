@@ -1,0 +1,33 @@
+{
+  "coupling_mapping_schema_version": 1,
+  "chain": "roof_to_swmm",
+  "status": "candidates_ready",
+  "relations": [
+    {
+      "mapping_id": "MAP_ROOF_SYNTH_001",
+      "building_id": "BLDG_SYNTH_001",
+      "roof_drain_id": "RD_SYNTH_001",
+      "swmm_node_id": "J1",
+      "overflow_target_cell_index": 179,
+      "candidate_distance_m": 18.310785242074477,
+      "catchment_area_m2": 900.0,
+      "exchange_elevation_m": 10.0,
+      "method": "explicit_ids_plus_nearest_centroid_candidate",
+      "confidence": "review",
+      "review_status": "needs_confirmation"
+    },
+    {
+      "mapping_id": "MAP_ROOF_SYNTH_002",
+      "building_id": "BLDG_SYNTH_002",
+      "roof_drain_id": "RD_SYNTH_002",
+      "swmm_node_id": "J2",
+      "overflow_target_cell_index": 408,
+      "candidate_distance_m": 18.486404798442646,
+      "catchment_area_m2": 900.0,
+      "exchange_elevation_m": 9.5,
+      "method": "explicit_ids_plus_nearest_centroid_candidate",
+      "confidence": "review",
+      "review_status": "needs_confirmation"
+    }
+  ]
+}

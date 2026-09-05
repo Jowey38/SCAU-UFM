@@ -1,0 +1,17 @@
+{
+ "job_config_schema_version": 1,
+ "package": "H:/githubcode/SCAU-UFM/samples/d5_gis_preproc_template",
+ "output_dir": "H:/scau-b6-out/run_export",
+ "case_name": "synthetic_city_block.stcf.nc",
+ "characteristic_length_m": 8.0,
+ "recombine": true,
+ "determinism_check": false,
+ "coupling_maps": true,
+ "validator_cli": "H:/githubcode/SCAU-UFM/build/windows-msvc/apps/preproc_cli/Debug/scau_preproc.exe",
+ "export_case": {
+  "target_dir": "H:/scau-b6-out/exported_case",
+  "force": true,
+  "engine_mode": "mock",
+  "end_time": 180.0
+ }
+}

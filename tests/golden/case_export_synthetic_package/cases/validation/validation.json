@@ -1,0 +1,99 @@
+{
+  "job_config": "H:\\scau-b6-out\\job_export.json",
+  "job_config_sha256": "10bd6cd03e23a7346d4a59d2b7da9969d89324d85de1f91f8518cd2c001d2af8",
+  "package": "H:\\githubcode\\SCAU-UFM\\samples\\d5_gis_preproc_template",
+  "started": "2026-09-05T00:12:01",
+  "policy_audit": {
+    "policy_version": "0.1.0",
+    "generator_timeout_s": 60.0,
+    "repair_mode": "reject_only (no repair rules executed by pipeline v1)"
+  },
+  "findings": [],
+  "case": {
+    "path": "H:\\scau-b6-out\\run_export\\synthetic_city_block.stcf.nc",
+    "sha256": "a89ba98da95bcd5732c17e1bf9977e8f75bdc1d81b96a6844333fc796e911bc4"
+  },
+  "authoritative_validate": {
+    "exit_code": 0,
+    "stdout": "valid STCF v5 UGRID case: H:\\scau-b6-out\\run_export\\synthetic_city_block.stcf.nc (nodes=526, faces=469, edges=996, soil_entries=2)"
+  },
+  "coupling_maps": {
+    "status": "ok",
+    "report": {
+      "coupling_mapping_schema_version": 1,
+      "mode": "explicit_ids",
+      "mode_parameters": {},
+      "spatial_candidates": null,
+      "findings": [],
+      "chains": {
+        "surface_to_swmm": {
+          "relations": 2,
+          "methods": [
+            "explicit_id_plus_point_in_cell"
+          ],
+          "by_confidence": {
+            "high": 2,
+            "review": 0
+          },
+          "needs_confirmation": 2
+        },
+        "roof_to_swmm": {
+          "relations": 2,
+          "methods": [
+            "explicit_ids_plus_nearest_centroid_candidate"
+          ],
+          "by_confidence": {
+            "high": 0,
+            "review": 2
+          },
+          "needs_confirmation": 2
+        },
+        "surface_to_dflowfm": {
+          "relations": 0,
+          "status": "provider_required"
+        }
+      },
+      "simdriver_fragment": "simdriver_links.conf",
+      "placeholders": {
+        "exchange_width_m": 1.0,
+        "priority_weight": 1.0
+      },
+      "runtime_semantics": "none (Q_limit/deficit/arbitration remain CouplingLib-owned)"
+    }
+  },
+  "coupling_confirmations": {
+    "effective_links_schema_version": 1,
+    "status": "complete",
+    "unconfirmed_total": 0,
+    "confirmations_loaded": 4,
+    "chains": {
+      "surface_to_swmm": {
+        "candidates": 2,
+        "accepted": 1,
+        "retargeted": 1,
+        "rejected": 0,
+        "created": 0,
+        "unconfirmed": 0,
+        "drifted": 0
+      },
+      "roof_to_swmm": {
+        "candidates": 2,
+        "accepted": 1,
+        "retargeted": 0,
+        "rejected": 1,
+        "created": 0,
+        "unconfirmed": 0,
+        "drifted": 0
+      }
+    },
+    "placeholders": {
+      "exchange_width_m": 1.0,
+      "priority_weight": 1.0
+    },
+    "runtime_semantics": "none (Q_limit/deficit/arbitration remain CouplingLib-owned)",
+    "confirmations_dir": "H:\\githubcode\\SCAU-UFM\\samples\\d5_gis_preproc_template\\coupling\\confirmed",
+    "effective_links": "H:\\scau-b6-out\\run_export\\coupling\\effective_links.json",
+    "simdriver_fragment": "H:\\scau-b6-out\\run_export\\coupling\\effective\\simdriver_links.conf"
+  },
+  "status": "ok"
+}

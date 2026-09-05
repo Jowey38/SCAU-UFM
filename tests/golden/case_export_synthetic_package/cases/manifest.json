@@ -1,0 +1,74 @@
+{
+  "package_manifest_schema_version": 1,
+  "exporter": "scau_preproc.case_export",
+  "source": {
+    "pipeline_output_dir": "H:\\scau-b6-out\\run_export",
+    "input_package": "H:\\githubcode\\SCAU-UFM\\samples\\d5_gis_preproc_template",
+    "job_config_sha256": "10bd6cd03e23a7346d4a59d2b7da9969d89324d85de1f91f8518cd2c001d2af8",
+    "case_sha256": "a89ba98da95bcd5732c17e1bf9977e8f75bdc1d81b96a6844333fc796e911bc4",
+    "package_manifest_sha256": "c74e59ace53454a9dd76e8a02b5d1a305ba753a386e5ca6d623923a99732bf77",
+    "geometry_clean_policy_sha256": "fc41ae83aac01707221c0d75df83017dee08da3a034261f0ad7c75b900915b67",
+    "mesh_controls_sha256": null,
+    "coupling_mode": "explicit_ids",
+    "confirmation_files_sha256": {
+      "MAP_ROOF_SYNTH_001.json": "56728c83a58bd3d36266ba2439e34d7b2fcb94c9e1ecc752ec9c1f14facc44d0",
+      "MAP_ROOF_SYNTH_002.json": "9b1a52b75363d9543307fa33e505e9ec44608970b493264bc54a1a8042b1ac09",
+      "MAP_SURF_SYNTH_001.json": "83a4cf368f0a454cd259ed87bcce352839d78b75ff1eb19c9dc4e98251e0d3b0",
+      "MAP_SURF_SYNTH_002.json": "049ef2e3258a47a4d59370a95ab57ae33d3ea1f4249fac3b6638dd9b9ca76c49"
+    }
+  },
+  "gate": {
+    "validation_status": "ok",
+    "effective_links_status": "complete",
+    "effective_surface_links": 2,
+    "effective_roof_links": 1,
+    "dflowfm": "provider_required",
+    "river_leg_enabled": false,
+    "staged_case_certification": {
+      "validator_cli": "H:/githubcode/SCAU-UFM/build/windows-msvc/apps/preproc_cli/Debug/scau_preproc.exe",
+      "exit_code": 0,
+      "stdout": "valid STCF v5 UGRID case: <package>\\mesh\\case.stcf.nc (nodes=526, faces=469, edges=996, soil_entries=2)"
+    }
+  },
+  "run_conf": {
+    "start_time": 0.0,
+    "end_time": 180.0,
+    "dt_couple": 60.0,
+    "dt_surface": 0.05,
+    "dt_swmm": 60.0,
+    "dt_dflowfm": 60.0,
+    "engine_mode": "mock",
+    "enable_whole_system_mass_audit": false,
+    "initial_eta": 11.4,
+    "initial_eta_source": "dem_max_plus_0.5m"
+  },
+  "files": {
+    "coupling/confirmed/MAP_ROOF_SYNTH_001.json": "56728c83a58bd3d36266ba2439e34d7b2fcb94c9e1ecc752ec9c1f14facc44d0",
+    "coupling/confirmed/MAP_ROOF_SYNTH_002.json": "9b1a52b75363d9543307fa33e505e9ec44608970b493264bc54a1a8042b1ac09",
+    "coupling/confirmed/MAP_SURF_SYNTH_001.json": "83a4cf368f0a454cd259ed87bcce352839d78b75ff1eb19c9dc4e98251e0d3b0",
+    "coupling/confirmed/MAP_SURF_SYNTH_002.json": "049ef2e3258a47a4d59370a95ab57ae33d3ea1f4249fac3b6638dd9b9ca76c49",
+    "coupling/confirmed/README.md": "e7f2cb7176fe4004903f2ba42e3536c1e1e5f63c231ffad98cba8f4394265c69",
+    "coupling/effective_links.json": "31c707fb79466909a5a3bc18c8ad56406bf67debcf372a21421e98240eaa4a47",
+    "coupling/mapping_report.json": "ff2c3e918922b6aef4a16eab6fcc4aa4e94d7b2ed43a14178f833ec2caa837b3",
+    "coupling/roof_drain_mapping.json": "51446de857926734eec52c55356379f80813abc6c328146c97da3559d72ceed2",
+    "coupling/surface_dflowfm_mapping.json": "4fddc453ed17227c7d44375e9a2ba761bac720e9da43c897e20ef9e8af9db899",
+    "coupling/surface_swmm_mapping.json": "552bac9eb1936a239b9dc676b34b23de3b4159ef5bb2048bf0837fde8caf965f",
+    "dflowfm/boundary_mapping.csv": "7884e3385413c3cd8de47cf356471ee77ca1611e4ebc567c1775aabee7500ce9",
+    "dflowfm/README.md": "94163f4b7168cf0dfb50561a1953026a1113b5f26e9ae3d60dd64c04c698482f",
+    "mesh/case.stcf.nc": "a89ba98da95bcd5732c17e1bf9977e8f75bdc1d81b96a6844333fc796e911bc4",
+    "mesh/mesh_quality.json": "24dd0ef95e971d368966ab040c69f8b1bfa299a2af2508b08892eef49a21b809",
+    "mesh/mesh_quality_cells.geojson": "2d4a61ca0c3461966e3d2a26a8d9f39d28ed2c5b1989b1613ee65cb7f0e4348a",
+    "metadata/geometry_clean_policy.json": "fc41ae83aac01707221c0d75df83017dee08da3a034261f0ad7c75b900915b67",
+    "metadata/package_manifest.json": "c74e59ace53454a9dd76e8a02b5d1a305ba753a386e5ca6d623923a99732bf77",
+    "simdriver/run.conf": "da28982b0897ca60c8a3836aa682e94285219b8a2ce40160b676cd87921f09ff",
+    "swmm/model.inp": "991e5066b2d7b1558ee8434b927291a91967a769dbbdee89ff4a930edd9cbd3f",
+    "validation/job_config.json": "10bd6cd03e23a7346d4a59d2b7da9969d89324d85de1f91f8518cd2c001d2af8",
+    "validation/pipeline_manifest.json": "11a82552657a496dabe942b5e185a9b1c0312882cfbc1cec6eb87f2e39e951fd",
+    "validation/validation.json": "f52dc4245e26d4366ecc2c27f3c252b3c40b8cf8597ae0f574fa2382da884e1a"
+  },
+  "reproduce": [
+    "py -3 -m scau_preproc.pipeline job_export.json",
+    "py -3 -m scau_preproc.case_export H:\\scau-b6-out\\run_export H:\\scau-b6-out\\exported_case",
+    "scau_sim simdriver/run.conf   # from the package root"
+  ]
+}

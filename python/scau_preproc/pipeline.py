@@ -392,7 +392,36 @@ def main() -> int:
         json.dumps(manifest, indent=2), encoding="utf-8"
     )
     has_review = any(f.get("severity") == "review" for f in validation["findings"])
-    return finish("review" if has_review else "ok", 0)
+    status = "review" if has_review else "ok"
+
+    # Stage F (B6): optional one-shot case package export. The exporter
+    # re-reads validation.json, so it is written first; a closed gate is a
+    # fatal finding of the run (nothing is exported).
+    export_block = job.get("export_case")
+    if export_block:
+        validation["status"] = status
+        (output_dir / "validation.json").write_text(json.dumps(validation, indent=2), encoding="utf-8")
+        from scau_preproc import case_export
+        if not isinstance(export_block, dict) or not export_block.get("target_dir"):
+            raise PipelineError("job_config export_case must be an object with target_dir")
+        target = Path(export_block["target_dir"])
+        if not target.is_absolute():
+            target = (job_path.parent / target).resolve()
+        options = {k: v for k, v in export_block.items() if k in case_export.RUN_CONF_DEFAULTS}
+        try:
+            package_manifest = case_export.export_case(
+                output_dir, target, options=options, validator_cli=validator,
+                force=bool(export_block.get("force", False)))
+        except case_export.ExportError as error:
+            validation["findings"].append({"severity": "fatal", "code": "CaseExportBlocked",
+                                           "detail": error.message})
+            return finish("fatal", 2)
+        validation["case_export"] = {
+            "target_dir": str(target),
+            "package_hash": case_export.package_hash(target),
+            "files": len(package_manifest["files"]),
+        }
+    return finish(status, 0)
 
 
 if __name__ == "__main__":

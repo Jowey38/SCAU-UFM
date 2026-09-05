@@ -142,3 +142,13 @@ class CouplingModeTests(unittest.TestCase):
         self.assertEqual([r[1] for r in rows], ["CouplingMode", "CouplingChainCandidates"])
         self.assertIn("high=1 review=1", rows[1][2])
         self.assertEqual(jobio.coupling_mode_rows(None), [])
+
+
+class ExportRowsTests(unittest.TestCase):
+    def test_export_block_and_rows(self):
+        job = jobio.build_job_config("p", "o", export_target_dir="case", export_options={"force": True, "end_time": 120.0})
+        self.assertEqual(job["export_case"], {"target_dir": str(Path("case")), "force": True, "end_time": 120.0})
+        self.assertNotIn("export_case", jobio.build_job_config("p", "o"))
+        rows = jobio.export_rows({"case_export": {"files": 22, "target_dir": "/c", "package_hash": "ab" * 32}})
+        self.assertEqual(rows[0][1], "CaseExported")
+        self.assertEqual(jobio.export_rows({}), [])
