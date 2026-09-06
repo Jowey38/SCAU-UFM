@@ -30,6 +30,7 @@ from qgis.core import (
     QgsVectorLayer,
 )
 from qgis.PyQt.QtCore import Qt
+from qgis.PyQt.QtGui import QBrush, QColor
 from qgis.PyQt.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -45,6 +46,8 @@ from qgis.PyQt.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -65,9 +68,10 @@ class WorkbenchDialog(QDialog):
     _SETTINGS_KEY = "scau_preproc_workbench/repo_root"
     _CONTROLS_LAYER_NAME = "scau_mesh_controls"
 
-    def __init__(self, repo_root_hint: str, parent=None) -> None:
+    def __init__(self, repo_root_hint: str, parent=None, iface=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("SCAU PreProc Workbench (M287-E1/E3/E4)")
+        self._iface = iface
+        self.setWindowTitle("SCAU PreProc Workbench (M287-E1..E5)")
         self.resize(820, 640)
 
         # The plugin may run from a copied profile deployment, so the repo
@@ -82,8 +86,10 @@ class WorkbenchDialog(QDialog):
 
         tabs = QTabWidget()
         tabs.addTab(self._build_job_page(initial_root), "作业")
+        tabs.addTab(self._build_data_tree_page(), "数据目录")
         tabs.addTab(self._build_mesh_page(), "网格工作台")
         tabs.addTab(self._build_coupling_page(), "耦合编辑器")
+        tabs.addTab(self._build_report_page(), "门禁与报告")
 
         self._run_button = QPushButton("运行流水线")
         self._run_button.clicked.connect(self._run)
@@ -474,6 +480,154 @@ class WorkbenchDialog(QDialog):
             self._show_rows([("fatal", "CreateRejected", str(error))])
             return
         self._show_rows([("info", "LinkCreated", f"create -> {path}（重新运行流水线后生效）")])
+
+    # --- E2 data tree / E5 report browser -----------------------------------
+
+    _LAMP_TEXT = {"pass": "● Pass", "review": "● Review", "fatal": "● Fatal", "missing": "○ Missing"}
+    _LAMP_COLOUR = {"pass": "#1a9850", "review": "#ff7f00", "fatal": "#d73027", "missing": "#9e9e9e"}
+
+    def _build_data_tree_page(self) -> QWidget:
+        page = QWidget()
+        self._tree = QTreeWidget()
+        self._tree.setColumnCount(4)
+        self._tree.setHeaderLabels(["数据集 / 产物", "状态", "说明", "路径"])
+        self._tree.itemDoubleClicked.connect(self._tree_item_activated)
+        refresh = QPushButton("刷新目录树")
+        refresh.clicked.connect(self._refresh_data_tree)
+        self._tree_summary = QLabel("未加载")
+        bar = QHBoxLayout()
+        bar.addWidget(refresh)
+        bar.addWidget(self._tree_summary)
+        bar.addStretch()
+        hint = QLabel("双击 GeoJSON 数据集或诊断产物即加载为图层。状态灯来自输入包清单（CRS/单位/存在性）"
+                      "与 validation.json 的对象级 finding；不做任何额外校验。")
+        hint.setWordWrap(True)
+        layout = QVBoxLayout(page)
+        layout.addLayout(bar)
+        layout.addWidget(self._tree)
+        layout.addWidget(hint)
+        return page
+
+    def _refresh_data_tree(self) -> None:
+        job = self._current_job()
+        if not job["package"]:
+            self._show_rows([("fatal", "MissingPackage", "请先在作业页选择输入包目录")])
+            return
+        tree = jobio.data_tree(job)
+        self._tree.clear()
+        for group in tree:
+            parent = QTreeWidgetItem([group["group"], "", "", ""])
+            parent.setExpanded(True)
+            worst = "pass"
+            for item in group["items"]:
+                child = QTreeWidgetItem([item["id"], self._LAMP_TEXT[item["lamp"]], item["detail"], item["path"] or ""])
+                child.setForeground(1, QBrush(QColor(self._LAMP_COLOUR[item["lamp"]])))
+                child.setData(0, Qt.ItemDataRole.UserRole, item.get("layer"))
+                parent.addChild(child)
+                order = ("pass", "missing", "review", "fatal")
+                if order.index(item["lamp"]) > order.index(worst):
+                    worst = item["lamp"]
+            parent.setText(1, self._LAMP_TEXT[worst])
+            parent.setForeground(1, QBrush(QColor(self._LAMP_COLOUR[worst])))
+            self._tree.addTopLevelItem(parent)
+        for column in range(4):
+            self._tree.resizeColumnToContents(column)
+        summary = jobio.data_tree_summary(tree)
+        self._tree_summary.setText("  ".join(f"{self._LAMP_TEXT[k]}: {v}" for k, v in summary.items()))
+
+    def _tree_item_activated(self, item: QTreeWidgetItem, _column: int) -> None:
+        path = item.data(0, Qt.ItemDataRole.UserRole)
+        if not path:
+            return
+        layer = QgsVectorLayer(str(path), f"scau_{item.text(0)}", "ogr")
+        if layer.isValid():
+            QgsProject.instance().addMapLayer(layer)
+            self._show_rows([("info", "LayerLoaded", str(path))])
+        else:
+            self._show_rows([("fatal", "LayerInvalid", str(path))])
+
+    def _build_report_page(self) -> QWidget:
+        page = QWidget()
+        self._report_tabs = QTabWidget()
+        self._report_tables: dict[str, QTableWidget] = {}
+        for key, title in (("import", "接入 (A)"), ("terrain_mesh", "地形/网格 (B-C)"), ("field", "字段 (D)"),
+                           ("coupling", "耦合 (E/E')"), ("export", "导出 (F)"), ("reproducibility", "可复现")):
+            table = QTableWidget(0, 2)
+            table.setHorizontalHeaderLabels(["项", "值"])
+            table.horizontalHeader().setStretchLastSection(True)
+            table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+            self._report_tables[key] = table
+            self._report_tabs.addTab(table, title)
+        self._findings_table = QTableWidget(0, 6)
+        self._findings_table.setHorizontalHeaderLabels(["severity", "code", "feature_id", "kind", "violation", "detail"])
+        self._findings_table.horizontalHeader().setStretchLastSection(True)
+        self._findings_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._findings_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        refresh = QPushButton("刷新报告")
+        refresh.clicked.connect(self._refresh_reports)
+        locate = QPushButton("定位选中 finding 的对象")
+        locate.clicked.connect(self._locate_finding)
+        self._gate_summary = QLabel("门禁：未运行")
+        bar = QHBoxLayout()
+        bar.addWidget(refresh)
+        bar.addWidget(locate)
+        bar.addWidget(self._gate_summary)
+        bar.addStretch()
+        layout = QVBoxLayout(page)
+        layout.addLayout(bar)
+        layout.addWidget(self._report_tabs)
+        layout.addWidget(QLabel("Findings（对象级；点击“定位”在地图上选中并缩放）"))
+        layout.addWidget(self._findings_table)
+        return page
+
+    def _refresh_reports(self) -> None:
+        job = self._current_job()
+        if not job["output_dir"]:
+            self._show_rows([("fatal", "MissingOutputDir", "请先在作业页选择输出目录")])
+            return
+        for key, rows in jobio.report_pages(job).items():
+            table = self._report_tables[key]
+            table.setRowCount(len(rows))
+            for r, (k, v) in enumerate(rows):
+                table.setItem(r, 0, QTableWidgetItem(k))
+                table.setItem(r, 1, QTableWidgetItem(v))
+        validation = jobio.load_validation_for(job)
+        rows = jobio.findings_table(validation)
+        self._findings_table.setRowCount(len(rows))
+        for r, row in enumerate(rows):
+            for c, key in enumerate(("severity", "code", "feature_id", "kind", "violation", "detail")):
+                self._findings_table.setItem(r, c, QTableWidgetItem("" if row.get(key) is None else str(row[key])))
+        can_export = jobio.exportable(validation)
+        status = (validation or {}).get("status")
+        self._gate_summary.setText(
+            f"门禁：{'允许导出' if can_export else '禁止导出'}（status={status}, findings={len(rows)}）")
+        self._export_button.setEnabled(can_export)
+
+    def _locate_finding(self) -> None:
+        row = self._findings_table.currentRow()
+        if row < 0:
+            self._show_rows([("fatal", "NoFindingSelected", "先在 findings 表中选择一行")])
+            return
+        kind = self._findings_table.item(row, 3).text() or None
+        feature_id = self._findings_table.item(row, 2).text() or None
+        located = jobio.locate_object(self._current_job(), kind, feature_id)
+        if not located:
+            self._show_rows([("info", "NoLocator", f"kind={kind!r} feature_id={feature_id!r} 没有可定位的图层"
+                                                    "（耦合对象需先在耦合编辑器刷新连线图层）")])
+            return
+        name, path, expression = located
+        project = QgsProject.instance()
+        layer = next((l for l in project.mapLayers().values() if l.name() == name), None)
+        if layer is None:
+            layer = QgsVectorLayer(path, name, "ogr")
+            if not layer.isValid():
+                self._show_rows([("fatal", "LayerInvalid", path)])
+                return
+            project.addMapLayer(layer)
+        layer.selectByExpression(expression)
+        if self._iface is not None and layer.selectedFeatureCount() > 0:
+            self._iface.mapCanvas().zoomToSelected(layer)
+        self._show_rows([("info", "Located", f"{name}: {expression} -> {layer.selectedFeatureCount()} feature(s)")])
 
     # --- helpers ------------------------------------------------------------
 

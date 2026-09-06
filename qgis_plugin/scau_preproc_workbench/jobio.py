@@ -599,6 +599,259 @@ def coupling_editor_rows(job: dict) -> list[tuple[str, str, str]]:
              f"dir={confirmations_dir_for(job)}")]
 
 
+# --- E2 data tree --------------------------------------------------------------
+
+DATA_TREE_GROUPS = (
+    ("Terrain", ("raster_dem",)),
+    ("Land Cover / Soil", ("vector_gis:landcover", "vector_gis:soil_zones", "table")),
+    ("Geometries", ("vector_gis:computational_boundary", "vector_gis:buildings")),
+    ("1D Networks", ("swmm_5_2_x", "mapping_table", "dflowfm_bmi_or_native")),
+    ("Policies", ("policy",)),
+)
+LAMPS = ("pass", "review", "fatal", "missing")
+
+
+def _dataset_group(dataset: dict) -> str:
+    kind = dataset.get("kind", "")
+    key_specific = f"{kind}:{dataset.get('id')}"
+    for group, kinds in DATA_TREE_GROUPS:
+        if kind in kinds or key_specific in kinds:
+            return group
+    return "Other"
+
+
+def _crs_lamp(package: Path, dataset: dict) -> tuple[str, str]:
+    """Pass when a metre-based projected CRS is declared, review while the
+    declaration is a provider TODO (synthetic template), fatal for lat/lon."""
+    manifest = json.loads((package / "manifest.json").read_text(encoding="utf-8"))
+    crs = str(manifest.get("target_crs", ""))
+    units = str(manifest.get("horizontal_units", ""))
+    if dataset.get("kind") == "raster_dem" and dataset.get("metadata"):
+        meta_path = package / dataset["metadata"]
+        if meta_path.is_file():
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            crs = str(meta.get("target_crs") or meta.get("source_crs") or crs)
+            units = str(meta.get("horizontal_units") or units)
+    if "4326" in crs or crs.upper().startswith("WGS84") or units.lower() in ("degree", "degrees"):
+        return "fatal", f"geographic CRS not allowed ({crs})"
+    if not crs or "TODO" in crs:
+        return "review", f"CRS undeclared ({crs or 'empty'}); units={units or '?'}"
+    if units.lower() not in ("metre", "meter", "m", "metres", "meters"):
+        return "review", f"CRS {crs} but horizontal units {units!r}"
+    return "pass", f"{crs} / {units}"
+
+
+def _findings_by_object(validation: dict | None) -> dict[str, list[dict]]:
+    index: dict[str, list[dict]] = {}
+    for finding in (validation or {}).get("findings", []):
+        for obj in finding.get("objects") or []:
+            index.setdefault(str(obj.get("kind", "")), []).append({**finding, "object": obj})
+    return index
+
+
+def data_tree(job: dict, validation: dict | None = None) -> list[dict]:
+    """[{group, items: [{id, path, kind, required, lamp, detail, layer}]}] for
+    the RAS-Mapper-style tree. `layer` is a loadable path when the dataset is a
+    GeoJSON (the shell offers "load" on double-click)."""
+    package = Path(job["package"])
+    manifest_path = package / "manifest.json"
+    if not manifest_path.is_file():
+        return [{"group": "Package", "items": [{"id": "manifest", "path": "manifest.json", "kind": "manifest",
+                                                  "required": True, "lamp": "fatal",
+                                                  "detail": "manifest.json missing", "layer": None}]}]
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    validation = validation if validation is not None else load_validation_for(job)
+    by_kind = _findings_by_object(validation)
+    groups: dict[str, list[dict]] = {group: [] for group, _ in DATA_TREE_GROUPS}
+    groups["Other"] = []
+    for dataset in manifest.get("datasets", []):
+        path = package / dataset["path"]
+        exists = path.is_file() or (dataset["path"].endswith("/") and path.is_dir() and any(path.iterdir()))
+        if not exists:
+            lamp, detail = ("fatal", "required file missing") if dataset.get("required") else ("missing", "optional; not provided")
+        else:
+            lamp, detail = "pass", "present"
+            if dataset.get("kind") in ("raster_dem", "vector_gis"):
+                lamp, detail = _crs_lamp(package, dataset)
+            if dataset.get("kind") == "mapping_table" and any(
+                    "TODO_PROVIDER" in line for line in path.read_text(encoding="utf-8").splitlines()[:50]):
+                lamp, detail = "review", "provider placeholders present"
+            if dataset.get("kind") == "dflowfm_bmi_or_native":
+                lamp, detail = "review", "provider_required (no authorized river model)"
+        object_kind = {"buildings": "building", "computational_boundary": "boundary"}.get(dataset["id"])
+        related = by_kind.get(object_kind, []) if object_kind else []
+        if any(f.get("severity") == "fatal" for f in related):
+            lamp, detail = "fatal", f"{len(related)} fatal finding(s) reference objects of this layer"
+        elif related and lamp == "pass":
+            lamp, detail = "review", f"{len(related)} finding(s) reference objects of this layer"
+        groups[_dataset_group(dataset)].append({
+            "id": dataset["id"], "path": dataset["path"], "kind": dataset.get("kind"),
+            "required": bool(dataset.get("required")), "lamp": lamp, "detail": detail,
+            "layer": str(path) if path.suffix == ".geojson" and path.is_file() else None,
+        })
+    outputs = []
+    output = Path(job["output_dir"]) if job.get("output_dir") else None
+    if output and output.is_dir():
+        status = (validation or {}).get("status")
+        lamp = {"ok": "pass", "review": "review", "fatal": "fatal"}.get(status, "missing")
+        outputs.append({"id": "validation", "path": "validation.json", "kind": "report", "required": True,
+                        "lamp": lamp, "detail": f"status={status}", "layer": None})
+        for name, kind in (("mesh_quality_cells.geojson", "diagnostic"), ("generator.diagnostic.geojson", "diagnostic"),
+                           ("coupling/effective_links.json", "coupling"), ("pipeline_manifest.json", "report")):
+            path = output / name
+            if path.is_file():
+                item_lamp = "pass"
+                if name == "generator.diagnostic.geojson":
+                    item_lamp = "fatal"
+                if name == "coupling/effective_links.json":
+                    item_lamp = "pass" if ((validation or {}).get("coupling_confirmations") or {}).get("status") == "complete" else "review"
+                outputs.append({"id": name, "path": name, "kind": kind, "required": False, "lamp": item_lamp,
+                                "detail": "present", "layer": str(path) if path.suffix == ".geojson" else None})
+        export = (validation or {}).get("case_export")
+        if export:
+            outputs.append({"id": "case_export", "path": export.get("target_dir"), "kind": "package", "required": False,
+                            "lamp": "pass", "detail": f"{export.get('files')} files, hash {str(export.get('package_hash'))[:12]}",
+                            "layer": None})
+    tree = [{"group": group, "items": items} for group, items in groups.items() if items]
+    if outputs:
+        tree.append({"group": "Outputs", "items": outputs})
+    return tree
+
+
+def data_tree_summary(tree: list[dict]) -> dict[str, int]:
+    counts = {lamp: 0 for lamp in LAMPS}
+    for group in tree:
+        for item in group["items"]:
+            counts[item["lamp"]] += 1
+    return counts
+
+
+def load_validation_for(job: dict) -> dict | None:
+    path = Path(job.get("output_dir", "")) / "validation.json" if job.get("output_dir") else None
+    if path and path.is_file():
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+    return None
+
+
+# --- E5 report browser ---------------------------------------------------------
+
+REPORT_PAGES = ("import", "terrain_mesh", "field", "coupling", "export", "reproducibility")
+
+
+def _read_json(path: Path) -> dict | None:
+    try:
+        return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
+    except (OSError, ValueError):
+        return None
+
+
+def report_pages(job: dict) -> dict[str, list[tuple[str, str]]]:
+    """Key/value rows per report page, all read from disk on every call."""
+    output = Path(job["output_dir"])
+    validation = _read_json(output / "validation.json") or {}
+    manifest = _read_json(output / "pipeline_manifest.json") or {}
+    quality = _read_json(output / "mesh_quality.json") or {}
+    mapping = _read_json(output / "coupling/mapping_report.json") or {}
+    effective = _read_json(output / "coupling/effective_links.json") or {}
+    export = validation.get("case_export") or {}
+    package_manifest = _read_json(Path(export["target_dir"]) / "manifest.json") if export.get("target_dir") else None
+
+    def kv(*pairs):
+        return [(str(k), "" if v is None else (json.dumps(v, ensure_ascii=False) if isinstance(v, (dict, list)) else str(v)))
+                for k, v in pairs]
+
+    audit = validation.get("policy_audit") or {}
+    pages = {
+        "import": kv(("status", validation.get("status")), ("package", validation.get("package")),
+                     ("job_config", validation.get("job_config")), ("job_config_sha256", validation.get("job_config_sha256")),
+                     ("policy_version", audit.get("policy_version")), ("generator_timeout_s", audit.get("generator_timeout_s")),
+                     ("repair_mode", audit.get("repair_mode")), ("started", validation.get("started"))),
+        "terrain_mesh": kv(("gmsh_version", quality.get("gmsh_version")),
+                           ("characteristic_length_m", quality.get("characteristic_length_m")),
+                           ("recombine", quality.get("recombine")), ("nodes", quality.get("nodes")),
+                           ("edges", quality.get("edges")), ("cells", (quality.get("quality") or {}).get("cells")),
+                           ("triangles", (quality.get("quality") or {}).get("triangles")),
+                           ("quadrilaterals", (quality.get("quality") or {}).get("quadrilaterals")),
+                           ("min_angle_degrees", (quality.get("quality") or {}).get("min_angle_degrees")),
+                           ("max_edge_length_ratio", (quality.get("quality") or {}).get("max_edge_length_ratio")),
+                           ("max_equiangle_skewness", (quality.get("per_cell_diagnostics") or {}).get("max_equiangle_skewness")),
+                           ("max_nonorthogonality_deg", (quality.get("per_cell_diagnostics") or {}).get("max_nonorthogonality_deg")),
+                           ("mesh_controls", (quality.get("mesh_controls") or {}).get("geojson")),
+                           ("breaklines_preserved", [b.get("control_id") for b in (quality.get("mesh_controls") or {}).get("breaklines", [])]),
+                           ("determinism", validation.get("determinism")),
+                           ("authoritative_validate", (validation.get("authoritative_validate") or {}).get("stdout"))),
+        "field": kv(("manning_n", "landcover LUT (G30)"), ("z_b", "DEM nearest sample"),
+                    ("soil", "placeholder (B5 pending)"), ("phi_t / Phi_c / omega_edge / phi_e_n", "unit placeholders (B5 pending)")),
+        "coupling": kv(("mode", mapping.get("mode")), ("mode_parameters", mapping.get("mode_parameters")),
+                       ("chains", mapping.get("chains")), ("generator_findings", len(mapping.get("findings") or [])),
+                       ("effective_status", effective.get("status")), ("unconfirmed_total", effective.get("unconfirmed_total")),
+                       ("confirmations_loaded", effective.get("confirmations_loaded")),
+                       ("effective_surface_links", len((effective.get("links") or {}).get("surface_to_swmm", []))),
+                       ("effective_roof_links", len((effective.get("links") or {}).get("roof_to_swmm", []))),
+                       ("placeholders", mapping.get("placeholders"))),
+        "export": kv(("target_dir", export.get("target_dir")), ("package_hash", export.get("package_hash")),
+                     ("files", export.get("files")),
+                     ("gate", (package_manifest or {}).get("gate")), ("run_conf", (package_manifest or {}).get("run_conf"))),
+        "reproducibility": kv(("reproduce", manifest.get("reproduce")), ("case_sha256", manifest.get("case_sha256")),
+                              ("package_manifest_sha256", manifest.get("package_manifest_sha256")),
+                              ("geometry_clean_policy_sha256", manifest.get("geometry_clean_policy_sha256")),
+                              ("generator_config_sha256", manifest.get("generator_config_sha256")),
+                              ("mesh_controls_sha256", (manifest.get("mesh_controls") or {}).get("geojson_sha256")),
+                              ("confirmations", manifest.get("confirmations")),
+                              ("package_reproduce", (package_manifest or {}).get("reproduce"))),
+    }
+    return pages
+
+
+def findings_table(validation: dict | None) -> list[dict]:
+    """One row per (finding, object): the E5 findings list with locators."""
+    rows = []
+    for finding in (validation or {}).get("findings", []):
+        objects = finding.get("objects") or [None]
+        for obj in objects:
+            rows.append({"severity": finding.get("severity"), "code": finding.get("code"),
+                         "detail": finding.get("detail", ""),
+                         "feature_id": (obj or {}).get("feature_id"), "kind": (obj or {}).get("kind"),
+                         "violation": (obj or {}).get("violation")})
+    return rows
+
+
+def locate_object(job: dict, kind: str | None, feature_id: str | None) -> tuple[str, str, str] | None:
+    """(layer_name, layer_path, expression) so the shell can select + zoom to
+    the offending object. Returns None when the kind has no map layer."""
+    if not kind or feature_id is None:
+        return None
+    package = Path(job["package"])
+    output = Path(job["output_dir"])
+    fid = str(feature_id).replace("'", "''")
+    if kind.startswith("mesh_control:"):
+        controls = (job.get("mesh_controls") or {}).get("geojson")
+        if controls and Path(controls).is_file():
+            return ("scau_mesh_controls", str(controls), f"\"control_id\" = '{fid}'")
+        return None
+    if kind.startswith("coupling:"):
+        editor = output / "coupling/editor/links.geojson"
+        if editor.is_file():
+            return ("scau_coupling_links", str(editor), f"\"mapping_id\" = '{fid}'")
+        return None
+    if kind == "building":
+        return ("scau_buildings", str(package / "buildings/buildings.geojson"), f"\"building_id\" = '{fid}'")
+    if kind in ("boundary", "building_constraint"):
+        diagnostic = output / "generator.diagnostic.geojson"
+        if diagnostic.is_file():
+            return ("scau_generator_diagnostic", str(diagnostic), f"\"feature_id\" = '{fid}'")
+        return None
+    if kind.startswith("swmm:"):
+        editor = output / "coupling/editor/nodes.geojson"
+        if editor.is_file():
+            return ("scau_coupling_nodes", str(editor), f"\"swmm_node_id\" = '{fid}'")
+        return None
+    return None
+
+
 def layer_paths(job: dict) -> dict[str, str]:
     """Map-visualizable artifacts for the QGIS shell (existence-checked)."""
     package = Path(job["package"])

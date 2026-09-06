@@ -43,5 +43,5 @@ class ScauPreprocWorkbenchPlugin:
 
         # Recreated每次打开：UI 无状态，报告一律从磁盘重读。仓库根仅作
         # hint 传入；对话框负责校验与持久化（拷贝部署下 __file__ 推断无效）。
-        self._dialog = WorkbenchDialog(_default_repo_root(), self._iface.mainWindow())
+        self._dialog = WorkbenchDialog(_default_repo_root(), self._iface.mainWindow(), iface=self._iface)
         self._dialog.show()
