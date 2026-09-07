@@ -29,6 +29,9 @@ metadata/
   field_dictionary.csv        Source field meaning and target canonical field.
   mapping_rules.yaml          Physical conversion and spatial relation rules.
   geometry_clean_policy.json  Versioned explicit tolerances and repair rules; no implicit defaults.
+  crs_policy.json             B2 CRS governance: target projected metre CRS, allowed source CRSs,
+                              DEM policy (rasters are never resampled here); geographic CRS is fatal.
+  dpm_rule_table.json         B5 DPM/soil rule table (approval-gated; synthetic_unapproved here).
   quality_requirements.md     Fatal/review/pass checks and acceptance thresholds.
 boundary/
   computational_boundary.geojson

@@ -65,6 +65,9 @@ REQUIRED = {
     # G36 locks the M287-B5 rule-table field derivation (class tuples, spec 5.3
     # rule-2 edge projection vs the solver kernel, closure laws, rest state).
     "G36": ("preproc_field_derivation_case", "implemented", True),
+    # G37 locks the M287-B2 CRS governance stage (governed reprojection of the
+    # synthetic package into EPSG:3395; audit-pinned PROJ pipeline).
+    "G37": ("preproc_crs_governance_case", "implemented", True),
 }
 
 

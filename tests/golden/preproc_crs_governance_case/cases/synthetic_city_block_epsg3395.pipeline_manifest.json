@@ -1,0 +1,117 @@
+{
+  "pipeline": "scau_preproc.pipeline",
+  "job_config_schema_version": 1,
+  "started": "2026-09-07T17:26:15",
+  "package_manifest_sha256": "c74e59ace53454a9dd76e8a02b5d1a305ba753a386e5ca6d623923a99732bf77",
+  "crs_governance": {
+    "policy_sha256": "7067c1787d94c1a25f28ae5c8200eea806abfe67f52a4177ef6484c4cd0b22c7",
+    "target_crs": "EPSG:3395",
+    "proj_version": "9.8.1",
+    "pyproj_version": "3.8.0",
+    "proj_pipelines": [
+      "proj=pipeline step inv proj=webmerc lat_0=0 lon_0=0 x_0=0 y_0=0 ellps=WGS84 step proj=merc lon_0=0 k=1 x_0=0 y_0=0 ellps=WGS84"
+    ],
+    "reprojected_files": [
+      "boundary/computational_boundary.geojson",
+      "buildings/buildings.geojson",
+      "landcover/landcover.geojson",
+      "soil/soil_zones.geojson",
+      "swmm/model.inp"
+    ],
+    "governed_package_sha256": {
+      "boundary/computational_boundary.geojson": "21da344d355311888d8f61e7e7ad27cbce91e573cfd1917eac8cdfcfd105055e",
+      "buildings/buildings.geojson": "472534973db54dc61d2dbfdd300d724d4616f181d3c45a8cc892bb3a2e829a9e",
+      "landcover/landcover.geojson": "1d250b02ff00c021c3ca7477e310e426b1034f5ebc9b4063f73e8607ec2b4f0b",
+      "soil/soil_zones.geojson": "49e6144b42eeb66faee48fd6ea6902d3a8a38e3e6f3653aaad77a93feb645fea",
+      "swmm/model.inp": "3ab0707c8c3b54561c26aa6a0d054c1f4c93925636ac723e1fa91e771376183c"
+    }
+  },
+  "geometry_clean_policy_sha256": "fc41ae83aac01707221c0d75df83017dee08da3a034261f0ad7c75b900915b67",
+  "generator_config_sha256": "048426a096a040f1b04095a95f05ca8964edcddd1cc11edea7ae3ac83f498d0d",
+  "mesh_controls": {
+    "geojson": "H:\\scau-b2-out\\reproj\\governed_package\\mesh_controls.geojson",
+    "geojson_sha256": "7565512b8f2d205193439dc3cad75ca839a8d3e9b1088b02aa3584a8ea4c9c0b"
+  },
+  "case_sha256": "8a4d72b6068c467897837f249c248ec778a6d821bf6fce73a331acb1183f0ee2",
+  "mesh_quality": {
+    "gmsh_version": "4.15.2",
+    "characteristic_length_m": 8.0,
+    "recombine": true,
+    "nodes": 1116,
+    "edges": 2189,
+    "output": "H:\\scau-b2-out\\reproj\\synthetic_city_block.stcf.nc",
+    "output_sha256": "8a4d72b6068c467897837f249c248ec778a6d821bf6fce73a331acb1183f0ee2",
+    "quality": {
+      "cells": 1072,
+      "triangles": 42,
+      "quadrilaterals": 1030,
+      "min_angle_degrees": 26.16544671435315,
+      "max_edge_length_ratio": 3.460323046285367,
+      "review_thresholds": {
+        "min_angle_degrees": 10.0,
+        "max_aspect_ratio": 20.0
+      }
+    },
+    "per_cell_diagnostics": {
+      "geojson": "H:\\scau-b2-out\\reproj\\mesh_quality_cells.geojson",
+      "diagnostic_only": true,
+      "max_equiangle_skewness": 0.9288,
+      "max_nonorthogonality_deg": 55.7869
+    },
+    "mesh_controls": {
+      "geojson": "H:\\scau-b2-out\\reproj\\governed_package\\mesh_controls.geojson",
+      "geojson_sha256": "7565512b8f2d205193439dc3cad75ca839a8d3e9b1088b02aa3584a8ea4c9c0b",
+      "default_size_m": null,
+      "default_dist_max_m": null,
+      "size_field": "Min(Constant per refinement_region, linear Threshold(Distance) per sized breakline); MeshSizeFromPoints/ExtendFromBoundary/FromCurvature=0",
+      "breaklines": [
+        {
+          "control_id": "BL_ROAD_EDGE",
+          "preserved": true,
+          "mesh_edges_on_breakline": 59
+        },
+        {
+          "control_id": "BL_DIAGONAL",
+          "preserved": true,
+          "mesh_edges_on_breakline": 8
+        },
+        {
+          "control_id": "BL_IN_POND",
+          "preserved": true,
+          "mesh_edges_on_breakline": 15
+        }
+      ],
+      "refinement_regions": [
+        {
+          "control_id": "RR_POND",
+          "size_m": 2.5,
+          "cells_inside": 289,
+          "max_edge_length_inside_m": 3.882116787851028,
+          "mean_edge_length_inside_m": 2.2658195745257803
+        },
+        {
+          "control_id": "RR_BUILDING_1",
+          "size_m": 4.0,
+          "cells_inside": 104,
+          "max_edge_length_inside_m": 4.751842175233285,
+          "mean_edge_length_inside_m": 3.536846689341773
+        }
+      ]
+    },
+    "field_derivation": null
+  },
+  "reproduce": "py -3 -m scau_preproc.pipeline reproj_job.json",
+  "coupling_maps": {
+    "mode": "explicit_ids",
+    "roof_node_max_distance_m": 50.0
+  },
+  "confirmations": {
+    "dir": "H:\\scau-b2-out\\reproj\\governed_package\\coupling\\confirmed",
+    "files_sha256": {
+      "MAP_ROOF_SYNTH_001.json": "56728c83a58bd3d36266ba2439e34d7b2fcb94c9e1ecc752ec9c1f14facc44d0",
+      "MAP_ROOF_SYNTH_002.json": "9b1a52b75363d9543307fa33e505e9ec44608970b493264bc54a1a8042b1ac09",
+      "MAP_SURF_SYNTH_001.json": "83a4cf368f0a454cd259ed87bcce352839d78b75ff1eb19c9dc4e98251e0d3b0",
+      "MAP_SURF_SYNTH_002.json": "049ef2e3258a47a4d59370a95ab57ae33d3ea1f4249fac3b6638dd9b9ca76c49"
+    }
+  }
+}

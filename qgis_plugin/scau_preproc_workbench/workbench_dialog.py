@@ -161,6 +161,8 @@ class WorkbenchDialog(QDialog):
         self._roof_distance_spin.setSuffix(" m")
         self._confirmations_edit = QLineEdit()
         self._confirmations_edit.setPlaceholderText("确认目录（可选；默认使用输入包 coupling/confirmed/）")
+        self._crs_policy_edit = QLineEdit()
+        self._crs_policy_edit.setPlaceholderText("CRS 策略 metadata/crs_policy.json（可选；留空 = 输入包自带策略或 v1 未检查模式）")
         self._rule_table_edit = QLineEdit()
         self._rule_table_edit.setPlaceholderText("DPM 规则表 metadata/dpm_rule_table.json（可选；留空 = v1 占位场）")
         options = QHBoxLayout()
@@ -176,6 +178,12 @@ class WorkbenchDialog(QDialog):
         coupling.addWidget(QLabel("屋面→检查井最大距离"))
         coupling.addWidget(self._roof_distance_spin)
         coupling.addStretch()
+        crs_row = QHBoxLayout()
+        crs_row.addWidget(QLabel("CRS 策略"))
+        crs_row.addWidget(self._crs_policy_edit)
+        browse_crs = QPushButton("...")
+        browse_crs.clicked.connect(lambda: self._browse(self._crs_policy_edit, False))
+        crs_row.addWidget(browse_crs)
         fields = QHBoxLayout()
         fields.addWidget(QLabel("字段派生规则表"))
         fields.addWidget(self._rule_table_edit)
@@ -193,6 +201,7 @@ class WorkbenchDialog(QDialog):
         layout.addLayout(grid)
         layout.addLayout(options)
         layout.addLayout(coupling)
+        layout.addLayout(crs_row)
         layout.addLayout(fields)
         layout.addLayout(confirmations)
         layout.addStretch()
@@ -679,6 +688,7 @@ class WorkbenchDialog(QDialog):
             coupling_mode=self._coupling_mode.currentData(),
             roof_node_max_distance_m=self._roof_distance_spin.value(),
             dpm_rule_table=self._rule_table_edit.text().strip() or None,
+            crs_policy=self._crs_policy_edit.text().strip() or None,
         )
 
     def _show_rows(self, rows) -> None:

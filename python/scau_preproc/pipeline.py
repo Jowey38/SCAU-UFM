@@ -130,6 +130,26 @@ def resolve_mesh_controls(job: dict, job_path: Path) -> dict | None:
     return resolved
 
 
+def resolve_crs_policy(job: dict, job_path: Path, package: Path) -> Path | None:
+    """Optional job_config "crs": {"policy": path} (B2). Relative paths resolve
+    against the job_config, then the package. When the block is absent, the
+    package's own metadata/crs_policy.json is used if present; a package
+    WITHOUT any policy runs in the v1 unchecked mode (recorded as such)."""
+    block = job.get("crs")
+    if block:
+        if not isinstance(block, dict) or not block.get("policy"):
+            raise PipelineError("job_config crs must be an object with a policy path")
+        path = Path(block["policy"])
+        if not path.is_absolute():
+            candidate = (job_path.parent / path).resolve()
+            path = candidate if candidate.is_file() else (package / path).resolve()
+        if not path.is_file():
+            raise PipelineError(f"crs policy not found: {path}")
+        return path
+    default = package / "metadata" / "crs_policy.json"
+    return default if default.is_file() else None
+
+
 def resolve_field_derivation(job: dict, job_path: Path, package: Path) -> dict | None:
     """Optional job_config "field_derivation" (B5): {"dpm_rule_table": path,
     "soil_zones"?: path}; relative paths resolve against the job_config, then
@@ -218,6 +238,35 @@ def main() -> int:
 
     policy_audit = check_package_contract(package)
     mesh_controls = resolve_mesh_controls(job, job_path)
+    source_package = package
+    crs_audit = None
+    crs_policy_path = resolve_crs_policy(job, job_path, package)
+    if crs_policy_path is not None:
+        # Stage A (B2): CRS governance. Fail-closed on any undeclared /
+        # geographic / non-allowed CRS; otherwise materialise the governed
+        # staging package (reprojected vectors + verbatim copies) and point
+        # every later stage at it. The input package is never modified.
+        from scau_preproc import crs_governance
+        staging = output_dir / "governed_package"
+        try:
+            crs_audit = crs_governance.govern_package(
+                package, crs_policy_path, staging,
+                mesh_controls=Path(mesh_controls["geojson"]) if mesh_controls else None)
+        except crs_governance.CrsGovernanceError as error:
+            validation_early = {
+                "job_config": str(job_path), "job_config_sha256": sha256_of(job_path),
+                "package": str(package), "started": started, "policy_audit": policy_audit,
+                "findings": [{"severity": "fatal", "code": "CrsGovernanceFailed", "detail": str(error),
+                              "objects": [{"feature_id": error.dataset, "kind": "dataset",
+                                           "violation": "crs_policy"}] if error.dataset else []}],
+                "status": "fatal",
+            }
+            (output_dir / "validation.json").write_text(json.dumps(validation_early, indent=2), encoding="utf-8")
+            print(json.dumps({"status": "fatal", "output_dir": str(output_dir)}))
+            return 2
+        package = staging
+        if mesh_controls and (staging / "mesh_controls.geojson").is_file():
+            mesh_controls = {**mesh_controls, "geojson": str(staging / "mesh_controls.geojson")}
     case_path = output_dir / job.get("case_name", "case.stcf.nc")
     diagnostics_path = output_dir / "generator.diagnostic.geojson"
     generator_config = {
@@ -243,9 +292,19 @@ def main() -> int:
     validation = {
         "job_config": str(job_path),
         "job_config_sha256": sha256_of(job_path),
-        "package": str(package),
+        "package": str(source_package),
+        "governed_package": str(package) if crs_audit is not None else None,
         "started": started,
         "policy_audit": policy_audit,
+        "crs_governance": None if crs_audit is None else {
+            "policy": crs_audit["policy"],
+            "policy_sha256": crs_audit["policy_sha256"],
+            "target_crs": crs_audit["target_crs"],
+            "proj_version": crs_audit["proj_version"],
+            "reprojected_files": crs_audit["reprojected_files"],
+            "datasets": {k: {kk: vv for kk, vv in v.items() if kk != "samples"} for k, v in crs_audit["datasets"].items()},
+            "audit": str(package / "crs_audit.json"),
+        },
         "findings": [],
     }
 
@@ -395,7 +454,18 @@ def main() -> int:
         "pipeline": "scau_preproc.pipeline",
         "job_config_schema_version": JOB_CONFIG_SCHEMA_VERSION,
         "started": started,
-        "package_manifest_sha256": sha256_of(package / "manifest.json"),
+        "package_manifest_sha256": sha256_of(source_package / "manifest.json"),
+        "crs_governance": None if crs_audit is None else {
+            "policy_sha256": crs_audit["policy_sha256"],
+            "target_crs": crs_audit["target_crs"],
+            "proj_version": crs_audit["proj_version"],
+            "pyproj_version": crs_audit["pyproj_version"],
+            "proj_pipelines": sorted({d["proj_pipeline"] for d in crs_audit["datasets"].values() if "proj_pipeline" in d}),
+            "reprojected_files": crs_audit["reprojected_files"],
+            "governed_package_sha256": {
+                rel: sha256_of(package / rel) for rel in crs_audit["reprojected_files"]
+            },
+        },
         "geometry_clean_policy_sha256": sha256_of(
             package / "metadata/geometry_clean_policy.json"
         ),

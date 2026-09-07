@@ -1,0 +1,12 @@
+{
+  "crs_policy_schema_version": 1,
+  "policy_id": "crs_policy",
+  "note": "Synthetic template: every source layer is authored in EPSG:3857 (metre). The target keeps that frame (identity), so this policy exercises the declaration/allow-list checks without transforming coordinates. tests/golden/preproc_crs_governance_case/cases/crs_policy_3395.json is the reprojecting variant (EPSG:3857 -> EPSG:3395) used by G37.",
+  "target_crs": "EPSG:3857",
+  "allow_reprojection": true,
+  "allowed_source_crs": ["EPSG:3857", "EPSG:3395"],
+  "source_crs_overrides": {},
+  "dem_policy": "must_match_target",
+  "audit_sample_count": 5,
+  "production_requirement": "Replace target_crs with the project's projected metre CRS (e.g. a CGCS2000 Gauss-Kruger zone), list only the authorized source CRSs, and keep dem_policy must_match_target unless B3 terrain conditioning takes over raster reprojection."
+}
