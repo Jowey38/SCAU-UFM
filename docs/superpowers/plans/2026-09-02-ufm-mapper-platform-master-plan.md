@@ -225,13 +225,13 @@ UI 纪律（全切片强制）：每页只做"渲染选择 → job_config → �
 | 页 | 名称 | 核心交互 | 消费/产出 | 依赖 | 切片 |
 |---|---|---|---|---|---|
 | P1 | 项目向导 | 选择输入包/输出目录/仓库根；CRS 与单位显示；完整性 7 项灯 | `manifest.json`、`crs_policy.json` | B2 | E2 |
-| P2 | 数据目录树 | Terrain / Land Cover / Geometries / 1D Networks 分组；逐层 Pass/Review/Fatal 灯；点击 finding 定位到对象 | `validation.json.findings[].objects` | — | E2 |
+| P2 | 数据目录树（✔） | Terrain / Land Cover / Geometries / 1D Networks 分组；逐层 Pass/Review/Fatal 灯；点击 finding 定位到对象 | `validation.json.findings[].objects` | — | E2 ✔ |
 | P3 | 字段映射 | 源字段 → canonical 目标（下拉只允许 canonical 集合） | `manifest.canonical_targets`、`field_dictionary.csv` | — | E2 |
 | P4 | 网格工作台（✔） | 草稿层绘制 → `mesh_controls.geojson`；热力图；诊断层 | 已落地 | — | E3 ✔ |
 | P5 | 语义与物理参数表 | 浏览/编辑 soil LUT、Manning LUT、DPM 规则表（编辑即写新版本文件，不改原文件） | `soil_lut.json`、`dpm_rule_table.json` | B5 | E5a |
 | P6 | 耦合关系编辑器（✔） | 地图高亮 1D 节点↔2D 单元连线；`review` 标红；确认/拒绝/改目标/新建/撤销 → 写 `coupling/confirmed/*.json` | 映射 JSON、确认契约 | C4 | E4 ✔ |
-| P7 | 质量门禁 | 全量报告浏览器（import/terrain/topology/field/coupling/reproducibility 分页）；fatal/review/pass 计数；点击定位 | 全部报告 | — | E5 |
-| P8 | 导出与复现 | 一键 Run Pipeline；导出按钮在 fatal/未确认时禁用（复用 `jobio.exportable`）；显示可复现命令与包哈希 | B6 导出器 | B6 | E5 |
+| P7 | 质量门禁（✔） | 全量报告浏览器（import/terrain/topology/field/coupling/reproducibility 分页）；fatal/review/pass 计数；点击定位 | 全部报告 | — | E5 ✔ |
+| P8 | 导出与复现（✔） | 一键 Run Pipeline；导出按钮在 fatal/未确认时禁用（复用 `jobio.exportable`）；显示可复现命令与包哈希 | B6 导出器 | B6 | E5 ✔ |
 | P9 | 结果制图 | 时间轴播放；深度/流速分级渲染；点击取时序；与 SWMM `.out`/D-Flow map 只读联看 | M288-A/B 产物 | M288-B | M288-C |
 | P10 | 管网工作台 | junction/outfall/conduit 草稿层；端点吸附；`.inp` 导入；保存 → `drainage_network.geojson` → 写出 + 真实引擎解析结果行；耦合角色着色 | N1 产物 | N1-B | N1-D |
 | P11 | 河网草绘 | river_node/river_branch/surface_interface_candidate 草稿层；吸附；导出 net/mdu；`provider_required` 计数灯 | N2 产物 | N2-B | N2-D |
@@ -282,6 +282,7 @@ UI 纪律（全切片强制）：每页只做"渲染选择 → job_config → �
 | **M287-C5** | 空间候选模式（explicit_ids / spatial_candidates / mixed；全 review） | **G34** | 2026-09-04 evidence |
 | **M287-E4** | 耦合关系编辑器（P6：状态着色连线图层、accept/reject/retarget/create/undo → C4 文件） | — | 2026-09-04 evidence |
 | **M287-B6** | 案例包导出器（阶段 F：门禁 + 原子组装 + `simdriver/run.conf` + 包级清单；E5 导出按钮） | **G35** | 2026-09-05 evidence |
+| **M287-E2 + E5** | 数据目录树（状态灯）+ 门禁与报告浏览器（六页 + findings 定位缩放） | — | 2026-09-06 evidence |
 
 ### 8.2 阶段 I ——"候选 → 确认 → 固化"闭环（当前主线，下一步）
 
@@ -292,7 +293,8 @@ UI 纪律（全切片强制）：每页只做"渲染选择 → job_config → �
 
 | **E4 耦合编辑器** | P6 页：连线图层、review 标红、确认/拒绝/改目标写契约文件；**新建链接**（任意 1D 节点拖到 2D 单元 → `decision: create` 候选，必经确认）；不改生成器输出 | C4, C5 | **DONE 2026-09-04**：`superpowers/specs/2026-09-04-m287-e4-coupling-editor-evidence.md`（契约由 G33 锁定；离屏冒烟全闭环） |
 
-| **E2 数据目录树 + P1/P3** | 分组树、状态灯、finding → 对象定位、字段映射下拉 | A 报告已含对象 ID | 离屏冒烟；三类状态灯断言 |
+| **E2 数据目录树 + P1/P3** | 分组树、状态灯、finding → 对象定位、字段映射下拉 | A 报告已含对象 ID | **DONE 2026-09-06**：`superpowers/specs/2026-09-06-m287-e2-e5-data-tree-report-browser-evidence.md`（字段映射下拉 P3 仍待 B5 契约） |
+
 
 ### 8.3 阶段 II —— 输入治理与真实字段（可与阶段 I 并行）
 
@@ -309,7 +311,8 @@ UI 纪律（全切片强制）：每页只做"渲染选择 → job_config → �
 |---|---|---|---|
 | **B6 案例包导出器** | 组装 `case/`；先全量 C++ 校验（`validate --case-dir`）后原子 rename；`swmm/model.inp`、`dflowfm/*` 原样复制；包级 SHA-256 + 可复现命令 | C4 | **DONE 2026-09-05（G35 `ci_gate:true`）**：`superpowers/specs/2026-09-05-m287-b6-case-export-evidence.md`；已知限制：SimDriver run loop 仅三模型，surface+SWMM 包可冷启动但不可运行（待 C3 或驱动双模型模式） |
 
-| **E5 门禁与导出中心** | P7 + P8：报告浏览器分页；导出禁用逻辑；一键导出 | B6 | 离屏冒烟：fatal/未确认 → 禁用；ok → 导出成功 |
+| **E5 门禁与导出中心** | P7 + P8：报告浏览器分页；导出禁用逻辑；一键导出 | B6 | **DONE 2026-09-06**（报告浏览器 + findings 定位 + 门禁摘要；导出按钮随 B6 落地） |
+
 | **B7 双平台确定性** | 受治理 Linux gmsh（third_party 治理）；跨平台哈希实验 | — | 证据决定门禁形态："逐位一致"或"记录在案的 1e-12 容差" |
 | **E6/E7 打包收口** | 图标、翻译、双轨冒烟清单；`project.ufm.json` 工程索引 | E2–E5 | 双版本 QGIS 冒烟清单勾完 |
 
@@ -361,7 +364,7 @@ M288-A(设计评审可在 B6 后并行启动) ─► M288-B ─► M288-C ─►
 M287-D 独立等待 M281；B7 独立实验
 ```
 
-阶段 I（C4/C5/E4）与 B6 已落地；建议下一切片：**E5 门禁与导出中心（报告浏览器）+ E2 数据目录树**，并行推进 **B5 字段派生格式** / **B2 CRS**；运行导出包需 **驱动双模型模式或 C3**（新增决策项）（确认契约 → 空间候选模式 → 耦合编辑器）——它们
+阶段 I（C4/C5/E4）、B6、E2/E5 已落地；建议下一切片：**B5 字段派生（格式先行）** 与 **B2 CRS 治理**（后端，可并行），随后 **E5a 参数表页 / E6-E7 收口**；运行导出包需 **驱动双模型模式或 C3**（决策项待定）（确认契约 → 空间候选模式 → 耦合编辑器）——它们
 是导出门禁语义完整的前提，也是 RAS Mapper "SA/2D Connections 手动确认"体验的对应物。
 
 ---
