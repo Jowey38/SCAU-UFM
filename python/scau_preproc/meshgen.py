@@ -18,6 +18,11 @@ and size fields; breaklines are asserted post-mesh to survive as mesh-edge
 chains; a per-cell diagnostic GeoJSON feeds the QGIS heat map. Without the
 key, generation is byte-identical to pipeline v1.
 
+M287-B5 field derivation (config key "field_derivation": {"dpm_rule_table",
+"soil_zones"?}): phi_t / Phi_c per landcover class from an approved rule table,
+omega_edge / phi_e_n / phi_et by the spec 5.3 rule-2 edge projection, soil_type
+from soil_zones; without the key the v1 unit placeholders are written.
+
 Run as `py -3 -m scau_preproc.meshgen <generator.config.json>`.
 """
 
@@ -31,7 +36,7 @@ import os
 import sys
 from pathlib import Path
 
-from scau_preproc import mesh_controls
+from scau_preproc import field_derivation, mesh_controls
 
 FILL = -1
 
@@ -478,16 +483,17 @@ def write_stcf_case(path: Path, topology: dict, node_x, node_y, fields: dict) ->
             var.setncattr("location", location)
             var[:] = values
 
-        field_var("phi_t", "cell", np.full(cell_count, 1.0), "face")
-        field_var("phi_xx", "cell", np.full(cell_count, 1.0), "face")
-        field_var("phi_xy", "cell", np.zeros(cell_count), "face")
-        field_var("phi_yy", "cell", np.full(cell_count, 1.0), "face")
+        derived = fields.get("derived")  # B5 rule-table derivation; None = v1 unit placeholders
+        field_var("phi_t", "cell", np.array(derived["phi_t"], dtype="f8") if derived else np.full(cell_count, 1.0), "face")
+        field_var("phi_xx", "cell", np.array(derived["phi_xx"], dtype="f8") if derived else np.full(cell_count, 1.0), "face")
+        field_var("phi_xy", "cell", np.array(derived["phi_xy"], dtype="f8") if derived else np.zeros(cell_count), "face")
+        field_var("phi_yy", "cell", np.array(derived["phi_yy"], dtype="f8") if derived else np.full(cell_count, 1.0), "face")
         field_var("manning_n", "cell", np.array(fields["manning_n"], dtype="f8"), "face")
         field_var("z_b", "cell", np.array(fields["z_b"], dtype="f8"), "face")
         field_var("soil_type", "cell", np.array(fields["soil_type"], dtype="i4"), "face", "i4")
-        field_var("omega_edge", "edge", np.full(edge_count, 1.0), "edge")
-        field_var("phi_e_n", "edge", np.full(edge_count, 1.0), "edge")
-        field_var("phi_et", "edge", np.full(edge_count, 1.0), "edge")
+        field_var("omega_edge", "edge", np.array(derived["omega_edge"], dtype="f8") if derived else np.full(edge_count, 1.0), "edge")
+        field_var("phi_e_n", "edge", np.array(derived["phi_e_n"], dtype="f8") if derived else np.full(edge_count, 1.0), "edge")
+        field_var("phi_et", "edge", np.array(derived["phi_et"], dtype="f8") if derived else np.full(edge_count, 1.0), "edge")
         for name in ("K_s", "psi_f", "theta_s", "theta_i"):
             var = ds.createVariable(name, "f8", ("soil_type_entry",))
             var[:] = np.array([entry[name] for entry in fields["soil_params"]], dtype="f8")
@@ -620,7 +626,45 @@ def main() -> int:
     landcover = load_geojson_polygons(package / "landcover/landcover.geojson", "class_code")
     fields = assign_fields(centroids, dem, landcover, package / "soil/soil_parameters.csv")
 
+    derivation_config = config.get("field_derivation") or {}
+    derivation_report_payload = None
+    if derivation_config.get("dpm_rule_table"):
+        package_manifest = json.loads((package / "manifest.json").read_text(encoding="utf-8"))
+        try:
+            rules = field_derivation.load_rule_table(
+                Path(derivation_config["dpm_rule_table"]),
+                package_is_synthetic=bool(package_manifest.get("synthetic_data", False)),
+            )
+            soil_zones = None
+            if rules["soil"]["source"] == "soil_zones":
+                soil_zones_path = Path(derivation_config.get("soil_zones", package / "soil/soil_zones.geojson"))
+                if not soil_zones_path.is_file():
+                    raise field_derivation.FieldDerivationError(f"soil zones not found: {soil_zones_path}")
+                soil_zones = load_geojson_polygons(soil_zones_path, "soil_type")
+            cell_fields = field_derivation.derive_cell_fields(centroids, landcover, rules, soil_zones)
+            edge_fields = field_derivation.derive_edge_fields(
+                mesh["node_x"], mesh["node_y"], topology["edge_nodes"], topology["edge_faces"],
+                cell_fields, rules)
+        except field_derivation.FieldDerivationError as error:
+            print(f"FieldDerivationFailed: {error}", file=sys.stderr)
+            raise SystemExit(2)
+        fields["derived"] = {**cell_fields, **edge_fields}
+        fields["soil_type"] = cell_fields["soil_type"]
+        fields["manning_n"] = cell_fields["manning_n"]
+        max_soil = len(fields["soil_params"])
+        bad = sorted({s for s in fields["soil_type"] if not 0 <= s < max_soil})
+        if bad:
+            print(f"FieldDerivationFailed: soil_type {bad} not in soil_parameters.csv (0..{max_soil - 1})",
+                  file=sys.stderr)
+            raise SystemExit(2)
+        derivation_report_payload = field_derivation.derivation_report(rules, cell_fields, edge_fields)
+        derivation_report_payload["rule_table_sha256"] = hashlib.sha256(
+            Path(derivation_config["dpm_rule_table"]).read_bytes()).hexdigest()
+
     write_stcf_case(output, topology, mesh["node_x"], mesh["node_y"], fields)
+    if derivation_report_payload is not None:
+        report_path = Path(config.get("field_report", output.with_suffix(".field_derivation.json")))
+        report_path.write_text(json.dumps(derivation_report_payload, indent=2), encoding="utf-8")
 
     cell_rows = mesh_controls.cell_diagnostics(
         mesh["node_x"], mesh["node_y"], mesh["faces"],
@@ -645,6 +689,11 @@ def main() -> int:
             "max_nonorthogonality_deg": max(r["nonorthogonality_deg"] for r in cell_rows),
         },
         "mesh_controls": controls_report,
+        "field_derivation": None if derivation_report_payload is None else {
+            "report": str(Path(config.get("field_report", output.with_suffix(".field_derivation.json")))),
+            "rule_table_sha256": derivation_report_payload["rule_table_sha256"],
+            "approval": derivation_report_payload["approval"],
+        },
     }
     report_path = Path(config.get("report", output.with_suffix(".quality.json")))
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")

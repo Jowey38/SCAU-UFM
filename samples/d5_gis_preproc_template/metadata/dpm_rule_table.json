@@ -1,0 +1,41 @@
+{
+  "dpm_rule_table_schema_version": 1,
+  "approval": {
+    "status": "synthetic_unapproved",
+    "approved_by": null,
+    "date": null,
+    "note": "Synthetic development values for the D-5 template only. Real parameter values require the data owner's / project authority's approval (M281, plan v1.1 section 4); the pipeline refuses this table for any package whose manifest does not declare synthetic_data: true."
+  },
+  "closure_limits": {"epsilon_phi": 1.0e-6, "cond_max": 1.0e4},
+  "unmapped_class": "fatal",
+  "landcover_overlap": "smallest_area_wins",
+  "landcover_overlap_note": "synthetic: the pond polygon lies inside the grass polygon; the most specific (smallest) polygon owns the cell",
+  "classes": {
+    "road": {
+      "phi_t": 0.95,
+      "Phi_c": {"xx": 0.95, "xy": 0.0, "yy": 0.80},
+      "note": "synthetic: street corridor, anisotropic along x (road axis)"
+    },
+    "grass": {
+      "phi_t": 1.0,
+      "Phi_c": {"xx": 1.0, "xy": 0.0, "yy": 1.0},
+      "note": "synthetic: open pervious ground, isotropic"
+    },
+    "water": {
+      "phi_t": 1.0,
+      "Phi_c": {"xx": 1.0, "xy": 0.0, "yy": 1.0},
+      "note": "synthetic: pond"
+    }
+  },
+  "edges": {
+    "default_omega": 1.0,
+    "boundary_omega": 1.0,
+    "interfaces": [
+      {"classes": ["road", "grass"], "omega_edge": 0.9, "note": "synthetic: kerb line partially blocks road->grass exchange"}
+    ]
+  },
+  "soil": {
+    "source": "soil_zones",
+    "missing_zone": {"soil_type": 0, "note": "synthetic: cells outside soil_zones (the road strip) are impervious"}
+  }
+}

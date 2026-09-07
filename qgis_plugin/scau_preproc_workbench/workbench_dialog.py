@@ -161,6 +161,8 @@ class WorkbenchDialog(QDialog):
         self._roof_distance_spin.setSuffix(" m")
         self._confirmations_edit = QLineEdit()
         self._confirmations_edit.setPlaceholderText("确认目录（可选；默认使用输入包 coupling/confirmed/）")
+        self._rule_table_edit = QLineEdit()
+        self._rule_table_edit.setPlaceholderText("DPM 规则表 metadata/dpm_rule_table.json（可选；留空 = v1 占位场）")
         options = QHBoxLayout()
         options.addWidget(QLabel("特征长度"))
         options.addWidget(self._lc_spin)
@@ -174,6 +176,12 @@ class WorkbenchDialog(QDialog):
         coupling.addWidget(QLabel("屋面→检查井最大距离"))
         coupling.addWidget(self._roof_distance_spin)
         coupling.addStretch()
+        fields = QHBoxLayout()
+        fields.addWidget(QLabel("字段派生规则表"))
+        fields.addWidget(self._rule_table_edit)
+        browse_rules = QPushButton("...")
+        browse_rules.clicked.connect(lambda: self._browse(self._rule_table_edit, False))
+        fields.addWidget(browse_rules)
         confirmations = QHBoxLayout()
         confirmations.addWidget(QLabel("耦合确认目录"))
         confirmations.addWidget(self._confirmations_edit)
@@ -185,6 +193,7 @@ class WorkbenchDialog(QDialog):
         layout.addLayout(grid)
         layout.addLayout(options)
         layout.addLayout(coupling)
+        layout.addLayout(fields)
         layout.addLayout(confirmations)
         layout.addStretch()
         return page
@@ -669,6 +678,7 @@ class WorkbenchDialog(QDialog):
             confirmations_dir=self._confirmations_edit.text().strip() or None,
             coupling_mode=self._coupling_mode.currentData(),
             roof_node_max_distance_m=self._roof_distance_spin.value(),
+            dpm_rule_table=self._rule_table_edit.text().strip() or None,
         )
 
     def _show_rows(self, rows) -> None:

@@ -1,0 +1,40 @@
+{
+  "field_derivation_schema_version": 1,
+  "rule_table": "H:\\githubcode\\SCAU-UFM\\samples\\d5_gis_preproc_template\\metadata\\dpm_rule_table.json",
+  "approval": {
+    "status": "synthetic_unapproved",
+    "approved_by": null,
+    "date": null
+  },
+  "closure_limits": {
+    "epsilon_phi": 1e-06,
+    "cond_max": 10000.0
+  },
+  "cells_by_class": {
+    "road": 83,
+    "grass": 363,
+    "water": 23
+  },
+  "unmapped_cells_defaulted": 0,
+  "landcover_overlap_rule": "smallest_area_wins",
+  "overlapping_landcover_cells": 23,
+  "manning_source": "landcover polygon chosen by the same class selection (derived mode)",
+  "soil_source": "soil_zones",
+  "soil_missing_zone_defaulted": 83,
+  "phi_t_range": [
+    0.95,
+    1.0
+  ],
+  "edge_rule": "spec 5.3 rule 2: phi_e_n = omega * n^T mean(Phi_c) n; phi_et = omega * t^T mean(Phi_c) t",
+  "interface_edges": 30,
+  "phi_e_n_range": [
+    0.8,
+    1.0
+  ],
+  "omega_edge_values": [
+    0.9,
+    1.0
+  ],
+  "runtime_semantics": "none (fields only; closure certified by scau_preproc validate)",
+  "rule_table_sha256": "768e1ff2b1e1f8bca10257182e3794faf11e60887138a0a8af601de642dad148"
+}

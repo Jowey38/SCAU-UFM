@@ -50,7 +50,7 @@ E1（作业页）、**B4 + E3（网格控制 + 网格工作台，G32）**；Gold
 | Terrain 图层（多 DEM 合并、优先级） | DEM 接入 + 采样 → `z_b`；多 DEM 拼接 | 单 DEM DONE；拼接 = B3b | B3 |
 | Terrain 修改（Terrain Modification：渠道切割、堤防抬升） | DEM 调理（填洼/水系强制/局部抬升）须 `terrain_condition_policy.json` 授权 | 未做 | B3 |
 | Land Cover → Manning LUT | landcover → `manning_n` LUT | DONE（G30） | — |
-| Infiltration layer | soil → Green-Ampt LUT | 占位 | B5 |
+| Infiltration layer | soil_zones → soil_type → Green-Ampt LUT（`soil_parameters.csv`） | DONE（G36） | — |
 | 2D Flow Area + Breaklines + Refinement Regions | `mesh_controls.geojson`（breakline / refinement_region） | **DONE（G32）** | — |
 | Mesh 质量检查（cell 尺寸、边角） | `mesh_quality.json` + `mesh_quality_cells.geojson` 热力图 | **DONE（E3）** | — |
 | Geometry：河道中心线/结构（几何） | **N2 河网草绘**：节点/河段/地表交界候选 → UGRID 1D 网络 + MDU 模板；水力参数 `provider_required` | 未做 | N2 |
@@ -170,7 +170,7 @@ simdriver_links.conf                  # SimDriver RuntimeConfig version = 2 片�
 ```text
 metadata/crs_policy.json                 # B2：目标 CRS（EPSG/WKT）、proj pipeline 字符串、允许的源 CRS 集合
 metadata/terrain_condition_policy.json   # B3：调理授权（fill/enforce/modify）、算法与参数版本、审计要求
-metadata/dpm_rule_table.json             # B5：规则表格式（先行）；值随 D-5 批准
+metadata/dpm_rule_table.json             # B5 ✔：dpm_rule_table_schema_version 1（approval 门、classes、edges.interfaces、soil、landcover_overlap）；值随 D-5 批准
 metadata/soil_lut.json                   # B5：soil_type → K_s/psi_f/theta_s/theta_i（替代 CSV 或与之并存需裁决）
 coupling/confirmed/<mapping_id>.json     # C4 ✔：confirmation_schema_version=1 {chain, mapping_id, decision: accept|reject|retarget|create, candidate_sha256, confirmed_by, timestamp, target}
 swmm/drainage_network.geojson            # N1：drainage_network_schema_version = 1（井/排放口/管道 + 白名单 OPTIONS）
@@ -204,7 +204,7 @@ results/<run_id>/timeseries/<point_id>.csv
   "mesh_controls": {"geojson": "...", "default_size_m": 3.0, "default_dist_max_m": 12.0},
   "crs": {"policy": "metadata/crs_policy.json"},                                  // B2
   "terrain_condition": {"policy": "metadata/terrain_condition_policy.json"},      // B3
-  "field_derivation": {"dpm_rule_table": "...", "soil_lut": "..."},               // B5
+  "field_derivation": {"dpm_rule_table": "metadata/dpm_rule_table.json", "soil_zones": "..."},  // B5 ✔（soil 参数仍在 soil_parameters.csv）
   "coupling_maps": true | {"mode": "explicit_ids|spatial_candidates|mixed", "roof_node_max_distance_m": 50.0},  // C5 ✔
   "confirmations_dir": "coupling/confirmed",                                      // C4 ✔（缺省 = 输入包 coupling/confirmed/）
   "export_case": {"target_dir": "case/", "force": false, "engine_mode": "mock", "end_time": 600.0},  // B6 ✔（门禁：ok + effective complete）
@@ -283,6 +283,7 @@ UI 纪律（全切片强制）：每页只做"渲染选择 → job_config → �
 | **M287-E4** | 耦合关系编辑器（P6：状态着色连线图层、accept/reject/retarget/create/undo → C4 文件） | — | 2026-09-04 evidence |
 | **M287-B6** | 案例包导出器（阶段 F：门禁 + 原子组装 + `simdriver/run.conf` + 包级清单；E5 导出按钮） | **G35** | 2026-09-05 evidence |
 | **M287-E2 + E5** | 数据目录树（状态灯）+ 门禁与报告浏览器（六页 + findings 定位缩放） | — | 2026-09-06 evidence |
+| **M287-B5** | 规则表字段派生（`dpm_rule_table.json` 格式/lint/审批门 + spec 5.3 规则 2 边投影 + soil_zones） | **G36** | 2026-09-07 evidence |
 
 ### 8.2 阶段 I ——"候选 → 确认 → 固化"闭环（当前主线，下一步）
 
@@ -302,7 +303,8 @@ UI 纪律（全切片强制）：每页只做"渲染选择 → job_config → �
 |---|---|---|---|
 | **B2 CRS 治理** | pyproj 受控重投影；`crs_policy.json`；proj pipeline 字符串版本化进 manifest；地理坐标一律 fatal；重投影审计样本 | — | 重投影确定性 golden（同平台逐位）；lat/lon 拒绝负向证据 |
 | **B3 DEM 调理** | Priority-Flood 填洼（算法/参数版本化）、可选水系强制、局部改造；`terrain_condition_policy.json` 授权；洼地/改动量诊断栅格；多 DEM 拼接 | B2 | 调理前后差异审计 golden；关闭策略时逐位不变 |
-| **B5 字段真实派生（格式先行）** | `soil_lut.json`、`dpm_rule_table.json` schema + 校验器；合成规则表驱动 `phi_t`/`Phi_c`/`omega_edge`/`phi_e_n` 派生；未映射对象 fail-closed | — | 收紧 G30 占位断言为规则表派生值断言；`validate_dpm_consistency` 全过 |
+| **B5 字段真实派生（格式先行）** | `soil_lut.json`、`dpm_rule_table.json` schema + 校验器；合成规则表驱动 `phi_t`/`Phi_c`/`omega_edge`/`phi_e_n` 派生；未映射对象 fail-closed | — | **DONE 2026-09-07（G36 `ci_gate:true`）**：`superpowers/specs/2026-09-07-m287-b5-field-derivation-evidence.md`；G30 保持占位模式不收紧（避免 G31–G35 级联），G36 在同一网格上断言规则表值 |
+
 | **E5a 参数表页** | P5：LUT/规则表浏览与版本化编辑 | B5 | 离屏冒烟；编辑产生新版本文件 |
 
 ### 8.4 阶段 III —— 前处理收口
@@ -364,7 +366,7 @@ M288-A(设计评审可在 B6 后并行启动) ─► M288-B ─► M288-C ─►
 M287-D 独立等待 M281；B7 独立实验
 ```
 
-阶段 I（C4/C5/E4）、B6、E2/E5 已落地；建议下一切片：**B5 字段派生（格式先行）** 与 **B2 CRS 治理**（后端，可并行），随后 **E5a 参数表页 / E6-E7 收口**；运行导出包需 **驱动双模型模式或 C3**（决策项待定）（确认契约 → 空间候选模式 → 耦合编辑器）——它们
+阶段 I、B5、B6、E2/E5 已落地；建议下一切片：**B2 CRS 治理**（后端），随后 **B3 DEM 调理**、**E5a 参数表页 / E6-E7 收口**；运行导出包需 **驱动双模型模式或 C3**（决策项待定）（确认契约 → 空间候选模式 → 耦合编辑器）——它们
 是导出门禁语义完整的前提，也是 RAS Mapper "SA/2D Connections 手动确认"体验的对应物。
 
 ---

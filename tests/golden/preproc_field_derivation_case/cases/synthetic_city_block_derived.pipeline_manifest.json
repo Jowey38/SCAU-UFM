@@ -1,0 +1,64 @@
+{
+  "pipeline": "scau_preproc.pipeline",
+  "job_config_schema_version": 1,
+  "started": "2026-09-07T08:37:02",
+  "package_manifest_sha256": "c74e59ace53454a9dd76e8a02b5d1a305ba753a386e5ca6d623923a99732bf77",
+  "geometry_clean_policy_sha256": "fc41ae83aac01707221c0d75df83017dee08da3a034261f0ad7c75b900915b67",
+  "generator_config_sha256": "ca8e00bf4c8278c8cec0a79c296bbdb2ec67d2cc063554bf21de69d2884a676f",
+  "mesh_controls": null,
+  "case_sha256": "1c76286984395bdd2b89799173e9611e728268cb7c8a491d4927daeaff510d44",
+  "mesh_quality": {
+    "gmsh_version": "4.15.2",
+    "characteristic_length_m": 8.0,
+    "recombine": true,
+    "nodes": 526,
+    "edges": 996,
+    "output": "H:\\scau-b5-out\\derived\\synthetic_city_block.stcf.nc",
+    "output_sha256": "1c76286984395bdd2b89799173e9611e728268cb7c8a491d4927daeaff510d44",
+    "quality": {
+      "cells": 469,
+      "triangles": 0,
+      "quadrilaterals": 469,
+      "min_angle_degrees": 43.64366104061448,
+      "max_edge_length_ratio": 2.361150361172137,
+      "review_thresholds": {
+        "min_angle_degrees": 10.0,
+        "max_aspect_ratio": 20.0
+      }
+    },
+    "per_cell_diagnostics": {
+      "geojson": "H:\\scau-b5-out\\derived\\mesh_quality_cells.geojson",
+      "diagnostic_only": true,
+      "max_equiangle_skewness": 0.5151,
+      "max_nonorthogonality_deg": 29.6014
+    },
+    "mesh_controls": null,
+    "field_derivation": {
+      "report": "H:\\scau-b5-out\\derived\\field_derivation.json",
+      "rule_table_sha256": "768e1ff2b1e1f8bca10257182e3794faf11e60887138a0a8af601de642dad148",
+      "approval": {
+        "status": "synthetic_unapproved",
+        "approved_by": null,
+        "date": null
+      }
+    }
+  },
+  "reproduce": "py -3 -m scau_preproc.pipeline derived_job.json",
+  "field_derivation": {
+    "dpm_rule_table": "H:\\githubcode\\SCAU-UFM\\samples\\d5_gis_preproc_template\\metadata\\dpm_rule_table.json",
+    "dpm_rule_table_sha256": "768e1ff2b1e1f8bca10257182e3794faf11e60887138a0a8af601de642dad148"
+  },
+  "coupling_maps": {
+    "mode": "explicit_ids",
+    "roof_node_max_distance_m": 50.0
+  },
+  "confirmations": {
+    "dir": "H:\\githubcode\\SCAU-UFM\\samples\\d5_gis_preproc_template\\coupling\\confirmed",
+    "files_sha256": {
+      "MAP_ROOF_SYNTH_001.json": "56728c83a58bd3d36266ba2439e34d7b2fcb94c9e1ecc752ec9c1f14facc44d0",
+      "MAP_ROOF_SYNTH_002.json": "9b1a52b75363d9543307fa33e505e9ec44608970b493264bc54a1a8042b1ac09",
+      "MAP_SURF_SYNTH_001.json": "83a4cf368f0a454cd259ed87bcce352839d78b75ff1eb19c9dc4e98251e0d3b0",
+      "MAP_SURF_SYNTH_002.json": "049ef2e3258a47a4d59370a95ab57ae33d3ea1f4249fac3b6638dd9b9ca76c49"
+    }
+  }
+}
