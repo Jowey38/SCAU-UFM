@@ -62,6 +62,9 @@ REQUIRED = {
     # G35 locks the M287-B6 exported case package (manifest hashes, effective-
     # only run.conf, SimDriver cold start with the real embedded SWMM engine).
     "G35": ("case_export_synthetic_package", "implemented", True),
+    # G36 locks the M287-B5 rule-table field derivation (class tuples, spec 5.3
+    # rule-2 edge projection vs the solver kernel, closure laws, rest state).
+    "G36": ("preproc_field_derivation_case", "implemented", True),
 }
 
 

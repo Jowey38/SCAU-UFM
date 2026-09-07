@@ -130,6 +130,28 @@ def resolve_mesh_controls(job: dict, job_path: Path) -> dict | None:
     return resolved
 
 
+def resolve_field_derivation(job: dict, job_path: Path, package: Path) -> dict | None:
+    """Optional job_config "field_derivation" (B5): {"dpm_rule_table": path,
+    "soil_zones"?: path}; relative paths resolve against the job_config, then
+    the package. Missing files are contract errors."""
+    block = job.get("field_derivation")
+    if not block:
+        return None
+    if not isinstance(block, dict) or not block.get("dpm_rule_table"):
+        raise PipelineError("job_config field_derivation must be an object with dpm_rule_table")
+    resolved = {}
+    for key in ("dpm_rule_table", "soil_zones"):
+        if block.get(key):
+            path = Path(block[key])
+            if not path.is_absolute():
+                candidate = (job_path.parent / path).resolve()
+                path = candidate if candidate.is_file() else (package / path).resolve()
+            if not path.is_file():
+                raise PipelineError(f"field_derivation {key} not found: {path}")
+            resolved[key] = str(path)
+    return resolved
+
+
 def resolve_coupling_maps(job: dict) -> dict | None:
     """job_config "coupling_maps": false/absent -> None; true -> explicit_ids
     (v1 behaviour); object {"mode": explicit_ids|spatial_candidates|mixed,
@@ -209,6 +231,10 @@ def main() -> int:
     }
     if mesh_controls:
         generator_config["mesh_controls"] = mesh_controls
+    field_derivation = resolve_field_derivation(job, job_path, package)
+    if field_derivation:
+        generator_config["field_derivation"] = field_derivation
+        generator_config["field_report"] = str(output_dir / "field_derivation.json")
     generator_config_path = output_dir / "generator.config.json"
     generator_config_path.write_text(json.dumps(generator_config, indent=2), encoding="utf-8")
 
@@ -245,6 +271,7 @@ def main() -> int:
         finding = {
             "severity": "fatal",
             "code": "MeshControlsRejected" if detail.startswith("MeshControlsRejected:")
+            else "FieldDerivationFailed" if detail.startswith("FieldDerivationFailed:")
             else "MeshGenerationFailed",
             "detail": detail,
             "diagnostic": str(diagnostics_path) if diagnostics_path.exists() else None,
@@ -270,6 +297,8 @@ def main() -> int:
         repeat_config["diagnostics"] = str(repeat_dir / "generator.diagnostic.geojson")
         repeat_config["report"] = str(repeat_dir / "mesh_quality.json")
         repeat_config["quality_cells"] = str(repeat_dir / "mesh_quality_cells.geojson")
+        if "field_report" in repeat_config:
+            repeat_config["field_report"] = str(repeat_dir / "field_derivation.json")
         repeat_config_path = repeat_dir / "generator.config.json"
         repeat_config_path.write_text(json.dumps(repeat_config, indent=2), encoding="utf-8")
         repeat_rc, repeat_err = run_generator(repeat_config_path, timeout_s)
@@ -379,6 +408,11 @@ def main() -> int:
         "mesh_quality": json.loads((output_dir / "mesh_quality.json").read_text(encoding="utf-8")),
         "reproduce": f"py -3 -m scau_preproc.pipeline {job_path.name}",
     }
+    if field_derivation:
+        manifest["field_derivation"] = {
+            **field_derivation,
+            "dpm_rule_table_sha256": sha256_of(Path(field_derivation["dpm_rule_table"])),
+        }
     if coupling_options is not None:
         manifest["coupling_maps"] = coupling_options
     if confirmations_dir is not None:

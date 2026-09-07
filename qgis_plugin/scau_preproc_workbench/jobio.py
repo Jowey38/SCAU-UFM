@@ -63,6 +63,7 @@ def build_job_config(
     roof_node_max_distance_m: float | None = None,
     export_target_dir: str | None = None,
     export_options: dict | None = None,
+    dpm_rule_table: str | None = None,
 ) -> dict:
     job = {
         "job_config_schema_version": JOB_CONFIG_SCHEMA_VERSION,
@@ -94,6 +95,8 @@ def build_job_config(
         job["confirmations_dir"] = str(Path(confirmations_dir))
     if export_target_dir:
         job["export_case"] = {"target_dir": str(Path(export_target_dir)), **(export_options or {})}
+    if dpm_rule_table:
+        job["field_derivation"] = {"dpm_rule_table": str(Path(dpm_rule_table))}
     return job
 
 
@@ -748,6 +751,29 @@ def _read_json(path: Path) -> dict | None:
         return None
 
 
+def _field_page(output: Path, manifest: dict) -> list[tuple[str, str]]:
+    """Stage D rows: rule-table derivation report when present (B5), else the
+    recorded v1 placeholder rules."""
+    report = _read_json(output / "field_derivation.json")
+    def s(v):
+        return "" if v is None else (json.dumps(v, ensure_ascii=False) if isinstance(v, (dict, list)) else str(v))
+    if not report:
+        return [("mode", "v1 placeholders (no job_config.field_derivation)"),
+                ("manning_n", "landcover first-match LUT"), ("z_b", "DEM nearest sample"),
+                ("soil_type", "landcover soil_type"), ("phi_t / Phi_c / omega_edge / phi_e_n / phi_et", "unit placeholders")]
+    approval = report.get("approval") or {}
+    rows = [("mode", "rule-table derivation (B5)"), ("rule_table", report.get("rule_table")),
+            ("rule_table_sha256", report.get("rule_table_sha256") or (manifest.get("field_derivation") or {}).get("dpm_rule_table_sha256")),
+            ("approval", f"{approval.get('status')} by={approval.get('approved_by')} date={approval.get('date')}"),
+            ("cells_by_class", s(report.get("cells_by_class"))), ("phi_t_range", s(report.get("phi_t_range"))),
+            ("landcover_overlap", f"{report.get('landcover_overlap_rule')} ({report.get('overlapping_landcover_cells')} cells)"),
+            ("unmapped_cells_defaulted", s(report.get("unmapped_cells_defaulted"))),
+            ("soil", f"{report.get('soil_source')} (missing-zone defaulted: {report.get('soil_missing_zone_defaulted')})"),
+            ("edge_rule", report.get("edge_rule")), ("interface_edges", s(report.get("interface_edges"))),
+            ("phi_e_n_range", s(report.get("phi_e_n_range"))), ("omega_edge_values", s(report.get("omega_edge_values")))]
+    return [(k, s(v)) for k, v in rows]
+
+
 def report_pages(job: dict) -> dict[str, list[tuple[str, str]]]:
     """Key/value rows per report page, all read from disk on every call."""
     output = Path(job["output_dir"])
@@ -783,8 +809,7 @@ def report_pages(job: dict) -> dict[str, list[tuple[str, str]]]:
                            ("breaklines_preserved", [b.get("control_id") for b in (quality.get("mesh_controls") or {}).get("breaklines", [])]),
                            ("determinism", validation.get("determinism")),
                            ("authoritative_validate", (validation.get("authoritative_validate") or {}).get("stdout"))),
-        "field": kv(("manning_n", "landcover LUT (G30)"), ("z_b", "DEM nearest sample"),
-                    ("soil", "placeholder (B5 pending)"), ("phi_t / Phi_c / omega_edge / phi_e_n", "unit placeholders (B5 pending)")),
+        "field": _field_page(output, manifest),
         "coupling": kv(("mode", mapping.get("mode")), ("mode_parameters", mapping.get("mode_parameters")),
                        ("chains", mapping.get("chains")), ("generator_findings", len(mapping.get("findings") or [])),
                        ("effective_status", effective.get("status")), ("unconfirmed_total", effective.get("unconfirmed_total")),
