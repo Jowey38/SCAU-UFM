@@ -1,0 +1,6 @@
+name=pyproj
+version=3.8.0
+proj_version=9.8.1
+license=MIT (pyproj) / MIT-X11 (PROJ)
+usage=python preprocessing only (crs_governance.py); no C++ linkage
+pinned_by=M287-B2 (superpowers/specs/2026-09-07-m287-b2-crs-governance-evidence.md)

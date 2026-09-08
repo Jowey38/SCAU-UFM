@@ -1,0 +1,12 @@
+{
+  "crs_policy_schema_version": 1,
+  "target_crs": "EPSG:3395",
+  "allow_reprojection": true,
+  "allowed_source_crs": [
+    "EPSG:3857"
+  ],
+  "source_crs_overrides": {},
+  "dem_policy": "declare_only",
+  "audit_sample_count": 5,
+  "note": "G37 variant: reproject the EPSG:3857 synthetic template into EPSG:3395 (both metre); the DEM stays declared in 3857 (declare_only) because B2 never resamples rasters."
+}

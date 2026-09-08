@@ -1,0 +1,361 @@
+{
+  "crs_audit_schema_version": 1,
+  "policy": "H:\\scau-b2-out\\crs_policy_3395.json",
+  "policy_sha256": "7067c1787d94c1a25f28ae5c8200eea806abfe67f52a4177ef6484c4cd0b22c7",
+  "target_crs": "EPSG:3395",
+  "target_crs_wkt": "PROJCRS[\"WGS 84 / World Mercator\",BASEGEOGCRS[\"WGS 84\",ENSEMBLE[\"World Geodetic System 1984 ensemble\",MEMBER[\"World Geodetic System 1984 (Transit)\"],MEMBER[\"World Geodetic System 1984 (G730)\"],MEMBER[\"World Geodetic System 1984 (G873)\"],MEMBER[\"World Geodetic System 1984 (G1150)\"],MEMBER[\"World Geodetic System 1984 (G1674)\"],MEMBER[\"World Geodetic System 1984 (G1762)\"],MEMBER[\"World Geodetic System 1984 (G2139)\"],MEMBER[\"World Geodetic System 1984 (G2296)\"],ELLIPSOID[\"WGS 84\",6378137,298.257223563,LENGTHUNIT[\"metre\",1]],ENSEMBLEACCURACY[2.0]],PRIMEM[\"Greenwich\",0,ANGLEUNIT[\"degree\",0.0174532925199433]],ID[\"EPSG\",4326]],CONVERSION[\"World Mercator\",METHOD[\"Mercator (variant A)\",ID[\"EPSG\",9804]],PARAMETER[\"Latitude of natural origin\",0,ANGLEUNIT[\"degree\",0.0174532925199433],ID[\"EPSG\",8801]],PARAMETER[\"Longitude of natural origin\",0,ANGLEUNIT[\"degree\",0.0174532925199433],ID[\"EPSG\",8802]],PARAMETER[\"Scale factor at natural origin\",1,SCALEUNIT[\"unity\",1],ID[\"EPSG\",8805]],PARAMETER[\"False easting\",0,LENGTHUNIT[\"metre\",1],ID[\"EPSG\",8806]],PARAMETER[\"False northing\",0,LENGTHUNIT[\"metre\",1],ID[\"EPSG\",8807]]],CS[Cartesian,2],AXIS[\"(E)\",east,ORDER[1],LENGTHUNIT[\"metre\",1]],AXIS[\"(N)\",north,ORDER[2],LENGTHUNIT[\"metre\",1]],USAGE[SCOPE[\"Very small scale conformal mapping.\"],AREA[\"World between 80°S and 84°N.\"],BBOX[-80,-180,84,180]],ID[\"EPSG\",3395]]",
+  "proj_version": "9.8.1",
+  "pyproj_version": "3.8.0",
+  "coordinate_decimals": 6,
+  "datasets": {
+    "computational_boundary": {
+      "path": "boundary/computational_boundary.geojson",
+      "source_crs": "EPSG:3857",
+      "target_crs": "EPSG:3395",
+      "action": "reprojected",
+      "proj_pipeline": "proj=pipeline step inv proj=webmerc lat_0=0 lon_0=0 x_0=0 y_0=0 ellps=WGS84 step proj=merc lon_0=0 k=1 x_0=0 y_0=0 ellps=WGS84",
+      "features": 1,
+      "samples": [
+        {
+          "source": [
+            0,
+            0
+          ],
+          "target": [
+            0.0,
+            0.0
+          ],
+          "roundtrip_error_m": 0.0
+        },
+        {
+          "source": [
+            200,
+            0
+          ],
+          "target": [
+            200.0,
+            0.0
+          ],
+          "roundtrip_error_m": 2.842170943040401e-14
+        },
+        {
+          "source": [
+            200,
+            120
+          ],
+          "target": [
+            200.0,
+            119.196674
+          ],
+          "roundtrip_error_m": 5.123796534383003e-14
+        },
+        {
+          "source": [
+            0,
+            120
+          ],
+          "target": [
+            0.0,
+            119.196674
+          ],
+          "roundtrip_error_m": 4.263256414560601e-14
+        },
+        {
+          "source": [
+            0,
+            0
+          ],
+          "target": [
+            0.0,
+            0.0
+          ],
+          "roundtrip_error_m": 0.0
+        }
+      ]
+    },
+    "buildings": {
+      "path": "buildings/buildings.geojson",
+      "source_crs": "EPSG:3857",
+      "target_crs": "EPSG:3395",
+      "action": "reprojected",
+      "proj_pipeline": "proj=pipeline step inv proj=webmerc lat_0=0 lon_0=0 x_0=0 y_0=0 ellps=WGS84 step proj=merc lon_0=0 k=1 x_0=0 y_0=0 ellps=WGS84",
+      "features": 2,
+      "samples": [
+        {
+          "source": [
+            40,
+            40
+          ],
+          "target": [
+            40.0,
+            39.732225
+          ],
+          "roundtrip_error_m": 2.5618982671915014e-14
+        },
+        {
+          "source": [
+            70,
+            40
+          ],
+          "target": [
+            70.0,
+            39.732225
+          ],
+          "roundtrip_error_m": 2.5618982671915014e-14
+        },
+        {
+          "source": [
+            70,
+            70
+          ],
+          "target": [
+            70.0,
+            69.531393
+          ],
+          "roundtrip_error_m": 1.4210854715202004e-14
+        },
+        {
+          "source": [
+            40,
+            70
+          ],
+          "target": [
+            40.0,
+            69.531393
+          ],
+          "roundtrip_error_m": 1.4210854715202004e-14
+        },
+        {
+          "source": [
+            40,
+            40
+          ],
+          "target": [
+            40.0,
+            39.732225
+          ],
+          "roundtrip_error_m": 2.5618982671915014e-14
+        }
+      ]
+    },
+    "landcover": {
+      "path": "landcover/landcover.geojson",
+      "source_crs": "EPSG:3857",
+      "target_crs": "EPSG:3395",
+      "action": "reprojected",
+      "proj_pipeline": "proj=pipeline step inv proj=webmerc lat_0=0 lon_0=0 x_0=0 y_0=0 ellps=WGS84 step proj=merc lon_0=0 k=1 x_0=0 y_0=0 ellps=WGS84",
+      "features": 3,
+      "samples": [
+        {
+          "source": [
+            0,
+            0
+          ],
+          "target": [
+            0.0,
+            0.0
+          ],
+          "roundtrip_error_m": 0.0
+        },
+        {
+          "source": [
+            200,
+            0
+          ],
+          "target": [
+            200.0,
+            0.0
+          ],
+          "roundtrip_error_m": 2.842170943040401e-14
+        },
+        {
+          "source": [
+            200,
+            20
+          ],
+          "target": [
+            200.0,
+            19.866112
+          ],
+          "roundtrip_error_m": 2.864289338439558e-14
+        },
+        {
+          "source": [
+            0,
+            20
+          ],
+          "target": [
+            0.0,
+            19.866112
+          ],
+          "roundtrip_error_m": 3.552713678800501e-15
+        },
+        {
+          "source": [
+            0,
+            0
+          ],
+          "target": [
+            0.0,
+            0.0
+          ],
+          "roundtrip_error_m": 0.0
+        }
+      ]
+    },
+    "soil_zones": {
+      "path": "soil/soil_zones.geojson",
+      "source_crs": "EPSG:3857",
+      "target_crs": "EPSG:3395",
+      "action": "reprojected",
+      "proj_pipeline": "proj=pipeline step inv proj=webmerc lat_0=0 lon_0=0 x_0=0 y_0=0 ellps=WGS84 step proj=merc lon_0=0 k=1 x_0=0 y_0=0 ellps=WGS84",
+      "features": 1,
+      "samples": [
+        {
+          "source": [
+            0,
+            20
+          ],
+          "target": [
+            0.0,
+            19.866112
+          ],
+          "roundtrip_error_m": 3.552713678800501e-15
+        },
+        {
+          "source": [
+            200,
+            20
+          ],
+          "target": [
+            200.0,
+            19.866112
+          ],
+          "roundtrip_error_m": 2.864289338439558e-14
+        },
+        {
+          "source": [
+            200,
+            120
+          ],
+          "target": [
+            200.0,
+            119.196674
+          ],
+          "roundtrip_error_m": 5.123796534383003e-14
+        },
+        {
+          "source": [
+            0,
+            120
+          ],
+          "target": [
+            0.0,
+            119.196674
+          ],
+          "roundtrip_error_m": 4.263256414560601e-14
+        },
+        {
+          "source": [
+            0,
+            20
+          ],
+          "target": [
+            0.0,
+            19.866112
+          ],
+          "roundtrip_error_m": 3.552713678800501e-15
+        }
+      ]
+    },
+    "mesh_controls": {
+      "path": "H:\\githubcode\\SCAU-UFM\\samples\\d5_gis_preproc_template\\mesh_controls\\mesh_controls.geojson",
+      "source_crs": "EPSG:3857",
+      "target_crs": "EPSG:3395",
+      "note": "mesh controls carry no crs member; they inherit the boundary CRS",
+      "action": "reprojected",
+      "proj_pipeline": "proj=pipeline step inv proj=webmerc lat_0=0 lon_0=0 x_0=0 y_0=0 ellps=WGS84 step proj=merc lon_0=0 k=1 x_0=0 y_0=0 ellps=WGS84",
+      "features": 5,
+      "samples": [
+        {
+          "source": [
+            10,
+            20
+          ],
+          "target": [
+            10.0,
+            19.866112
+          ],
+          "roundtrip_error_m": 5.0242958677880805e-15
+        },
+        {
+          "source": [
+            190,
+            20
+          ],
+          "target": [
+            190.0,
+            19.866112
+          ],
+          "roundtrip_error_m": 2.864289338439558e-14
+        },
+        {
+          "source": [
+            15,
+            85
+          ],
+          "target": [
+            15.0,
+            84.430978
+          ],
+          "roundtrip_error_m": 1.7763568394002505e-15
+        },
+        {
+          "source": [
+            35,
+            100
+          ],
+          "target": [
+            35.0,
+            99.330562
+          ],
+          "roundtrip_error_m": 8.556067554929069e-14
+        },
+        {
+          "source": [
+            60,
+            110
+          ],
+          "target": [
+            60.0,
+            109.263618
+          ],
+          "roundtrip_error_m": 7.105427357601002e-15
+        }
+      ]
+    },
+    "dem": {
+      "path": "terrain/dem.asc",
+      "source_crs": "EPSG:3857",
+      "target_crs": "EPSG:3395",
+      "action": "declared_mismatch_allowed"
+    },
+    "swmm": {
+      "path": "swmm/model.inp",
+      "source_crs": "EPSG:3857",
+      "target_crs": "EPSG:3395",
+      "action": "coordinates_rewritten",
+      "proj_pipeline": "proj=pipeline step inv proj=webmerc lat_0=0 lon_0=0 x_0=0 y_0=0 ellps=WGS84 step proj=merc lon_0=0 k=1 x_0=0 y_0=0 ellps=WGS84",
+      "nodes": 3,
+      "note": "only the [COORDINATES] section is rewritten; all other sections verbatim"
+    }
+  },
+  "staging_package": "H:\\scau-b2-out\\reproj\\governed_package",
+  "reprojected_files": [
+    "boundary/computational_boundary.geojson",
+    "buildings/buildings.geojson",
+    "landcover/landcover.geojson",
+    "soil/soil_zones.geojson",
+    "swmm/model.inp"
+  ]
+}

@@ -64,6 +64,7 @@ def build_job_config(
     export_target_dir: str | None = None,
     export_options: dict | None = None,
     dpm_rule_table: str | None = None,
+    crs_policy: str | None = None,
 ) -> dict:
     job = {
         "job_config_schema_version": JOB_CONFIG_SCHEMA_VERSION,
@@ -97,6 +98,8 @@ def build_job_config(
         job["export_case"] = {"target_dir": str(Path(export_target_dir)), **(export_options or {})}
     if dpm_rule_table:
         job["field_derivation"] = {"dpm_rule_table": str(Path(dpm_rule_table))}
+    if crs_policy:
+        job["crs"] = {"policy": str(Path(crs_policy))}
     return job
 
 
@@ -665,6 +668,7 @@ def data_tree(job: dict, validation: dict | None = None) -> list[dict]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     validation = validation if validation is not None else load_validation_for(job)
     by_kind = _findings_by_object(validation)
+    governed = ((validation or {}).get("crs_governance") or {}).get("datasets") or {}
     groups: dict[str, list[dict]] = {group: [] for group, _ in DATA_TREE_GROUPS}
     groups["Other"] = []
     for dataset in manifest.get("datasets", []):
@@ -674,7 +678,12 @@ def data_tree(job: dict, validation: dict | None = None) -> list[dict]:
             lamp, detail = ("fatal", "required file missing") if dataset.get("required") else ("missing", "optional; not provided")
         else:
             lamp, detail = "pass", "present"
-            if dataset.get("kind") in ("raster_dem", "vector_gis"):
+            if dataset["id"] in governed:
+                # B2 ran: the pipeline's audit is the authority for CRS status.
+                entry = governed[dataset["id"]]
+                lamp = "pass" if entry.get("action") in ("copied_identity", "reprojected", "coordinates_rewritten") else "review"
+                detail = f"CRS {entry.get('source_crs')} -> {entry.get('target_crs')} ({entry.get('action')})"
+            elif dataset.get("kind") in ("raster_dem", "vector_gis"):
                 lamp, detail = _crs_lamp(package, dataset)
             if dataset.get("kind") == "mapping_table" and any(
                     "TODO_PROVIDER" in line for line in path.read_text(encoding="utf-8").splitlines()[:50]):
@@ -790,8 +799,13 @@ def report_pages(job: dict) -> dict[str, list[tuple[str, str]]]:
                 for k, v in pairs]
 
     audit = validation.get("policy_audit") or {}
+    crs = validation.get("crs_governance") or {}
     pages = {
         "import": kv(("status", validation.get("status")), ("package", validation.get("package")),
+                     ("governed_package", validation.get("governed_package")),
+                     ("crs_policy", crs.get("policy") or "(none: v1 unchecked mode)"),
+                     ("target_crs", crs.get("target_crs")), ("proj_version", crs.get("proj_version")),
+                     ("reprojected_files", crs.get("reprojected_files")),
                      ("job_config", validation.get("job_config")), ("job_config_sha256", validation.get("job_config_sha256")),
                      ("policy_version", audit.get("policy_version")), ("generator_timeout_s", audit.get("generator_timeout_s")),
                      ("repair_mode", audit.get("repair_mode")), ("started", validation.get("started"))),
