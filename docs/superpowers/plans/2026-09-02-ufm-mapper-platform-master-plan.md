@@ -1,6 +1,6 @@
 # UFM-Mapper 平台总体规划 v3（RAS Mapper 式现代化 GIS 全流程数据加工与处理平台）
 
-日期：2026-09-02
+日期：2026-09-02（§2.3 / §3 / §8 状态同步：2026-09-09）
 状态：PLANNED（总体蓝图；不改变 M281 D-5 BLOCKED 决策；不修改任何已激活 gate）
 层级关系：
 - 本文件 = **平台全景蓝图**（产品定义、能力矩阵、架构、契约、阶段、里程碑、验收）；
@@ -107,19 +107,19 @@ E1（作业页）、**B4 + E3（网格控制 + 网格工作台，G32）**；Gold
 
 | 模块 | 位置 | 现状 |
 |---|---|---|
-| `scau_preproc.pipeline` 编排器 | `python/scau_preproc/pipeline.py` | v1 + B4 |
+| `scau_preproc.pipeline` 编排器 | `python/scau_preproc/pipeline.py` | v1 + B2/B3/B4/B5/B6 + C4/C5（阶段 A–F 全部接入） |
 | `meshgen` / `mesh_controls` | `python/scau_preproc/` | DONE |
 | `coupling_maps` 三链路生成器 | `python/scau_preproc/coupling_maps.py` | DONE（dflowfm 占位） |
 | `crs_governance`（B2） | `python/scau_preproc/crs_governance.py` | DONE（G37） |
-| `terrain_condition`（B3） | `python/scau_preproc/terrain_condition.py` | 待建 |
-| `field_derivation`（B5：soil LUT、DPM 规则表） | `python/scau_preproc/field_derivation.py` | 待建（当前占位在 meshgen.assign_fields） |
-| `confirmations`（C4） | `python/scau_preproc/confirmations.py` | 待建 |
-| `case_export`（B6） | `python/scau_preproc/case_export.py` | 待建（须消费 N1 模式与 N2 `provider_required`） |
+| `terrain_condition`（B3） | `python/scau_preproc/terrain_condition.py` | DONE（G38；`terrain_condition_policy.json` 授权；关闭态逐位 = G30） |
+| `field_derivation`（B5：DPM 规则表、soil zones） | `python/scau_preproc/field_derivation.py` | DONE（G36；`soil_lut.json` 与 `soil_parameters.csv` 并存裁决未决，见 §12） |
+| `confirmations`（C4） | `python/scau_preproc/confirmations.py` | DONE（G33） |
+| `case_export`（B6） | `python/scau_preproc/case_export.py` | DONE（G35；N1 模式 / N2 `provider_required` 消费待 N 系列落地时扩展） |
 | `inp_io` / `swmm_author`（N1） | `python/scau_preproc/` + `scau_preproc swmm-parse` | 待建 |
 | `dflowfm_author`（N2） | `python/scau_preproc/`（从 `tools/dflowfm/generate_single_reach_1d.py` 提炼）+ `scau_preproc ugrid1d-validate` | 待建 |
 | `scau_results` CLI（M288-B） | `python/scau_results/` 或 `apps/results_cli` | 待建 |
-| 权威校验 | `apps/preproc_cli`（`generate/validate`）、`libs/stcf`、`libs/mesh` | DONE；B6 需 `validate --case-dir` |
-| QGIS 插件 | `qgis_plugin/scau_preproc_workbench/`（`jobio.py` 纯层） | E1/E3 DONE |
+| 权威校验 | `apps/preproc_cli`（`generate/validate`）、`libs/stcf`、`libs/mesh` | DONE；B6 未新增 `validate --case-dir`：导出器复用流水线的 `validate --input` 结果 + 暂存目录原子组装 + 包级 SHA-256（见 §3 F 行） |
+| QGIS 插件 | `qgis_plugin/scau_preproc_workbench/`（`jobio.py` 纯层） | E1/E2/E3/E4/E5/E5a/P3 DONE（P1/P2/P3/P4/P5/P6/P7/P8）；E6/E7 打包收口进行中；P9–P11 待 M288 / N 系列 |
 | 部署/打包 | `tools/qgis/deploy_plugin.sh` | 拷贝部署 |
 
 ---
@@ -131,12 +131,12 @@ E1（作业页）、**B4 + E3（网格控制 + 网格工作台，G32）**；Gold
 | 阶段 | 输入 | 自动处理 | 输出 | Fail-Closed 检查 | 必须人工确认 |
 |---|---|---|---|---|---|
 | **A 数据接入契约** | 输入包（`manifest.json` + 数据集） | 7 项必需文件存在性；`canonical_targets` 合法；`geometry_clean_policy` 版本化；**B2** CRS/单位读取与受控重投影 | `validation.json`（import 段）、重投影审计样本 | 缺件、未知目标字段、地理坐标、单位非米、未授权样本 | 授权、垂直基准、无效几何处置 |
-| **B 地形与几何** | DEM、边界、建筑 | 边界裁剪、DEM 采样 → `z_b`、建筑 hole 提纯、自相交/未闭合检测；**B3** 填洼/水系强制/局部改造（policy 授权） | 诊断 GeoJSON、`terrain_condition_report.json`、洼地/改动量栅格 | 退化几何、NoData 采样、未授权调理 | 建筑阻塞/开口语义、DEM 调理方案 |
+| **B 地形与几何**（B3 ✔） | DEM、边界、建筑、可选 `terrain/streams.geojson` | 边界裁剪、DEM 采样 → `z_b`、建筑 hole 提纯、自相交/未闭合检测；**B3** 栅格重投影接手 → 水系强制 → Priority-Flood 填洼（固定顺序、`terrain_condition_policy.json` 授权、算法版本钉死；局部改造未做） | 诊断 GeoJSON、`conditioned_terrain/{dem,depression_depth,terrain_change}.asc`、`terrain_condition_report.json` | 退化几何、NoData 采样、未授权调理、填洼深度超阈值（review） | 建筑阻塞/开口语义、DEM 调理方案、洼地栅格复查 |
 | **C 网格剖分**（✔） | 边界 + hole + `mesh_controls.geojson` | 约束剖分、size fields、embed、拓扑构建、质量报告、逐单元诊断、超时 kill | `case.stcf.nc`（几何部分）、`mesh_quality.json`、`mesh_quality_cells.geojson` | 部分网格、非流形、约束线未保留、控制要素违规 | 尺寸/加密策略、review 项处置 |
 | **D 字段派生** | landcover、soil、buildings、`dpm_rule_table.json` | `manning_n` LUT（✔）；**B5** soil → Green-Ampt LUT、规则表 → `phi_t`/`Phi_c`/`omega_edge`/`phi_e_n` | 字段写入 `case.stcf.nc`、`field_derivation_report.json` | 未映射对象、`theta_i < theta_s <= 1` 违反、`validate_dpm_consistency` 违反、规则表未批准 | 参数表/规则表本身 |
 | **E 耦合映射**（✔候选） | SWMM `.inp`、映射 CSV、建筑、河网 provider | 三链路候选（显式 ID > 空间包含 > 近邻，带距离/置信度） | `coupling/*_mapping.json`、`mapping_report.json`、`simdriver_links.conf` | 节点落孔洞、引用未知对象、无 provider 证据 | 所有 `confidence: review`、一对多/多对一、交换高程 |
 | **E' 确认合并**（C4） | 候选 + `coupling/confirmed/*.json` | 哈希级一致性校验（候选漂移即 review）；确认结果覆盖候选生成最终链接 | `coupling/effective_links.json`、`simdriver_links.conf`（最终） | 确认引用的候选已漂移、确认者/时间缺失 | 无（此阶段消费人工结果） |
-| **F 校验与导出**（B6） | 全部产物 | C++ 权威校验（`validate --case-dir`）→ 组装 `case/` → 原子 rename → 包级 SHA-256 → 可复现命令 | `case/`（§4） | 任何 fatal、未确认 review、哈希不一致 | 无（门禁自动） |
+| **F 校验与导出**（B6 ✔） | 全部产物 | 门禁（`validation.status == ok` 且有效链接完整、`validate --input` 已通过、哈希一致）→ 暂存目录组装 `case/` → 原子 rename → 包级 SHA-256 → `simdriver/run.conf` + 可复现命令 | `case/`（§4） | 任何 fatal、未确认 review、哈希不一致 | 无（门禁自动） |
 | **G 运行**（既有 SimDriver） | `case/` | SimDriver 冷启动消费 | `run_summary.json`；**M288-A** 时序 NetCDF | 配置不完整、引擎不可用 | 发布判定走稳定性协议 |
 | **R 结果后处理**（M288-B） | 时序 NetCDF + run manifest | 最大深度/范围包络、到达时间、持续时间、点/断面时序、GeoTIFF 栅格化 | `results/*.nc`、`results/*.json`、GeoTIFF | 来源哈希不匹配、变量集不完整 | 结果解读 |
 
@@ -169,9 +169,11 @@ simdriver_links.conf                  # SimDriver RuntimeConfig version = 2 片�
 
 ```text
 metadata/crs_policy.json                 # B2 ✔：crs_policy_schema_version 1（target_crs、allowed_source_crs、overrides、dem_policy）；crs_audit.json 记录 PROJ pipeline
-metadata/terrain_condition_policy.json   # B3：调理授权（fill/enforce/modify）、算法与参数版本、审计要求
+metadata/terrain_condition_policy.json   # B3 ✔：terrain_condition_policy_schema_version 1（enabled、authorization、operations.reproject/stream_enforcement/fill_depressions）；terrain_condition_report.json 记录前后 SHA 与逐操作统计
 metadata/dpm_rule_table.json             # B5 ✔：dpm_rule_table_schema_version 1（approval 门、classes、edges.interfaces、soil、landcover_overlap）；值随 D-5 批准
-metadata/soil_lut.json                   # B5：soil_type → K_s/psi_f/theta_s/theta_i（替代 CSV 或与之并存需裁决）
+metadata/soil_lut.json                   # B5 未采用：soil 参数仍由 soil/soil_parameters.csv 承载；P5 编辑写出 soil_parameters.vNNN.csv（并存/替代裁决见 §12）
+metadata/field_mapping.vNNN.json         # P3 ✔：field_mapping_schema_version 1（源字段 → canonical 目标声明；importer 绑定待 M287-D）
+metadata/dpm_rule_table.vNNN.json        # P5 ✔：编辑产生的新版本（revision 块；approval 回落 synthetic_unapproved）
 coupling/confirmed/<mapping_id>.json     # C4 ✔：confirmation_schema_version=1 {chain, mapping_id, decision: accept|reject|retarget|create, candidate_sha256, confirmed_by, timestamp, target}
 swmm/drainage_network.geojson            # N1：drainage_network_schema_version = 1（井/排放口/管道 + 白名单 OPTIONS）
 swmm/model.inp.authoring.json            # N1：{mode: authored|external, 哈希, writer_version, engine_parse}
@@ -295,7 +297,7 @@ UI 纪律（全切片强制）：每页只做"渲染选择 → job_config → �
 
 | **E4 耦合编辑器** | P6 页：连线图层、review 标红、确认/拒绝/改目标写契约文件；**新建链接**（任意 1D 节点拖到 2D 单元 → `decision: create` 候选，必经确认）；不改生成器输出 | C4, C5 | **DONE 2026-09-04**：`superpowers/specs/2026-09-04-m287-e4-coupling-editor-evidence.md`（契约由 G33 锁定；离屏冒烟全闭环） |
 
-| **E2 数据目录树 + P1/P3** | 分组树、状态灯、finding → 对象定位、字段映射下拉 | A 报告已含对象 ID | **DONE 2026-09-06**：`superpowers/specs/2026-09-06-m287-e2-e5-data-tree-report-browser-evidence.md`（字段映射下拉 P3 仍待 B5 契约） |
+| **E2 数据目录树 + P1/P3** | 分组树、状态灯、finding → 对象定位、字段映射下拉 | A 报告已含对象 ID | **DONE 2026-09-06**：`superpowers/specs/2026-09-06-m287-e2-e5-data-tree-report-browser-evidence.md`（P3 字段映射下拉于 2026-09-09 随 E5a 落地） |
 
 
 ### 8.3 阶段 II —— 输入治理与真实字段（可与阶段 I 并行）
@@ -304,10 +306,10 @@ UI 纪律（全切片强制）：每页只做"渲染选择 → job_config → �
 |---|---|---|---|
 | **B2 CRS 治理** | pyproj 受控重投影；`crs_policy.json`；proj pipeline 字符串版本化进 manifest；地理坐标一律 fatal；重投影审计样本 | — | **DONE 2026-09-07（G37 `ci_gate:true`）**：`superpowers/specs/2026-09-07-m287-b2-crs-governance-evidence.md`；栅格不重采样（`dem_policy must_match_target`），B3 接手 |
 
-| **B3 DEM 调理** | Priority-Flood 填洼（算法/参数版本化）、可选水系强制、局部改造；`terrain_condition_policy.json` 授权；洼地/改动量诊断栅格；多 DEM 拼接 | B2 | 调理前后差异审计 golden；关闭策略时逐位不变 |
+| **B3 DEM 调理** | Priority-Flood 填洼（算法/参数版本化）、可选水系强制、栅格重投影接手；`terrain_condition_policy.json` 授权；洼地/改动量诊断栅格 | B2 | **DONE 2026-09-09（G38 `ci_gate:true`）**：`superpowers/specs/2026-09-09-m287-b3-terrain-condition-evidence.md`；关闭策略 = G30 逐位；局部改造 / 多 DEM 拼接（B3b）未做 |
 | **B5 字段真实派生（格式先行）** | `soil_lut.json`、`dpm_rule_table.json` schema + 校验器；合成规则表驱动 `phi_t`/`Phi_c`/`omega_edge`/`phi_e_n` 派生；未映射对象 fail-closed | — | **DONE 2026-09-07（G36 `ci_gate:true`）**：`superpowers/specs/2026-09-07-m287-b5-field-derivation-evidence.md`；G30 保持占位模式不收紧（避免 G31–G35 级联），G36 在同一网格上断言规则表值 |
 
-| **E5a 参数表页** | P5：LUT/规则表浏览与版本化编辑 | B5 | 离屏冒烟；编辑产生新版本文件 |
+| **E5a 参数表页 + P3 字段映射** | P5：规则表 / 土壤表浏览、闭合律 lint、版本化编辑（approval 回落）；P3：源字段 → canonical 下拉、`field_mapping.vNNN.json` | B5 | **DONE 2026-09-09**：`superpowers/specs/2026-09-09-m287-e5a-p3-parameter-and-field-mapping-pages-evidence.md`（离屏冒烟含真实写出） |
 
 ### 8.4 阶段 III —— 前处理收口
 
@@ -368,8 +370,7 @@ M288-A(设计评审可在 B6 后并行启动) ─► M288-B ─► M288-C ─►
 M287-D 独立等待 M281；B7 独立实验
 ```
 
-阶段 I、B2、B5、B6、E2/E5 已落地；建议下一切片：**B3 DEM 调理**（`terrain_condition_policy.json`、填洼、可选栅格重投影接手），随后 **E5a 参数表页 / E6-E7 收口**；运行导出包需 **驱动双模型模式或 C3**（决策项待定）（确认契约 → 空间候选模式 → 耦合编辑器）——它们
-是导出门禁语义完整的前提，也是 RAS Mapper "SA/2D Connections 手动确认"体验的对应物。
+阶段 I、B2、B3、B5、B6、E2/E5、E5a/P3 已落地（2026-09-09）；剩余前处理收口：**E6/E7 打包**、**B7 双平台确定性**、**A6 样例包自检清单**（`samples/d5_gis_preproc_template/validation/sample_package_selfcheck.md`）。运行导出包需 **驱动双模型模式或 C3**（决策项 §12）。N 系列与 M288 见 `2026-09-09-ufm-mapper-progress-and-remaining-tasks.md`。
 
 ---
 

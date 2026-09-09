@@ -101,3 +101,7 @@ Before a real sample can enter an importer spike, the provider must confirm:
 12. expected mesh, mapping, and field-quality acceptance values.
 
 Until those decisions are supplied by the data owner and accepted by the project, D-5 remains blocked as recorded in M281.
+
+## Self-check
+
+Run `py -3 -m scau_preproc.package_selfcheck samples/d5_gis_preproc_template` (from `python/`) and walk `validation/sample_package_selfcheck.md` before trusting a green pipeline run.
