@@ -72,7 +72,7 @@ class WorkbenchDialog(QDialog):
     def __init__(self, repo_root_hint: str, parent=None, iface=None) -> None:
         super().__init__(parent)
         self._iface = iface
-        self.setWindowTitle("SCAU PreProc Workbench (M287-E1..E5)")
+        self.setWindowTitle("SCAU PreProc Workbench (M287-E1..E5a / P3)")
         self.resize(820, 640)
 
         # The plugin may run from a copied profile deployment, so the repo
@@ -88,7 +88,9 @@ class WorkbenchDialog(QDialog):
         tabs = QTabWidget()
         tabs.addTab(self._build_job_page(initial_root), "作业")
         tabs.addTab(self._build_data_tree_page(), "数据目录")
+        tabs.addTab(self._build_field_mapping_page(), "字段映射")
         tabs.addTab(self._build_mesh_page(), "网格工作台")
+        tabs.addTab(self._build_parameter_page(), "参数表")
         tabs.addTab(self._build_coupling_page(), "耦合编辑器")
         tabs.addTab(self._build_report_page(), "门禁与报告")
 
@@ -509,6 +511,243 @@ class WorkbenchDialog(QDialog):
             self._show_rows([("fatal", "CreateRejected", str(error))])
             return
         self._show_rows([("info", "LinkCreated", f"create -> {path}（重新运行流水线后生效）")])
+
+    # --- P5 parameter tables (E5a) ------------------------------------------
+
+    def _build_parameter_page(self) -> QWidget:
+        page = QWidget()
+        bar = QHBoxLayout()
+        refresh = QPushButton("加载 / 刷新参数表")
+        refresh.clicked.connect(self._refresh_parameter_tables)
+        lint = QPushButton("预检（闭合律 lint）")
+        lint.clicked.connect(self._lint_parameter_tables)
+        self._param_editor_edit = QLineEdit(QgsSettings().value(self._OPERATOR_KEY, "", type=str))
+        self._param_editor_edit.setPlaceholderText("编辑者标识（写入 revision.edited_by）")
+        self._param_note_edit = QLineEdit()
+        self._param_note_edit.setPlaceholderText("修订备注（可选）")
+        save_rules = QPushButton("保存规则表新版本")
+        save_rules.clicked.connect(self._save_rule_table_version)
+        save_soil = QPushButton("保存土壤表新版本")
+        save_soil.clicked.connect(self._save_soil_table_version)
+        for widget in (refresh, lint, QLabel("编辑者"), self._param_editor_edit, self._param_note_edit,
+                       save_rules, save_soil):
+            bar.addWidget(widget)
+        bar.addStretch()
+
+        self._rule_source_label = QLabel("规则表：未加载")
+        self._class_table = QTableWidget(0, len(jobio.RULE_CLASS_COLUMNS))
+        self._class_table.setHorizontalHeaderLabels(list(jobio.RULE_CLASS_COLUMNS))
+        self._class_table.horizontalHeader().setStretchLastSection(True)
+        self._interface_table = QTableWidget(0, len(jobio.RULE_INTERFACE_COLUMNS))
+        self._interface_table.setHorizontalHeaderLabels(list(jobio.RULE_INTERFACE_COLUMNS))
+        self._interface_table.horizontalHeader().setStretchLastSection(True)
+        rows_bar = QHBoxLayout()
+        for label, table in (("+ 类别行", self._class_table), ("+ 界面行", self._interface_table)):
+            button = QPushButton(label)
+            button.clicked.connect(lambda _=False, t=table: t.insertRow(t.rowCount()))
+            rows_bar.addWidget(button)
+        for label, table in (("- 选中类别行", self._class_table), ("- 选中界面行", self._interface_table)):
+            button = QPushButton(label)
+            button.clicked.connect(lambda _=False, t=table: t.removeRow(t.currentRow()) if t.currentRow() >= 0 else None)
+            rows_bar.addWidget(button)
+        rows_bar.addStretch()
+
+        self._soil_source_label = QLabel("土壤表：未加载")
+        self._soil_table = QTableWidget(0, len(jobio.SOIL_COLUMNS))
+        self._soil_table.setHorizontalHeaderLabels(list(jobio.SOIL_COLUMNS))
+        self._soil_table.horizontalHeader().setStretchLastSection(True)
+
+        hint = QLabel(
+            "浏览 metadata/dpm_rule_table.json（类别 phi_t / Phi_c、界面 omega_edge）与 soil/soil_parameters.csv。"
+            "编辑只写出新版本文件（<名>.vNNN.json / .csv，含 revision 块），原文件永不改写；"
+            "编辑后的规则表 approval 自动回落为 synthetic_unapproved（M281：参数值须数据所有方重新批准）。"
+            "此处 lint 仅为预检，认证以流水线为准。要让流水线使用新版本，请在作业页把“字段派生规则表”指向它。")
+        hint.setWordWrap(True)
+
+        layout = QVBoxLayout(page)
+        layout.addLayout(bar)
+        layout.addWidget(self._rule_source_label)
+        layout.addWidget(QLabel("类别（phi_t、Phi_c.xx/xy/yy）"))
+        layout.addWidget(self._class_table)
+        layout.addWidget(QLabel("界面（类别对 → omega_edge）"))
+        layout.addWidget(self._interface_table)
+        layout.addLayout(rows_bar)
+        layout.addWidget(self._soil_source_label)
+        layout.addWidget(self._soil_table)
+        layout.addWidget(hint)
+        return page
+
+    @staticmethod
+    def _fill_table(table: QTableWidget, columns, rows: list[dict]) -> None:
+        table.setRowCount(len(rows))
+        for r, row in enumerate(rows):
+            for c, key in enumerate(columns):
+                value = row.get(key)
+                table.setItem(r, c, QTableWidgetItem("" if value is None else str(value)))
+
+    @staticmethod
+    def _table_rows(table: QTableWidget, columns) -> list[dict]:
+        rows = []
+        for r in range(table.rowCount()):
+            row = {}
+            for c, key in enumerate(columns):
+                item = table.item(r, c)
+                row[key] = item.text().strip() if item is not None else ""
+            if any(row.values()):
+                rows.append(row)
+        return rows
+
+    def _refresh_parameter_tables(self) -> None:
+        job = self._current_job()
+        if not job["package"]:
+            self._show_rows([("fatal", "MissingPackage", "请先在作业页选择输入包目录")])
+            return
+        rule_path = jobio.rule_table_path(job)
+        if rule_path and rule_path.is_file():
+            table = jobio.load_rule_table(rule_path)
+            self._rule_source_label.setText(f"规则表：{rule_path}")
+            self._fill_table(self._class_table, jobio.RULE_CLASS_COLUMNS, jobio.rule_class_rows(table))
+            self._fill_table(self._interface_table, jobio.RULE_INTERFACE_COLUMNS, jobio.rule_interface_rows(table))
+        else:
+            self._rule_source_label.setText("规则表：无（v1 占位场）")
+            self._class_table.setRowCount(0)
+            self._interface_table.setRowCount(0)
+        soil_path = jobio.soil_table_path(job)
+        if soil_path.is_file():
+            self._soil_source_label.setText(f"土壤表：{soil_path}")
+            self._fill_table(self._soil_table, jobio.SOIL_COLUMNS, jobio.load_soil_rows(soil_path))
+        else:
+            self._soil_source_label.setText(f"土壤表：缺失 {soil_path}")
+            self._soil_table.setRowCount(0)
+        self._show_rows(jobio.parameter_table_rows(job))
+
+    def _edited_rule_table(self) -> dict | None:
+        rule_path = jobio.rule_table_path(self._current_job())
+        if not rule_path or not rule_path.is_file():
+            self._show_rows([("fatal", "NoRuleTable", "没有可编辑的规则表；先在作业页指定 dpm_rule_table.json")])
+            return None
+        base = jobio.load_rule_table(rule_path)
+        try:
+            return jobio.rule_table_from_rows(
+                base, self._table_rows(self._class_table, jobio.RULE_CLASS_COLUMNS),
+                self._table_rows(self._interface_table, jobio.RULE_INTERFACE_COLUMNS))
+        except ValueError as error:
+            self._show_rows([("fatal", "RuleTableInvalid", str(error))])
+            return None
+
+    def _lint_parameter_tables(self) -> None:
+        table = self._edited_rule_table()
+        rows = jobio.lint_rule_table(table) if table else []
+        rows.extend(jobio.lint_soil_rows(self._table_rows(self._soil_table, jobio.SOIL_COLUMNS)))
+        self._show_rows(rows)
+
+    def _param_editor(self) -> str:
+        editor = self._param_editor_edit.text().strip()
+        if editor:
+            QgsSettings().setValue(self._OPERATOR_KEY, editor)
+        return editor
+
+    def _save_rule_table_version(self) -> None:
+        table = self._edited_rule_table()
+        if table is None:
+            return
+        try:
+            path = jobio.write_rule_table_version(jobio.rule_table_path(self._current_job()), table,
+                                                 edited_by=self._param_editor(), note=self._param_note_edit.text().strip())
+        except ValueError as error:
+            self._show_rows([("fatal", "RuleTableRejected", str(error))])
+            return
+        self._show_rows([("info", "RuleTableVersionWritten",
+                          f"{path}（approval 已回落为 synthetic_unapproved；在作业页选择该文件后重新运行流水线）")]
+                        + jobio.lint_rule_table(table))
+
+    def _save_soil_table_version(self) -> None:
+        try:
+            path = jobio.write_soil_table_version(jobio.soil_table_path(self._current_job()),
+                                                 self._table_rows(self._soil_table, jobio.SOIL_COLUMNS),
+                                                 edited_by=self._param_editor())
+        except ValueError as error:
+            self._show_rows([("fatal", "SoilTableRejected", str(error))])
+            return
+        self._show_rows([("info", "SoilTableVersionWritten",
+                          f"{path}（流水线仍读取 soil/soil_parameters.csv；替换原件属于输入包治理动作，需数据所有方批准）")])
+
+    # --- P3 field mapping --------------------------------------------------
+
+    _MAPPING_COLUMNS = ("dataset", "layer", "source_field", "source_type", "sample", "target")
+
+    def _build_field_mapping_page(self) -> QWidget:
+        page = QWidget()
+        bar = QHBoxLayout()
+        refresh = QPushButton("发现源字段 / 刷新")
+        refresh.clicked.connect(self._refresh_field_mapping)
+        self._mapping_editor_edit = QLineEdit(QgsSettings().value(self._OPERATOR_KEY, "", type=str))
+        self._mapping_editor_edit.setPlaceholderText("编辑者标识")
+        self._mapping_note_edit = QLineEdit()
+        self._mapping_note_edit.setPlaceholderText("备注（可选）")
+        save = QPushButton("保存映射新版本")
+        save.clicked.connect(self._save_field_mapping)
+        for widget in (refresh, QLabel("编辑者"), self._mapping_editor_edit, self._mapping_note_edit, save):
+            bar.addWidget(widget)
+        bar.addStretch()
+        self._mapping_table = QTableWidget(0, len(self._MAPPING_COLUMNS))
+        self._mapping_table.setHorizontalHeaderLabels(list(self._MAPPING_COLUMNS))
+        self._mapping_table.horizontalHeader().setStretchLastSection(True)
+        self._mapping_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        hint = QLabel(
+            "源字段自动从输入包数据集发现（GeoJSON 属性 / CSV 列 / DEM=elevation）；目标下拉只允许 manifest.canonical_targets "
+            "中的 canonical 字段或“(unmapped)”，一个 canonical 目标至多一个来源。保存写出 metadata/field_mapping.vNNN.json"
+            "（声明性契约，供 M287-D 真实数据 importer 消费；不改变当前合成流水线的计算）。")
+        hint.setWordWrap(True)
+        layout = QVBoxLayout(page)
+        layout.addLayout(bar)
+        layout.addWidget(self._mapping_table)
+        layout.addWidget(hint)
+        return page
+
+    def _refresh_field_mapping(self) -> None:
+        job = self._current_job()
+        if not job["package"]:
+            self._show_rows([("fatal", "MissingPackage", "请先在作业页选择输入包目录")])
+            return
+        try:
+            targets = jobio.canonical_targets(job)
+            rows = jobio.field_mapping_rows(job)
+        except ValueError as error:
+            self._show_rows([("fatal", "CanonicalTargetsInvalid", str(error))])
+            return
+        self._mapping_table.setRowCount(len(rows))
+        for r, row in enumerate(rows):
+            for c, key in enumerate(self._MAPPING_COLUMNS[:-1]):
+                self._mapping_table.setItem(r, c, QTableWidgetItem(str(row.get(key, ""))))
+            combo = QComboBox()
+            combo.addItem(jobio.UNMAPPED, jobio.UNMAPPED)
+            for target in targets:
+                combo.addItem(target, target)
+            combo.setCurrentIndex(max(0, combo.findData(row["target"])))
+            self._mapping_table.setCellWidget(r, len(self._MAPPING_COLUMNS) - 1, combo)
+        self._show_rows(jobio.field_mapping_summary(job))
+
+    def _mapping_rows_from_table(self) -> list[dict]:
+        rows = []
+        for r in range(self._mapping_table.rowCount()):
+            row = {key: self._mapping_table.item(r, c).text() for c, key in enumerate(self._MAPPING_COLUMNS[:-1])}
+            combo = self._mapping_table.cellWidget(r, len(self._MAPPING_COLUMNS) - 1)
+            row["target"] = combo.currentData() if combo is not None else jobio.UNMAPPED
+            rows.append(row)
+        return rows
+
+    def _save_field_mapping(self) -> None:
+        editor = self._mapping_editor_edit.text().strip()
+        if editor:
+            QgsSettings().setValue(self._OPERATOR_KEY, editor)
+        try:
+            path = jobio.write_field_mapping_version(self._current_job(), self._mapping_rows_from_table(),
+                                                    edited_by=editor, note=self._mapping_note_edit.text().strip())
+        except ValueError as error:
+            self._show_rows([("fatal", "FieldMappingRejected", str(error))])
+            return
+        self._show_rows([("info", "FieldMappingVersionWritten", str(path))] + jobio.field_mapping_summary(self._current_job()))
 
     # --- E2 data tree / E5 report browser -----------------------------------
 

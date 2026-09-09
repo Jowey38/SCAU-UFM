@@ -939,3 +939,471 @@ def layer_paths(job: dict) -> dict[str, str]:
     if controls:
         candidates["mesh_controls"] = Path(controls)
     return {name: str(path) for name, path in candidates.items() if path.is_file()}
+
+
+# --- E5a parameter tables (P5) --------------------------------------------------
+#
+# Browsing is read-only over metadata/dpm_rule_table.json and
+# soil/soil_parameters.csv. Editing NEVER rewrites the source file: a new
+# versioned sibling (<stem>.v<NNN>.json / .csv) is written with a `revision`
+# block, and an edited rule table drops back to approval.status
+# "synthetic_unapproved" (an edit invalidates the data owner's approval, M281).
+# The pipeline stays the single validation authority; the lint here only makes
+# a bad value locatable while typing.
+
+RULE_CLASS_COLUMNS = ("class_code", "phi_t", "phi_xx", "phi_xy", "phi_yy", "note")
+RULE_INTERFACE_COLUMNS = ("class_a", "class_b", "omega_edge", "note")
+SOIL_COLUMNS = ("soil_type", "soil_name", "K_s", "psi_f", "theta_s", "theta_i",
+                "K_s_units", "psi_f_units", "theta_units", "source_or_authority")
+DEFAULT_CLOSURE_LIMITS = {"epsilon_phi": 1.0e-6, "cond_max": 1.0e4}
+
+
+def rule_table_path(job: dict) -> Path | None:
+    configured = (job.get("field_derivation") or {}).get("dpm_rule_table")
+    if configured:
+        return Path(configured)
+    default = Path(job["package"]) / "metadata" / "dpm_rule_table.json"
+    return default if default.is_file() else None
+
+
+def soil_table_path(job: dict) -> Path:
+    return Path(job["package"]) / "soil" / "soil_parameters.csv"
+
+
+def load_rule_table(path: Path) -> dict:
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def rule_class_rows(table: dict) -> list[dict]:
+    rows = []
+    for code, entry in sorted((table.get("classes") or {}).items()):
+        tensor = entry.get("Phi_c") or {}
+        rows.append({"class_code": code, "phi_t": entry.get("phi_t"), "phi_xx": tensor.get("xx"),
+                     "phi_xy": tensor.get("xy"), "phi_yy": tensor.get("yy"), "note": entry.get("note", "")})
+    return rows
+
+
+def rule_interface_rows(table: dict) -> list[dict]:
+    rows = []
+    for item in (table.get("edges") or {}).get("interfaces") or []:
+        classes = list(item.get("classes") or ["", ""])
+        rows.append({"class_a": classes[0], "class_b": classes[1] if len(classes) > 1 else "",
+                     "omega_edge": item.get("omega_edge"), "note": item.get("note", "")})
+    return rows
+
+
+def rule_table_from_rows(base: dict, class_rows: list[dict], interface_rows: list[dict]) -> dict:
+    """Rebuilds a rule table from edited rows, keeping every non-tabular block
+    (approval, closure_limits, soil, unmapped_class, ...) of `base`."""
+    table = json.loads(json.dumps(base))
+    classes = {}
+    for row in class_rows:
+        code = str(row.get("class_code", "")).strip()
+        if not code:
+            raise ValueError("class_code must not be empty")
+        if code in classes:
+            raise ValueError(f"duplicate class_code {code!r}")
+        try:
+            classes[code] = {"phi_t": float(row["phi_t"]),
+                             "Phi_c": {"xx": float(row["phi_xx"]), "xy": float(row["phi_xy"]), "yy": float(row["phi_yy"])}}
+        except (KeyError, TypeError, ValueError) as error:
+            raise ValueError(f"class {code!r}: phi_t / Phi_c must be numbers ({error})") from error
+        if row.get("note"):
+            classes[code]["note"] = str(row["note"])
+    table["classes"] = classes
+    interfaces = []
+    for row in interface_rows:
+        a, b = str(row.get("class_a", "")).strip(), str(row.get("class_b", "")).strip()
+        if not a or not b:
+            raise ValueError("interface rows need class_a and class_b")
+        try:
+            omega = float(row["omega_edge"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise ValueError(f"interface {a}/{b}: omega_edge must be a number ({error})") from error
+        entry = {"classes": [a, b], "omega_edge": omega}
+        if row.get("note"):
+            entry["note"] = str(row["note"])
+        interfaces.append(entry)
+    table.setdefault("edges", {})["interfaces"] = interfaces
+    return table
+
+
+def lint_rule_table(table: dict) -> list[tuple[str, str, str]]:
+    """UI pre-flight mirroring the closure laws the pipeline enforces
+    (phi_t in (0,1], Phi_c SPD with lambda in [epsilon_phi, 1], cond <= cond_max,
+    phi_t >= max diagonal, interface classes known, omega in [0,1])."""
+    import math
+    limits = {**DEFAULT_CLOSURE_LIMITS, **(table.get("closure_limits") or {})}
+    rows: list[tuple[str, str, str]] = []
+    classes = table.get("classes") or {}
+    if not classes:
+        rows.append(("fatal", "RuleTableEmpty", "classes must not be empty"))
+    for code, entry in sorted(classes.items()):
+        try:
+            phi_t = float(entry["phi_t"])
+            xx, xy, yy = (float(entry["Phi_c"][k]) for k in ("xx", "xy", "yy"))
+        except (KeyError, TypeError, ValueError):
+            rows.append(("fatal", "RuleClassIncomplete", f"{code}: phi_t and Phi_c.xx/xy/yy are required numbers"))
+            continue
+        if not 0.0 < phi_t <= 1.0:
+            rows.append(("fatal", "RulePhiTRange", f"{code}: phi_t={phi_t} must be in (0, 1]"))
+        half_trace = 0.5 * (xx + yy)
+        radius = math.hypot(0.5 * (xx - yy), xy)
+        lam_min, lam_max = half_trace - radius, half_trace + radius
+        if lam_min < limits["epsilon_phi"]:
+            rows.append(("fatal", "RuleTensorNotSPD", f"{code}: lambda_min={lam_min:.3e} < epsilon_phi={limits['epsilon_phi']}"))
+        if lam_max > 1.0 + 1e-12:
+            rows.append(("fatal", "RuleTensorTooLarge", f"{code}: lambda_max={lam_max:.6f} > 1"))
+        if lam_min > 0 and lam_max / lam_min > limits["cond_max"]:
+            rows.append(("fatal", "RuleTensorCondition", f"{code}: condition number {lam_max / lam_min:.3e} > {limits['cond_max']}"))
+        if phi_t < max(xx, yy) - 1e-12:
+            rows.append(("fatal", "RuleStorageBelowConveyance", f"{code}: phi_t={phi_t} < max(Phi_c.xx, Phi_c.yy)={max(xx, yy)}"))
+    for item in (table.get("edges") or {}).get("interfaces") or []:
+        pair = item.get("classes") or []
+        for code in pair:
+            if code not in classes:
+                rows.append(("fatal", "RuleInterfaceUnknownClass", f"interface {pair}: class {code!r} has no entry"))
+        omega = item.get("omega_edge")
+        if not isinstance(omega, (int, float)) or isinstance(omega, bool) or not 0.0 <= float(omega) <= 1.0:
+            rows.append(("fatal", "RuleOmegaRange", f"interface {pair}: omega_edge={omega!r} must be in [0, 1]"))
+    approval = table.get("approval") or {}
+    rows.append(("pass" if approval.get("status") == "approved" else "review", "RuleTableApproval",
+                 f"status={approval.get('status')} by={approval.get('approved_by')} date={approval.get('date')}"))
+    if not any(r[0] == "fatal" for r in rows):
+        rows.insert(0, ("pass", "RuleTableLint", f"{len(classes)} class(es) satisfy the closure laws (authority: pipeline)"))
+    return rows
+
+
+def load_soil_rows(path: Path) -> list[dict]:
+    import csv
+    with Path(path).open(encoding="utf-8", newline="") as handle:
+        return [dict(row) for row in csv.DictReader(handle)]
+
+
+def lint_soil_rows(rows: list[dict]) -> list[tuple[str, str, str]]:
+    out: list[tuple[str, str, str]] = []
+    seen = set()
+    for row in rows:
+        try:
+            soil_type = int(row["soil_type"])
+            k_s, psi_f, theta_s, theta_i = (float(row[k]) for k in ("K_s", "psi_f", "theta_s", "theta_i"))
+        except (KeyError, TypeError, ValueError):
+            out.append(("fatal", "SoilRowIncomplete", f"{row.get('soil_type')!r}: soil_type/K_s/psi_f/theta_s/theta_i must be numbers"))
+            continue
+        if soil_type in seen:
+            out.append(("fatal", "SoilTypeDuplicate", f"soil_type {soil_type} appears twice"))
+        seen.add(soil_type)
+        if k_s < 0:
+            out.append(("fatal", "SoilKsNegative", f"soil_type {soil_type}: K_s={k_s} < 0"))
+        if psi_f <= 0:
+            out.append(("fatal", "SoilPsiNotPositive", f"soil_type {soil_type}: psi_f={psi_f} must be > 0"))
+        if not 0 < theta_s <= 1:
+            out.append(("fatal", "SoilThetaSRange", f"soil_type {soil_type}: theta_s={theta_s} must be in (0, 1]"))
+        if not 0 <= theta_i < theta_s:
+            out.append(("fatal", "SoilThetaIRange", f"soil_type {soil_type}: theta_i={theta_i} must be in [0, theta_s)"))
+    expected = list(range(len(rows)))
+    if sorted(seen) != expected:
+        out.append(("fatal", "SoilTypeNotContiguous", f"soil_type values {sorted(seen)} must be 0..{len(rows) - 1} (STCF soil_type_entry index)"))
+    if not any(r[0] == "fatal" for r in out):
+        out.insert(0, ("pass", "SoilTableLint", f"{len(rows)} soil type(s) valid (authority: pipeline)"))
+    return out
+
+
+def next_version_path(source: Path) -> Path:
+    """<dir>/<stem>.v<NNN><suffix> with NNN = 1 + highest existing version.
+    A source that is itself a version (stem ends in .vNNN) shares the family."""
+    import re
+    source = Path(source)
+    match = re.match(r"^(.*)\.v(\d{3,})$", source.stem)
+    family = match.group(1) if match else source.stem
+    highest = 0
+    for sibling in source.parent.glob(f"{family}.v*{source.suffix}"):
+        m = re.match(rf"^{re.escape(family)}\.v(\d{{3,}})$", sibling.stem)
+        if m:
+            highest = max(highest, int(m.group(1)))
+    return source.parent / f"{family}.v{highest + 1:03d}{source.suffix}"
+
+
+def write_rule_table_version(source: Path, table: dict, *, edited_by: str, note: str = "") -> Path:
+    """Writes the edited table as a NEW version next to `source` (never in
+    place). Approval is reset: edited values are unapproved until the data
+    owner re-approves them (the pipeline refuses unapproved tables for real
+    packages)."""
+    import hashlib
+    if not edited_by.strip():
+        raise ValueError("edited_by must not be empty")
+    fatal = [r for r in lint_rule_table(table) if r[0] == "fatal"]
+    if fatal:
+        raise ValueError("; ".join(f"{code}: {detail}" for _, code, detail in fatal))
+    source = Path(source)
+    target = next_version_path(source)
+    payload = json.loads(json.dumps(table))
+    payload["approval"] = {"status": "synthetic_unapproved", "approved_by": None, "date": None,
+                           "note": f"edited by {edited_by.strip()} on {_now_iso()}; re-approval required before use on real data"}
+    payload["revision"] = {"based_on": source.name,
+                           "based_on_sha256": hashlib.sha256(source.read_bytes()).hexdigest() if source.is_file() else None,
+                           "edited_by": edited_by.strip(), "timestamp": _now_iso(), "note": note}
+    tmp = target.with_suffix(target.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp.replace(target)
+    return target
+
+
+def write_soil_table_version(source: Path, rows: list[dict], *, edited_by: str) -> Path:
+    import csv
+    if not edited_by.strip():
+        raise ValueError("edited_by must not be empty")
+    fatal = [r for r in lint_soil_rows(rows) if r[0] == "fatal"]
+    if fatal:
+        raise ValueError("; ".join(f"{code}: {detail}" for _, code, detail in fatal))
+    source = Path(source)
+    target = next_version_path(source)
+    columns = list(SOIL_COLUMNS)
+    for row in rows:
+        for key in row:
+            if key not in columns:
+                columns.append(key)
+    tmp = target.with_suffix(target.suffix + ".tmp")
+    with tmp.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns, lineterminator="\n")
+        writer.writeheader()
+        for row in sorted(rows, key=lambda r: int(r["soil_type"])):
+            writer.writerow({**{c: "" for c in columns}, **row,
+                             "source_or_authority": f"edited_by:{edited_by.strip()} (re-approval required)"})
+    tmp.replace(target)
+    return target
+
+
+def parameter_table_rows(job: dict) -> list[tuple[str, str, str]]:
+    """Status rows for the P5 page (which tables are loaded + lint)."""
+    rows: list[tuple[str, str, str]] = []
+    rule_path = rule_table_path(job)
+    if rule_path is None or not rule_path.is_file():
+        rows.append(("info", "NoRuleTable", "no dpm_rule_table.json (v1 placeholder fields); set one on the job page"))
+    else:
+        try:
+            rows.append(("info", "RuleTable", str(rule_path)))
+            rows.extend(lint_rule_table(load_rule_table(rule_path)))
+        except (OSError, ValueError) as error:
+            rows.append(("fatal", "RuleTableUnreadable", str(error)))
+    soil_path = soil_table_path(job)
+    if soil_path.is_file():
+        try:
+            rows.append(("info", "SoilTable", str(soil_path)))
+            rows.extend(lint_soil_rows(load_soil_rows(soil_path)))
+        except (OSError, ValueError) as error:
+            rows.append(("fatal", "SoilTableUnreadable", str(error)))
+    else:
+        rows.append(("fatal", "SoilTableMissing", str(soil_path)))
+    return rows
+
+
+# --- P3 field mapping ---------------------------------------------------------------
+#
+# Source fields are discovered from the package datasets (GeoJSON property
+# names, CSV headers, DEM = "elevation"); targets are ONLY the canonical set the
+# pipeline accepts (manifest.canonical_targets, itself validated against
+# scau_preproc.pipeline.CANONICAL_TARGETS) plus "(unmapped)". The mapping is
+# written as a versioned metadata/field_mapping.v<NNN>.json; it is a
+# declaration for the importer (M287-D, BLOCKED on M281) and never changes what
+# the current synthetic pipeline computes.
+
+CANONICAL_TARGETS = (
+    "node_x", "node_y", "face_nodes", "edge_nodes",
+    "phi_t", "phi_xx", "phi_xy", "phi_yy",
+    "manning_n", "z_b", "soil_type",
+    "omega_edge", "phi_e_n", "phi_et",
+)
+UNMAPPED = "(unmapped)"
+FIELD_MAPPING_SCHEMA_VERSION = 1
+# Targets that the generator produces itself (mesh topology / derived DPM
+# fields); they never need a source column in the package.
+GENERATOR_OWNED_TARGETS = frozenset({"node_x", "node_y", "face_nodes", "edge_nodes", "omega_edge", "phi_e_n",
+                                     "phi_et", "phi_t", "phi_xx", "phi_xy", "phi_yy"})
+# Default suggestions: identical names map to themselves; nothing else is inferred.
+_DEFAULT_TARGET_BY_SOURCE = {"elevation": "z_b", "manning_n": "manning_n", "soil_type": "soil_type"}
+
+
+def canonical_targets(job: dict) -> list[str]:
+    """Targets offered by the dropdown: the manifest's canonical_targets when
+    declared (every entry must be canonical), else the full canonical set."""
+    manifest_path = Path(job["package"]) / "manifest.json"
+    declared = None
+    if manifest_path.is_file():
+        try:
+            declared = json.loads(manifest_path.read_text(encoding="utf-8")).get("canonical_targets")
+        except (OSError, ValueError):
+            declared = None
+    if declared:
+        unknown = [t for t in declared if t not in CANONICAL_TARGETS]
+        if unknown:
+            raise ValueError(f"manifest declares non-canonical targets {unknown}")
+        return list(declared)
+    return list(CANONICAL_TARGETS)
+
+
+def discover_source_fields(job: dict) -> list[dict]:
+    """[{dataset, layer, source_field, source_type, sample}] from the package."""
+    import csv
+    package = Path(job["package"])
+    manifest_path = package / "manifest.json"
+    if not manifest_path.is_file():
+        return []
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    fields: list[dict] = []
+    for dataset in manifest.get("datasets", []):
+        path = package / dataset["path"]
+        kind = dataset.get("kind")
+        if not path.is_file():
+            continue
+        if kind == "raster_dem":
+            fields.append({"dataset": dataset["id"], "layer": path.name, "kind": kind, "source_field": "elevation",
+                           "source_type": "float", "sample": "cell value"})
+        elif path.suffix == ".geojson":
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            seen: dict[str, object] = {}
+            for feature in data.get("features", []):
+                for key, value in (feature.get("properties") or {}).items():
+                    seen.setdefault(key, value)
+            for key, value in seen.items():
+                fields.append({"dataset": dataset["id"], "layer": path.name, "kind": kind, "source_field": key,
+                               "source_type": type(value).__name__ if value is not None else "null",
+                               "sample": "" if value is None else str(value)[:40]})
+        elif path.suffix == ".csv":
+            with path.open(encoding="utf-8", newline="") as handle:
+                reader = csv.DictReader(handle)
+                first = next(reader, None) or {}
+                for key in reader.fieldnames or []:
+                    fields.append({"dataset": dataset["id"], "layer": path.name, "kind": kind, "source_field": key,
+                                   "source_type": "text", "sample": str(first.get(key, ""))[:40]})
+    return fields
+
+
+def field_dictionary_targets(job: dict) -> dict[tuple[str, str], str]:
+    """(dataset|layer, source_field) -> target_field from metadata/field_dictionary.csv.
+    Canonical targets are kept; an explicit 'N/A' is recorded as UNMAPPED so it
+    overrides the same-name default (e.g. soil_parameters.soil_type is the LUT
+    key, not a cell field); non-canonical targets are ignored."""
+    import csv
+    path = Path(job["package"]) / "metadata" / "field_dictionary.csv"
+    out: dict[tuple[str, str], str] = {}
+    if not path.is_file():
+        return out
+    with path.open(encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            target = (row.get("target_field") or "").strip()
+            if target in CANONICAL_TARGETS or target.upper() == "N/A":
+                value = target if target in CANONICAL_TARGETS else UNMAPPED
+                field = (row.get("source_field") or "").strip()
+                out[((row.get("dataset") or "").strip().lower(), field)] = value
+                out[((row.get("layer") or "").strip().lower(), field)] = value
+    return out
+
+
+def field_mapping_path(job: dict) -> Path:
+    return Path(job["package"]) / "metadata" / "field_mapping.json"
+
+
+def load_field_mapping(job: dict) -> dict | None:
+    """Latest version (highest .vNNN) or the base file, else None."""
+    base = field_mapping_path(job)
+    candidates = sorted(base.parent.glob("field_mapping.v*.json")) if base.parent.is_dir() else []
+    path = candidates[-1] if candidates else (base if base.is_file() else None)
+    if path is None:
+        return None
+    try:
+        return {**json.loads(path.read_text(encoding="utf-8")), "_file": path.name}
+    except (OSError, ValueError):
+        return None
+
+
+def field_mapping_rows(job: dict) -> list[dict]:
+    """Rows for the P3 table: discovered source fields with the current target.
+    A saved field_mapping (latest version) is authoritative: fields it does not
+    list are unmapped. Without one, the field dictionary, then a same-name
+    default for spatial datasets, seed the table."""
+    targets = set(canonical_targets(job))
+    saved = load_field_mapping(job)
+    existing = {(m["dataset"], m["source_field"]): m["target"] for m in ((saved or {}).get("mappings") or [])}
+    dictionary = field_dictionary_targets(job)
+    rows = []
+    claimed: dict[str, tuple[str, str]] = {}
+    for field in discover_source_fields(job):
+        key = (field["dataset"], field["source_field"])
+        target = existing.get(key)
+        if saved is not None:
+            rows.append({**field, "target": target if target in targets else UNMAPPED, "note": ""})
+            continue
+        if target is None:
+            for alias in (field["dataset"].lower(), field["layer"].split(".")[0].lower()):
+                target = dictionary.get((alias, field["source_field"]))
+                if target:
+                    break
+        if target is None and field.get("kind") in ("vector_gis", "raster_dem"):
+            # Same-name defaults only for spatial datasets: lookup-table columns
+            # (soil_parameters.soil_type is the LUT key) are never cell fields.
+            target = _DEFAULT_TARGET_BY_SOURCE.get(field["source_field"])
+        target = target if target in targets else UNMAPPED
+        note = ""
+        if target != UNMAPPED:
+            # A canonical target has exactly one source; the first dataset (manifest
+            # order) keeps the seed, later candidates are left for the operator.
+            if target in claimed:
+                note = f"seed dropped: {target} already fed by {claimed[target][0]}.{claimed[target][1]}"
+                target = UNMAPPED
+            else:
+                claimed[target] = key
+        rows.append({**field, "target": target, "note": note})
+    return rows
+
+
+def write_field_mapping_version(job: dict, rows: list[dict], *, edited_by: str, note: str = "") -> Path:
+    """Writes metadata/field_mapping.v<NNN>.json (never overwrites). Every
+    target must be canonical (or unmapped); a canonical target may be fed by
+    at most one source field."""
+    if not edited_by.strip():
+        raise ValueError("edited_by must not be empty")
+    allowed = set(canonical_targets(job))
+    mappings = []
+    used: dict[str, tuple[str, str]] = {}
+    for row in rows:
+        target = row.get("target") or UNMAPPED
+        if target == UNMAPPED:
+            continue
+        if target not in allowed:
+            raise ValueError(f"{row['dataset']}.{row['source_field']}: target {target!r} is not a canonical field")
+        if target in used:
+            raise ValueError(f"target {target!r} mapped from both {used[target]} and "
+                             f"({row['dataset']}, {row['source_field']})")
+        used[target] = (row["dataset"], row["source_field"])
+        mappings.append({"dataset": row["dataset"], "layer": row.get("layer"), "source_field": row["source_field"],
+                         "target": target})
+    payload = {"field_mapping_schema_version": FIELD_MAPPING_SCHEMA_VERSION,
+               "package": Path(job["package"]).name,
+               "edited_by": edited_by.strip(), "timestamp": _now_iso(), "note": note,
+               "status": "declaration_only (importer binding waits for M281 / M287-D)",
+               "mappings": sorted(mappings, key=lambda m: (m["dataset"], m["source_field"]))}
+    target_path = next_version_path(field_mapping_path(job))
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = target_path.with_suffix(target_path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp.replace(target_path)
+    return target_path
+
+
+def field_mapping_summary(job: dict) -> list[tuple[str, str, str]]:
+    rows = field_mapping_rows(job)
+    mapped = [r for r in rows if r["target"] != UNMAPPED]
+    current = load_field_mapping(job)
+    missing = sorted(set(canonical_targets(job)) - {r["target"] for r in mapped} - GENERATOR_OWNED_TARGETS)
+    out = [("info", "FieldMapping", f"{len(mapped)}/{len(rows)} source fields mapped; "
+                                    f"file={current['_file'] if current else '(none: dictionary + defaults)'}"),
+           ("review" if missing else "pass", "FieldMappingCoverage",
+            f"sampled targets without a source: {missing or 'none'}")]
+    for r in rows:
+        if r.get("note"):
+            out.append(("review", "FieldMappingAmbiguousSeed", f"{r['dataset']}.{r['source_field']}: {r['note']}"))
+    return out
