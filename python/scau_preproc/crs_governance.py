@@ -47,7 +47,8 @@ from pathlib import Path
 CRS_POLICY_SCHEMA_VERSION = 1
 CRS_AUDIT_SCHEMA_VERSION = 1
 VECTOR_DATASETS = ("boundary/computational_boundary.geojson", "buildings/buildings.geojson",
-                   "landcover/landcover.geojson", "soil/soil_zones.geojson")
+                   "landcover/landcover.geojson", "soil/soil_zones.geojson",
+                   "terrain/streams.geojson")  # B3 stream enforcement lines (optional)
 COORD_DECIMALS = 6
 ROUNDTRIP_TOLERANCE_M = 1.0e-6
 
@@ -250,10 +251,15 @@ def _copy_tree(src: Path, dst: Path, skip: set[str]) -> None:
             shutil.copyfile(path, target)
 
 
-def govern_package(package: Path, policy_path: Path, staging: Path, mesh_controls: Path | None = None) -> dict:
+def govern_package(package: Path, policy_path: Path, staging: Path, mesh_controls: Path | None = None,
+                   dem_reprojection_authorized: bool = False) -> dict:
     """Validates every dataset's CRS against the policy and materialises the
     governed staging package. Returns the audit (also written to
-    staging/crs_audit.json). Raises CrsGovernanceError (fail-closed)."""
+    staging/crs_audit.json). Raises CrsGovernanceError (fail-closed).
+
+    `dem_reprojection_authorized` is set by the pipeline when a B3 terrain
+    policy enables `reproject`: the raster leg is then deferred to terrain
+    conditioning instead of being fatal under dem_policy must_match_target."""
     import pyproj
 
     package = Path(package)
@@ -344,12 +350,16 @@ def govern_package(package: Path, policy_path: Path, staging: Path, mesh_control
         if dem_crs.is_geographic:
             raise CrsGovernanceError(f"DEM CRS {dem_text!r} is geographic", "dem")
         matches = dem_crs == target
-        if not matches and policy["dem_policy"] == "must_match_target":
+        if not matches and policy["dem_policy"] == "must_match_target" and not dem_reprojection_authorized:
             raise CrsGovernanceError(
                 f"DEM CRS {dem_text!r} differs from target {target_text!r}; rasters are not resampled in B2 "
-                "(dem_policy must_match_target) - supply a DEM in the target CRS or defer to B3 terrain conditioning", "dem")
+                "(dem_policy must_match_target) - supply a DEM in the target CRS or authorize reproject in "
+                "metadata/terrain_condition_policy.json (B3)", "dem")
+        action = ("copied_identity" if matches
+                  else "reprojection_deferred_to_terrain_condition" if dem_reprojection_authorized
+                  else "declared_mismatch_allowed")
         audit["datasets"]["dem"] = {"path": dem["path"], "source_crs": dem_text, "target_crs": target_text,
-                                    "action": "copied_identity" if matches else "declared_mismatch_allowed"}
+                                    "action": action}
 
     # SWMM coordinates follow the boundary CRS unless overridden.
     swmm_rel = "swmm/model.inp"

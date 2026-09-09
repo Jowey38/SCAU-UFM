@@ -68,6 +68,9 @@ REQUIRED = {
     # G37 locks the M287-B2 CRS governance stage (governed reprojection of the
     # synthetic package into EPSG:3395; audit-pinned PROJ pipeline).
     "G37": ("preproc_crs_governance_case", "implemented", True),
+    # G38 locks the M287-B3 terrain conditioning stage (authorized stream burn +
+    # Priority-Flood fill on a committed twin fixture; disabled policy = G30 bytes).
+    "G38": ("preproc_terrain_condition_case", "implemented", True),
 }
 
 
