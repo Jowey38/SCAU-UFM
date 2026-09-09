@@ -202,6 +202,17 @@ class WorkbenchDialog(QDialog):
         browse_rules = QPushButton("...")
         browse_rules.clicked.connect(lambda: self._browse(self._rule_table_edit, False))
         fields.addWidget(browse_rules)
+        project_row = QHBoxLayout()
+        self._project_edit = QLineEdit()
+        self._project_edit.setPlaceholderText("工程索引 project.ufm.json（可选；默认输出目录的上级；可再生、非权威）")
+        open_project = QPushButton("打开工程")
+        open_project.clicked.connect(self._open_project)
+        save_project = QPushButton("保存工程")
+        save_project.clicked.connect(self._save_project)
+        project_row.addWidget(QLabel("工程文件"))
+        project_row.addWidget(self._project_edit)
+        project_row.addWidget(open_project)
+        project_row.addWidget(save_project)
         confirmations = QHBoxLayout()
         confirmations.addWidget(QLabel("耦合确认目录"))
         confirmations.addWidget(self._confirmations_edit)
@@ -217,8 +228,70 @@ class WorkbenchDialog(QDialog):
         layout.addLayout(terrain_row)
         layout.addLayout(fields)
         layout.addLayout(confirmations)
+        layout.addLayout(project_row)
         layout.addStretch()
         return page
+
+    # --- E7 project index ---------------------------------------------------
+
+    def _project_path(self) -> Path:
+        text = self._project_edit.text().strip()
+        return Path(text) if text else jobio.default_project_index_path(self._current_job())
+
+    def _save_project(self) -> None:
+        job = self._current_job()
+        if not job["output_dir"]:
+            self._show_rows([("fatal", "MissingOutputDir", "请先选择输出目录")])
+            return
+        path = jobio.update_project_index(self._project_path(), job, jobio.load_validation_for(job),
+                                          repo_root=self._repo_edit.text().strip() or None)
+        self._project_edit.setText(str(path))
+        self._show_rows([("info", "ProjectIndexSaved", str(path))] + jobio.project_index_rows(path))
+
+    def _open_project(self) -> None:
+        text = self._project_edit.text().strip()
+        if not text:
+            chosen, _ = QFileDialog.getOpenFileName(self, "project.ufm.json", "", "UFM project (*.ufm.json *.json)")
+            if not chosen:
+                return
+            self._project_edit.setText(chosen)
+        index = jobio.load_project_index(self._project_path())
+        if index is None:
+            self._show_rows([("fatal", "ProjectIndexInvalid", str(self._project_path()))])
+            return
+        self._apply_ui_state(index)
+        self._show_rows(jobio.project_index_rows(self._project_path()))
+
+    def _apply_ui_state(self, index: dict) -> None:
+        state = index.get("ui_state") or {}
+        if index.get("repo_root") and jobio.repo_root_valid(index["repo_root"]):
+            self._repo_edit.setText(index["repo_root"])
+        if state.get("package"):
+            self._package_edit.setText(state["package"])
+        if state.get("output_dir"):
+            self._output_edit.setText(state["output_dir"])
+        if state.get("validator_cli"):
+            self._validator_edit.setText(state["validator_cli"])
+        if state.get("characteristic_length_m") is not None:
+            self._lc_spin.setValue(float(state["characteristic_length_m"]))
+        self._recombine_check.setChecked(bool(state.get("recombine", True)))
+        self._determinism_check.setChecked(bool(state.get("determinism_check", True)))
+        coupling = state.get("coupling_maps", False)
+        self._coupling_check.setChecked(bool(coupling))
+        if isinstance(coupling, dict):
+            self._coupling_mode.setCurrentIndex(max(0, self._coupling_mode.findData(coupling.get("mode", "explicit_ids"))))
+            if coupling.get("roof_node_max_distance_m") is not None:
+                self._roof_distance_spin.setValue(float(coupling["roof_node_max_distance_m"]))
+        controls = state.get("mesh_controls") or {}
+        self._controls_enable.setChecked(bool(controls.get("geojson")))
+        self._controls_edit.setText(controls.get("geojson", ""))
+        self._default_size_spin.setValue(float(controls.get("default_size_m") or 0.0))
+        self._default_dist_spin.setValue(float(controls.get("default_dist_max_m") or 0.0))
+        self._confirmations_edit.setText(state.get("confirmations_dir", "") or "")
+        self._rule_table_edit.setText((state.get("field_derivation") or {}).get("dpm_rule_table", "") or "")
+        self._crs_policy_edit.setText((state.get("crs") or {}).get("policy", "") or "")
+        self._terrain_policy_edit.setText((state.get("terrain_condition") or {}).get("policy", "") or "")
+        self._export_target_edit.setText((state.get("export_case") or {}).get("target_dir", "") or "")
 
     def _build_mesh_page(self) -> QWidget:
         page = QWidget()
@@ -990,6 +1063,11 @@ class WorkbenchDialog(QDialog):
             rows.insert(0, ("fatal", result["status"], result["stderr"][-2000:]))
         if result["status"] == "ok":
             rows.extend(jobio.mesh_quality_summary(job))
+        # E7: every run refreshes the regenerable project index.
+        try:
+            jobio.update_project_index(self._project_path(), job, result.get("validation"), repo_root=repo_root)
+        except OSError as error:
+            rows.append(("info", "ProjectIndexNotWritten", str(error)))
         self._show_rows(rows)
         can_export = jobio.exportable(result.get("validation"))
         self._export_label.setText(
