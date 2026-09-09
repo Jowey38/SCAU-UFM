@@ -31,6 +31,8 @@ def main() -> int:
     parser.add_argument("--output", default=None)
     parser.add_argument("--run", action="store_true", help="also run the pipeline subprocess")
     parser.add_argument("--terrain-policy", default=None, help="B3 policy path for the job page field")
+    parser.add_argument("--exercise-edits", action="store_true",
+                        help="P5/P3: edit a cell and save versioned rule/soil/mapping files (use on a COPY of the package)")
     args = parser.parse_args()
     repo = Path(args.repo_root).resolve()
     package = (repo / args.package).resolve() if not Path(args.package).is_absolute() else Path(args.package)
@@ -76,6 +78,32 @@ def main() -> int:
         step("parameter_tables", lambda: dialog._refresh_parameter_tables())
     if hasattr(dialog, "_refresh_field_mapping"):
         step("field_mapping", lambda: dialog._refresh_field_mapping())
+    if args.exercise_edits and hasattr(dialog, "_save_rule_table_version"):
+        def edits():
+            from qgis.PyQt.QtWidgets import QTableWidgetItem
+            dialog._rule_table_edit.setText(str(package / "metadata" / "dpm_rule_table.json"))
+            dialog._param_editor_edit.setText("smoke")
+            dialog._mapping_editor_edit.setText("smoke")
+            dialog._refresh_parameter_tables()
+            assert dialog._class_table.rowCount() >= 1
+            def findings():
+                return [(dialog._findings.item(r, 1).text(), dialog._findings.item(r, 2).text()[:200])
+                        for r in range(dialog._findings.rowCount())]
+            dialog._class_table.setItem(0, 4, QTableWidgetItem("0.9"))   # grass phi_yy: legal edit
+            dialog._save_rule_table_version()
+            print("SMOKE after_rule_save", findings())
+            dialog._save_soil_table_version()
+            print("SMOKE after_soil_save", findings())
+            dialog._refresh_field_mapping()
+            assert dialog._mapping_table.rowCount() >= 1
+            dialog._save_field_mapping()
+            print("SMOKE after_mapping_save", findings())
+            written = sorted(p.name for p in (package / "metadata").glob("*.v001.*")) +                       sorted(p.name for p in (package / "soil").glob("*.v001.*"))
+            print("SMOKE versioned_files", written)
+            assert written == ["dpm_rule_table.v001.json", "field_mapping.v001.json", "soil_parameters.v001.csv"], written
+            codes = [dialog._findings.item(r, 1).text() for r in range(dialog._findings.rowCount())]
+            assert "FieldMappingVersionWritten" in codes, codes
+        step("parameter_and_mapping_edits", edits)
     if args.run:
         def run():
             dialog._run()
