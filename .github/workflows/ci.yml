@@ -220,6 +220,46 @@ jobs:
         shell: bash
         run: python3 tests/golden/suite_manifest/check_manifest.py
 
+  # B7 cross-platform determinism EVIDENCE lane (non-blocking): regenerates the
+  # G30 preproc fixture on Linux with the governed python lock and records the
+  # verdict (bitwise / 1e-12 / topology_differs). Promotion to a blocking gate
+  # follows the B7 decision (third_party/manifest/gmsh.version).
+  preproc-cross-platform:
+    name: preproc-cross-platform (ubuntu, evidence)
+    runs-on: ubuntu-22.04
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install governed preproc python lock
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r third_party/manifest/preproc-python.lock
+          sudo apt-get update && sudo apt-get install -y libglu1-mesa libxcursor1 libxft2 libxinerama1 libxrender1 libxrandr2 libgl1
+
+      - name: Headless preproc unit tests
+        shell: bash
+        working-directory: python
+        run: python -m unittest discover -s tests -t .
+
+      - name: B7 regenerate G30 and compare
+        shell: bash
+        run: python tools/preproc/cross_platform_hash.py --out b7_evidence/linux-x86_64.json
+
+      - name: Upload B7 evidence row
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b7-evidence-linux-x86_64
+          path: b7_evidence/
+
   spike-isolation-check:
     name: spike-isolation-check
     runs-on: ubuntu-22.04

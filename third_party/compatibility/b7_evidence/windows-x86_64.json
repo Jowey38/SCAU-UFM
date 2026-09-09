@@ -1,0 +1,19 @@
+{
+  "b7_evidence_schema_version": 1,
+  "timestamp": "2026-09-09T14:36:33",
+  "fixture": "tests/golden/preproc_gis_synthetic_case/cases/synthetic_city_block.stcf.nc",
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "machine": "AMD64",
+    "python": "3.14.4",
+    "gmsh": "4.15.2",
+    "numpy": "2.5.2",
+    "netCDF4": "1.7.4",
+    "pyproj": "3.8.0",
+    "gmsh_library": "4.15.2"
+  },
+  "same_host_bitwise_reruns": true,
+  "reference_sha256": "a89ba98da95bcd5732c17e1bf9977e8f75bdc1d81b96a6844333fc796e911bc4",
+  "candidate_sha256": "a89ba98da95bcd5732c17e1bf9977e8f75bdc1d81b96a6844333fc796e911bc4",
+  "verdict": "bitwise"
+}
