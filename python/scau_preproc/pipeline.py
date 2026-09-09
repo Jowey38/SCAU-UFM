@@ -150,6 +150,26 @@ def resolve_crs_policy(job: dict, job_path: Path, package: Path) -> Path | None:
     return default if default.is_file() else None
 
 
+def resolve_terrain_policy(job: dict, job_path: Path, package: Path) -> Path | None:
+    """Optional job_config "terrain_condition": {"policy": path} (B3). Relative
+    paths resolve against the job_config, then the package. When the block is
+    absent, the package's own metadata/terrain_condition_policy.json is used if
+    present; no policy = the DEM is sampled verbatim (v1 behaviour)."""
+    block = job.get("terrain_condition")
+    if block:
+        if not isinstance(block, dict) or not block.get("policy"):
+            raise PipelineError("job_config terrain_condition must be an object with a policy path")
+        path = Path(block["policy"])
+        if not path.is_absolute():
+            candidate = (job_path.parent / path).resolve()
+            path = candidate if candidate.is_file() else (package / path).resolve()
+        if not path.is_file():
+            raise PipelineError(f"terrain condition policy not found: {path}")
+        return path
+    default = package / "metadata" / "terrain_condition_policy.json"
+    return default if default.is_file() else None
+
+
 def resolve_field_derivation(job: dict, job_path: Path, package: Path) -> dict | None:
     """Optional job_config "field_derivation" (B5): {"dpm_rule_table": path,
     "soil_zones"?: path}; relative paths resolve against the job_config, then
@@ -239,6 +259,32 @@ def main() -> int:
     policy_audit = check_package_contract(package)
     mesh_controls = resolve_mesh_controls(job, job_path)
     source_package = package
+
+    def early_fatal(code: str, error: Exception, violation: str) -> int:
+        dataset = getattr(error, "dataset", None)
+        validation_early = {
+            "job_config": str(job_path), "job_config_sha256": sha256_of(job_path),
+            "package": str(source_package), "started": started, "policy_audit": policy_audit,
+            "findings": [{"severity": "fatal", "code": code, "detail": str(error),
+                          "objects": [{"feature_id": dataset, "kind": "dataset",
+                                       "violation": violation}] if dataset else []}],
+            "status": "fatal",
+        }
+        (output_dir / "validation.json").write_text(json.dumps(validation_early, indent=2), encoding="utf-8")
+        print(json.dumps({"status": "fatal", "output_dir": str(output_dir)}))
+        return 2
+
+    # Stage B policy (B3) is loaded first: an authorized `reproject` tells the
+    # CRS stage that the raster leg is handled downstream instead of fatal.
+    terrain_policy_path = resolve_terrain_policy(job, job_path, package)
+    terrain_policy = None
+    if terrain_policy_path is not None:
+        from scau_preproc import terrain_condition
+        try:
+            terrain_policy = terrain_condition.load_policy(terrain_policy_path)
+        except terrain_condition.TerrainConditionError as error:
+            return early_fatal("TerrainConditionFailed", error, "terrain_condition_policy")
+
     crs_audit = None
     crs_policy_path = resolve_crs_policy(job, job_path, package)
     if crs_policy_path is not None:
@@ -251,22 +297,29 @@ def main() -> int:
         try:
             crs_audit = crs_governance.govern_package(
                 package, crs_policy_path, staging,
-                mesh_controls=Path(mesh_controls["geojson"]) if mesh_controls else None)
+                mesh_controls=Path(mesh_controls["geojson"]) if mesh_controls else None,
+                dem_reprojection_authorized=bool(
+                    terrain_policy and terrain_policy["enabled"] and terrain_policy["reproject"]["enabled"]))
         except crs_governance.CrsGovernanceError as error:
-            validation_early = {
-                "job_config": str(job_path), "job_config_sha256": sha256_of(job_path),
-                "package": str(package), "started": started, "policy_audit": policy_audit,
-                "findings": [{"severity": "fatal", "code": "CrsGovernanceFailed", "detail": str(error),
-                              "objects": [{"feature_id": error.dataset, "kind": "dataset",
-                                           "violation": "crs_policy"}] if error.dataset else []}],
-                "status": "fatal",
-            }
-            (output_dir / "validation.json").write_text(json.dumps(validation_early, indent=2), encoding="utf-8")
-            print(json.dumps({"status": "fatal", "output_dir": str(output_dir)}))
-            return 2
+            return early_fatal("CrsGovernanceFailed", error, "crs_policy")
         package = staging
         if mesh_controls and (staging / "mesh_controls.geojson").is_file():
             mesh_controls = {**mesh_controls, "geojson": str(staging / "mesh_controls.geojson")}
+
+    terrain_report = None
+    if terrain_policy is not None:
+        # Stage B (B3): authorized terrain conditioning. Writes the conditioned
+        # DEM + diagnostics beside the run; the generator is pointed at it ONLY
+        # when the policy is enabled, so a disabled policy leaves the generator
+        # configuration - and therefore the case bytes - untouched.
+        dem_entry = (crs_audit or {}).get("datasets", {}).get("dem") or {}
+        try:
+            terrain_report = terrain_condition.condition_package(
+                package, terrain_policy_path, output_dir / "conditioned_terrain",
+                target_crs=(crs_audit or {}).get("target_crs"),
+                dem_source_crs=dem_entry.get("source_crs"))
+        except terrain_condition.TerrainConditionError as error:
+            return early_fatal("TerrainConditionFailed", error, "terrain_condition")
     case_path = output_dir / job.get("case_name", "case.stcf.nc")
     diagnostics_path = output_dir / "generator.diagnostic.geojson"
     generator_config = {
@@ -280,6 +333,8 @@ def main() -> int:
     }
     if mesh_controls:
         generator_config["mesh_controls"] = mesh_controls
+    if terrain_report is not None and terrain_report["enabled"]:
+        generator_config["dem"] = terrain_report["conditioned_dem"]
     field_derivation = resolve_field_derivation(job, job_path, package)
     if field_derivation:
         generator_config["field_derivation"] = field_derivation
@@ -305,7 +360,13 @@ def main() -> int:
             "datasets": {k: {kk: vv for kk, vv in v.items() if kk != "samples"} for k, v in crs_audit["datasets"].items()},
             "audit": str(package / "crs_audit.json"),
         },
-        "findings": [],
+        "terrain_condition": None if terrain_report is None else {
+            key: terrain_report[key] for key in (
+                "policy", "policy_sha256", "enabled", "authorization", "active_operations",
+                "source_dem_sha256", "conditioned_dem", "conditioned_dem_sha256", "operations",
+                "change_summary", "diagnostic_rasters")
+        },
+        "findings": [] if terrain_report is None else list(terrain_report["findings"]),
     }
 
     def finish(status: str, exit_code: int) -> int:
@@ -469,6 +530,14 @@ def main() -> int:
         "geometry_clean_policy_sha256": sha256_of(
             package / "metadata/geometry_clean_policy.json"
         ),
+        "terrain_condition": None if terrain_report is None else {
+            "policy_sha256": terrain_report["policy_sha256"],
+            "enabled": terrain_report["enabled"],
+            "active_operations": terrain_report["active_operations"],
+            "source_dem_sha256": terrain_report["source_dem_sha256"],
+            "conditioned_dem_sha256": terrain_report["conditioned_dem_sha256"],
+            "fill": (terrain_report["operations"].get("fill_depressions") or {}).get("algorithm_version"),
+        },
         "generator_config_sha256": sha256_of(generator_config_path),
         "mesh_controls": None if not mesh_controls else {
             **mesh_controls,

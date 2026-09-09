@@ -1,0 +1,97 @@
+"""Headless (offscreen) smoke test of the SCAU PreProc Workbench plugin.
+
+Runs inside a QGIS python (python-qgis.bat / python-qgis-ltr.bat), e.g.
+
+  QT_QPA_PLATFORM=offscreen "<QGIS>/bin/python-qgis.bat" tools/qgis/offscreen_smoke.py \
+      --repo-root <checkout> [--package samples/d5_gis_preproc_template] [--output <dir>] [--run]
+
+It instantiates WorkbenchDialog from the CHECKOUT (not the deployed profile
+copy), fills the job page with the sample package, and drives the private
+slots that do not need a map canvas: data tree refresh, report refresh,
+parameter-table / field-mapping pages, and optionally the pipeline run.
+Exit code 0 = every step succeeded; every step prints one `SMOKE <step> ok|FAIL`
+line so the run can be pasted into the dual-version checklist
+(tools/qgis/SMOKE_CHECKLIST.md).
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+import tempfile
+import traceback
+from pathlib import Path
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--repo-root", required=True)
+    parser.add_argument("--package", default="samples/d5_gis_preproc_template")
+    parser.add_argument("--output", default=None)
+    parser.add_argument("--run", action="store_true", help="also run the pipeline subprocess")
+    parser.add_argument("--terrain-policy", default=None, help="B3 policy path for the job page field")
+    args = parser.parse_args()
+    repo = Path(args.repo_root).resolve()
+    package = (repo / args.package).resolve() if not Path(args.package).is_absolute() else Path(args.package)
+    output = Path(args.output) if args.output else Path(tempfile.mkdtemp(prefix="scau_smoke_"))
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from qgis.core import Qgis, QgsApplication
+    app = QgsApplication([], False)
+    app.initQgis()
+    print(f"SMOKE qgis_version {Qgis.QGIS_VERSION}")
+    sys.path.insert(0, str(repo / "qgis_plugin"))
+    failures = 0
+
+    def step(name, fn):
+        nonlocal failures
+        try:
+            fn()
+            print(f"SMOKE {name} ok")
+        except Exception:  # noqa: BLE001 - report every step
+            failures += 1
+            print(f"SMOKE {name} FAIL")
+            traceback.print_exc()
+
+    dialog = None
+
+    def construct():
+        nonlocal dialog
+        from scau_preproc_workbench.workbench_dialog import WorkbenchDialog
+        dialog = WorkbenchDialog(str(repo))
+        dialog._repo_edit.setText(str(repo))
+        dialog._package_edit.setText(str(package))
+        dialog._output_edit.setText(str(output))
+        dialog._validator_edit.setText("")
+        if args.terrain_policy:
+            dialog._terrain_policy_edit.setText(args.terrain_policy)
+        job = dialog._current_job()
+        assert job["package"] == str(package), job
+
+    step("construct_dialog", construct)
+    step("data_tree", lambda: dialog._refresh_data_tree())
+    step("report_browser", lambda: dialog._refresh_reports())
+    if hasattr(dialog, "_refresh_parameter_tables"):
+        step("parameter_tables", lambda: dialog._refresh_parameter_tables())
+    if hasattr(dialog, "_refresh_field_mapping"):
+        step("field_mapping", lambda: dialog._refresh_field_mapping())
+    if args.run:
+        def run():
+            dialog._run()
+            rows = [(dialog._findings.item(r, 1).text(), dialog._findings.item(r, 2).text()[-400:])
+                    for r in range(dialog._findings.rowCount())]
+            print("SMOKE findings", [code for code, _ in rows])
+            assert dialog._findings.rowCount() > 0
+            if any(code == "NoValidationReport" for code, _ in rows):
+                raise RuntimeError("pipeline wrote no validation.json: " + "; ".join(d for _, d in rows))
+        step("run_pipeline", run)
+        step("data_tree_after_run", lambda: dialog._refresh_data_tree())
+        step("report_browser_after_run", lambda: dialog._refresh_reports())
+    app.exitQgis()
+    print(f"SMOKE result {'ok' if failures == 0 else f'{failures} failure(s)'} output={output}")
+    return 0 if failures == 0 else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

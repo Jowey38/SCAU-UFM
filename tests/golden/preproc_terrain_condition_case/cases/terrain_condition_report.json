@@ -1,0 +1,66 @@
+{
+  "terrain_report_schema_version": 1,
+  "policy": "H:\\githubcode\\SCAU-UFM\\tests\\golden\\preproc_terrain_condition_case\\cases\\terrain_condition_policy_fill.json",
+  "policy_sha256": "477402a8c63edc72df99e44553f56b5e8699a3d5abb44391b60dfd7bc6340be2",
+  "enabled": true,
+  "authorization": {
+    "authorized_by": "synthetic-fixture (SCAU-UFM golden G38)",
+    "date": "2026-09-09",
+    "note": "synthetic data; not a data-owner authorization"
+  },
+  "operation_order": [
+    "reproject",
+    "stream_enforcement",
+    "fill_depressions"
+  ],
+  "active_operations": [
+    "stream_enforcement",
+    "fill_depressions"
+  ],
+  "source_dem": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\tmpwiz_1dp1\\out_fill\\governed_package\\terrain\\dem.asc",
+  "source_dem_sha256": "8404d87d5fad4e3246239ecc0a53ef81ee7864417f780b1158045da66131e46f",
+  "conditioned_dem": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\tmpwiz_1dp1\\out_fill\\conditioned_terrain\\dem.asc",
+  "conditioned_dem_sha256": "aca85073b159d0973d2fb38f9a5680239670fe46d6a67af6d5b14cc6da975fe6",
+  "operations": {
+    "stream_enforcement": {
+      "streams": "terrain/streams.geojson",
+      "streams_sha256": "107a495f3159e69df10424585c1d74a27e3edf6c0f7396ba36239434a8cfc9d4",
+      "features": 1,
+      "line_strings": 1,
+      "cells_burned": 19,
+      "burn_depth_m": 0.2,
+      "sample_spacing_m": 5.0
+    },
+    "fill_depressions": {
+      "algorithm": "priority_flood",
+      "algorithm_version": 1,
+      "reference": "Barnes, Lehman & Mulla (2014) Priority-Flood",
+      "epsilon_m": 0.0,
+      "connectivity": 8,
+      "nodata_is_outlet": true,
+      "seed_cells": 60,
+      "cells_filled": 16,
+      "max_fill_depth_m": 0.5200000000000014,
+      "fill_volume_m3": 440.00000000000165
+    }
+  },
+  "change_summary": {
+    "valid_cells": 240,
+    "cells_changed": 35,
+    "max_abs_change_m": 0.5200000000000014,
+    "net_change_m3": 60.000000000002984,
+    "grid": {
+      "ncols": 20,
+      "nrows": 12,
+      "xllcorner": 0.0,
+      "yllcorner": 0.0,
+      "cellsize": 10.0
+    }
+  },
+  "diagnostic_rasters": {
+    "depression_depth": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\tmpwiz_1dp1\\out_fill\\conditioned_terrain\\depression_depth.asc",
+    "terrain_change": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\tmpwiz_1dp1\\out_fill\\conditioned_terrain\\terrain_change.asc"
+  },
+  "findings": [],
+  "conditioned_grid_sha256": "cffa452032d2c8c56fe4635c7cdad06d3499bb2d65c110897118a53ffdb87f7e"
+}

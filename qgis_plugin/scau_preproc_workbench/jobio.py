@@ -65,6 +65,7 @@ def build_job_config(
     export_options: dict | None = None,
     dpm_rule_table: str | None = None,
     crs_policy: str | None = None,
+    terrain_policy: str | None = None,
 ) -> dict:
     job = {
         "job_config_schema_version": JOB_CONFIG_SCHEMA_VERSION,
@@ -100,6 +101,8 @@ def build_job_config(
         job["field_derivation"] = {"dpm_rule_table": str(Path(dpm_rule_table))}
     if crs_policy:
         job["crs"] = {"policy": str(Path(crs_policy))}
+    if terrain_policy:
+        job["terrain_condition"] = {"policy": str(Path(terrain_policy))}
     return job
 
 
@@ -669,6 +672,7 @@ def data_tree(job: dict, validation: dict | None = None) -> list[dict]:
     validation = validation if validation is not None else load_validation_for(job)
     by_kind = _findings_by_object(validation)
     governed = ((validation or {}).get("crs_governance") or {}).get("datasets") or {}
+    terrain = (validation or {}).get("terrain_condition")
     groups: dict[str, list[dict]] = {group: [] for group, _ in DATA_TREE_GROUPS}
     groups["Other"] = []
     for dataset in manifest.get("datasets", []):
@@ -685,6 +689,13 @@ def data_tree(job: dict, validation: dict | None = None) -> list[dict]:
                 detail = f"CRS {entry.get('source_crs')} -> {entry.get('target_crs')} ({entry.get('action')})"
             elif dataset.get("kind") in ("raster_dem", "vector_gis"):
                 lamp, detail = _crs_lamp(package, dataset)
+            if dataset.get("kind") == "raster_dem" and terrain and terrain.get("enabled"):
+                # B3 ran: the DEM the mesh saw is the CONDITIONED one; always a
+                # review lamp so the operator looks at the change rasters.
+                summary = terrain.get("change_summary") or {}
+                lamp = "review"
+                detail = (f"conditioned ({', '.join(terrain.get('active_operations') or [])}): "
+                          f"{summary.get('cells_changed')} cells changed, max |dz| {summary.get('max_abs_change_m') or 0:.3f} m")
             if dataset.get("kind") == "mapping_table" and any(
                     "TODO_PROVIDER" in line for line in path.read_text(encoding="utf-8").splitlines()[:50]):
                 lamp, detail = "review", "provider placeholders present"
@@ -709,7 +720,10 @@ def data_tree(job: dict, validation: dict | None = None) -> list[dict]:
         outputs.append({"id": "validation", "path": "validation.json", "kind": "report", "required": True,
                         "lamp": lamp, "detail": f"status={status}", "layer": None})
         for name, kind in (("mesh_quality_cells.geojson", "diagnostic"), ("generator.diagnostic.geojson", "diagnostic"),
-                           ("coupling/effective_links.json", "coupling"), ("pipeline_manifest.json", "report")):
+                           ("coupling/effective_links.json", "coupling"), ("pipeline_manifest.json", "report"),
+                           ("conditioned_terrain/dem.asc", "raster"),
+                           ("conditioned_terrain/depression_depth.asc", "raster"),
+                           ("conditioned_terrain/terrain_change.asc", "raster")):
             path = output / name
             if path.is_file():
                 item_lamp = "pass"
@@ -717,8 +731,10 @@ def data_tree(job: dict, validation: dict | None = None) -> list[dict]:
                     item_lamp = "fatal"
                 if name == "coupling/effective_links.json":
                     item_lamp = "pass" if ((validation or {}).get("coupling_confirmations") or {}).get("status") == "complete" else "review"
+                if kind == "raster":
+                    item_lamp = "review"
                 outputs.append({"id": name, "path": name, "kind": kind, "required": False, "lamp": item_lamp,
-                                "detail": "present", "layer": str(path) if path.suffix == ".geojson" else None})
+                                "detail": "present", "layer": str(path) if path.suffix in (".geojson", ".asc") else None})
         export = (validation or {}).get("case_export")
         if export:
             outputs.append({"id": "case_export", "path": export.get("target_dir"), "kind": "package", "required": False,
@@ -800,6 +816,10 @@ def report_pages(job: dict) -> dict[str, list[tuple[str, str]]]:
 
     audit = validation.get("policy_audit") or {}
     crs = validation.get("crs_governance") or {}
+    terrain = validation.get("terrain_condition") or {}
+    terrain_ops = terrain.get("operations") or {}
+    fill = terrain_ops.get("fill_depressions") or {}
+    change = terrain.get("change_summary") or {}
     pages = {
         "import": kv(("status", validation.get("status")), ("package", validation.get("package")),
                      ("governed_package", validation.get("governed_package")),
@@ -809,7 +829,18 @@ def report_pages(job: dict) -> dict[str, list[tuple[str, str]]]:
                      ("job_config", validation.get("job_config")), ("job_config_sha256", validation.get("job_config_sha256")),
                      ("policy_version", audit.get("policy_version")), ("generator_timeout_s", audit.get("generator_timeout_s")),
                      ("repair_mode", audit.get("repair_mode")), ("started", validation.get("started"))),
-        "terrain_mesh": kv(("gmsh_version", quality.get("gmsh_version")),
+        "terrain_mesh": kv(("terrain_policy", terrain.get("policy") or "(none: DEM sampled verbatim)"),
+                           ("terrain_enabled", terrain.get("enabled")),
+                           ("terrain_operations", terrain.get("active_operations")),
+                           ("terrain_authorization", terrain.get("authorization")),
+                           ("terrain_fill", None if not fill else
+                            f"{fill.get('algorithm')} v{fill.get('algorithm_version')} eps={fill.get('epsilon_m')} "
+                            f"filled={fill.get('cells_filled')} max_depth={fill.get('max_fill_depth_m')}"),
+                           ("terrain_change", None if not change else
+                            f"cells_changed={change.get('cells_changed')} max_abs={change.get('max_abs_change_m')} "
+                            f"net_m3={change.get('net_change_m3')}"),
+                           ("conditioned_dem_sha256", terrain.get("conditioned_dem_sha256")),
+                           ("gmsh_version", quality.get("gmsh_version")),
                            ("characteristic_length_m", quality.get("characteristic_length_m")),
                            ("recombine", quality.get("recombine")), ("nodes", quality.get("nodes")),
                            ("edges", quality.get("edges")), ("cells", (quality.get("quality") or {}).get("cells")),
@@ -839,6 +870,7 @@ def report_pages(job: dict) -> dict[str, list[tuple[str, str]]]:
                               ("geometry_clean_policy_sha256", manifest.get("geometry_clean_policy_sha256")),
                               ("generator_config_sha256", manifest.get("generator_config_sha256")),
                               ("mesh_controls_sha256", (manifest.get("mesh_controls") or {}).get("geojson_sha256")),
+                              ("terrain_condition", manifest.get("terrain_condition")),
                               ("confirmations", manifest.get("confirmations")),
                               ("package_reproduce", (package_manifest or {}).get("reproduce"))),
     }

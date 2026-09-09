@@ -32,6 +32,7 @@
     {"id": "buildings", "path": "buildings/buildings.geojson", "kind": "vector_gis", "required": true, "synthetic": true},
     {"id": "landcover", "path": "landcover/landcover.geojson", "kind": "vector_gis", "required": true, "synthetic": true},
     {"id": "geometry_clean_policy", "path": "metadata/geometry_clean_policy.json", "kind": "policy", "required": true, "synthetic": true},
+    {"id": "terrain_condition_policy", "path": "metadata/terrain_condition_policy.json", "kind": "policy", "required": false, "synthetic": true},
     {"id": "soil_zones", "path": "soil/soil_zones.geojson", "kind": "vector_gis", "required": false, "synthetic": true},
     {"id": "soil_parameters", "path": "soil/soil_parameters.csv", "kind": "table", "required": false, "synthetic": true},
     {"id": "swmm", "path": "swmm/model.inp", "kind": "swmm_5_2_x", "required": true, "synthetic": true},

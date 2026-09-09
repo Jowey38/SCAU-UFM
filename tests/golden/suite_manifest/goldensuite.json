@@ -331,5 +331,14 @@
     "reference_path": "tests/golden/reference/tolerances.md",
     "ci_gate": true,
     "status": "implemented"
+  },
+  {
+    "test_id": "G38",
+    "name": "preproc_terrain_condition_case",
+    "test_path": "tests/golden/preproc_terrain_condition_case/",
+    "applicable_phase": "Phase 2+",
+    "reference_path": "tests/golden/reference/tolerances.md",
+    "ci_gate": true,
+    "status": "implemented"
   }
 ]

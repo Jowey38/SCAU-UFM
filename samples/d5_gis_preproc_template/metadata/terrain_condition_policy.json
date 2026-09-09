@@ -1,0 +1,18 @@
+{
+  "terrain_condition_policy_schema_version": 1,
+  "policy_id": "terrain_condition_policy",
+  "note": "Synthetic template: conditioning is DISABLED so the DEM is sampled verbatim and the pipeline output stays byte-identical to a run without this file (G30/G32/G36/G37 fixtures). tests/golden/preproc_terrain_condition_case/cases/terrain_condition_policy_fill.json is the enabled variant (stream burn + Priority-Flood fill) used by G38.",
+  "enabled": false,
+  "authorization": {
+    "authorized_by": "TODO_PROVIDER",
+    "date": null,
+    "note": "Any DEM modification (reprojection, stream enforcement, depression filling) is a repair and needs the data owner's written authorization before `enabled` may be set to true."
+  },
+  "operations": {
+    "reproject": {"enabled": false, "method": "nearest", "target_cellsize_m": null},
+    "stream_enforcement": {"enabled": false, "streams": "terrain/streams.geojson", "burn_depth_m": 1.0, "sample_spacing_factor": 0.5},
+    "fill_depressions": {"enabled": false, "algorithm": "priority_flood", "algorithm_version": 1, "epsilon_m": 0.0, "connectivity": 8, "nodata_is_outlet": true, "max_fill_depth_review_m": 0.5}
+  },
+  "diagnostics": {"write_rasters": true},
+  "production_requirement": "Set enabled=true only with a filled authorization block; enable exactly the operations the data owner approved; keep algorithm_version pinned so a changed fill algorithm surfaces as a policy change, never silently."
+}

@@ -622,7 +622,9 @@ def main() -> int:
             "refinement_regions": region_size_report(controls, membership, mesh, topology),
         }
 
-    dem = load_ascii_grid(package / "terrain/dem.asc")
+    # B3: the pipeline points at the conditioned DEM when a terrain policy is
+    # enabled; without the key the package DEM is sampled verbatim.
+    dem = load_ascii_grid(Path(config.get("dem", package / "terrain/dem.asc")))
     landcover = load_geojson_polygons(package / "landcover/landcover.geojson", "class_code")
     fields = assign_fields(centroids, dem, landcover, package / "soil/soil_parameters.csv")
 

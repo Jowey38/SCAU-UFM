@@ -1,0 +1,31 @@
+{
+  "type": "FeatureCollection",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:3857"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "stream_id": "S1",
+        "note": "synthetic drainage line reaching the west rim"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            0.0,
+            100.0
+          ],
+          [
+            180.0,
+            100.0
+          ]
+        ]
+      }
+    }
+  ]
+}

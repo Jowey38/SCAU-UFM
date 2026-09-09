@@ -24,6 +24,7 @@ from qgis.core import (
     QgsLineSymbol,
     QgsMarkerSymbol,
     QgsProject,
+    QgsRasterLayer,
     QgsRendererCategory,
     QgsRendererRange,
     QgsSettings,
@@ -165,6 +166,9 @@ class WorkbenchDialog(QDialog):
         self._crs_policy_edit.setPlaceholderText("CRS 策略 metadata/crs_policy.json（可选；留空 = 输入包自带策略或 v1 未检查模式）")
         self._rule_table_edit = QLineEdit()
         self._rule_table_edit.setPlaceholderText("DPM 规则表 metadata/dpm_rule_table.json（可选；留空 = v1 占位场）")
+        self._terrain_policy_edit = QLineEdit()
+        self._terrain_policy_edit.setPlaceholderText(
+            "DEM 调理策略 metadata/terrain_condition_policy.json（可选；留空 = 输入包自带策略或 DEM 原样采样）")
         options = QHBoxLayout()
         options.addWidget(QLabel("特征长度"))
         options.addWidget(self._lc_spin)
@@ -184,6 +188,12 @@ class WorkbenchDialog(QDialog):
         browse_crs = QPushButton("...")
         browse_crs.clicked.connect(lambda: self._browse(self._crs_policy_edit, False))
         crs_row.addWidget(browse_crs)
+        terrain_row = QHBoxLayout()
+        terrain_row.addWidget(QLabel("DEM 调理策略"))
+        terrain_row.addWidget(self._terrain_policy_edit)
+        browse_terrain = QPushButton("...")
+        browse_terrain.clicked.connect(lambda: self._browse(self._terrain_policy_edit, False))
+        terrain_row.addWidget(browse_terrain)
         fields = QHBoxLayout()
         fields.addWidget(QLabel("字段派生规则表"))
         fields.addWidget(self._rule_table_edit)
@@ -202,6 +212,7 @@ class WorkbenchDialog(QDialog):
         layout.addLayout(options)
         layout.addLayout(coupling)
         layout.addLayout(crs_row)
+        layout.addLayout(terrain_row)
         layout.addLayout(fields)
         layout.addLayout(confirmations)
         layout.addStretch()
@@ -557,7 +568,10 @@ class WorkbenchDialog(QDialog):
         path = item.data(0, Qt.ItemDataRole.UserRole)
         if not path:
             return
-        layer = QgsVectorLayer(str(path), f"scau_{item.text(0)}", "ogr")
+        if str(path).endswith(".asc"):
+            layer = QgsRasterLayer(str(path), f"scau_{item.text(0)}")
+        else:
+            layer = QgsVectorLayer(str(path), f"scau_{item.text(0)}", "ogr")
         if layer.isValid():
             QgsProject.instance().addMapLayer(layer)
             self._show_rows([("info", "LayerLoaded", str(path))])
@@ -689,6 +703,7 @@ class WorkbenchDialog(QDialog):
             roof_node_max_distance_m=self._roof_distance_spin.value(),
             dpm_rule_table=self._rule_table_edit.text().strip() or None,
             crs_policy=self._crs_policy_edit.text().strip() or None,
+            terrain_policy=self._terrain_policy_edit.text().strip() or None,
         )
 
     def _show_rows(self, rows) -> None:

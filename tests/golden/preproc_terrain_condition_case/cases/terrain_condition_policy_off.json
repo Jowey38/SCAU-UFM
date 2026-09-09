@@ -1,0 +1,36 @@
+{
+  "terrain_condition_policy_schema_version": 1,
+  "policy_id": "terrain_condition_policy_off",
+  "note": "G38 disabled variant: same operations declared, enabled=false -> DEM sampled verbatim.",
+  "enabled": false,
+  "authorization": {
+    "authorized_by": "synthetic-fixture (SCAU-UFM golden G38)",
+    "date": "2026-09-09",
+    "note": "synthetic data; not a data-owner authorization"
+  },
+  "operations": {
+    "reproject": {
+      "enabled": false,
+      "method": "nearest",
+      "target_cellsize_m": null
+    },
+    "stream_enforcement": {
+      "enabled": true,
+      "streams": "terrain/streams.geojson",
+      "burn_depth_m": 0.2,
+      "sample_spacing_factor": 0.5
+    },
+    "fill_depressions": {
+      "enabled": true,
+      "algorithm": "priority_flood",
+      "algorithm_version": 1,
+      "epsilon_m": 0.0,
+      "connectivity": 8,
+      "nodata_is_outlet": true,
+      "max_fill_depth_review_m": 1.0
+    }
+  },
+  "diagnostics": {
+    "write_rasters": true
+  }
+}
