@@ -176,6 +176,51 @@ TEST(SimDriverRunLoop, CflRollbackStopsBeforeEnginesAdvance) {
     EXPECT_DOUBLE_EQ(dflowfm.elapsed_time(), 0.0);
 }
 
+TEST(SimDriverRunLoop, DrainageOnlyNeverCallsDisabledRiver) {
+    auto config = run_loop_config();
+    config.enable_dflowfm = false;
+    config.surface_river.clear();
+    config.dflowfm_mdu_path.clear();
+    sim::SimDriver driver;
+    driver.configure(config);
+    scau::coupling::drainage::MockSwmmEngine swmm;
+    scau::coupling::river::MockDFlowFMEngine dflowfm;
+    swmm.initialize("mock.inp");
+    swmm.set_node_head_fixture(11, 0.0);
+    sim::RunLoopHooks hooks{};
+    hooks.dflowfm_elapsed_time = []() -> double {
+        throw std::logic_error("disabled river clock was queried");
+    };
+    const auto result = sim::run_simulation(driver, swmm, dflowfm, hooks);
+    EXPECT_EQ(result.final_state, sim::SimDriverState::completed);
+    EXPECT_EQ(result.committed_epochs, 10U);
+    EXPECT_DOUBLE_EQ(swmm.elapsed_time(), 10.0);
+    EXPECT_GT(result.summary.total_drained_volume, 0.0);
+    EXPECT_NEAR(result.summary.final_surface_physical_volume +
+                    result.summary.total_drained_volume -
+                    result.summary.total_returned_volume,
+                1.36, 1.0e-9);
+    for (const auto& epoch : result.summary.epochs) {
+        EXPECT_EQ(epoch.checkpoint_status, "committed");
+    }
+}
+
+TEST(SimDriverRunLoop, DrainageOnlyCflRollbackDoesNotAdvanceSwmm) {
+    auto config = run_loop_config();
+    config.enable_dflowfm = false;
+    config.surface_river.clear();
+    config.dt_surface = 1.0;
+    sim::SimDriver driver;
+    driver.configure(config);
+    scau::coupling::drainage::MockSwmmEngine swmm;
+    scau::coupling::river::MockDFlowFMEngine dflowfm;
+    swmm.initialize("mock.inp");
+    const auto result = sim::run_simulation(driver, swmm, dflowfm);
+    EXPECT_EQ(result.final_state, sim::SimDriverState::review_required);
+    EXPECT_EQ(result.committed_epochs, 0U);
+    EXPECT_DOUBLE_EQ(swmm.elapsed_time(), 0.0);
+}
+
 TEST(SimDriverRunLoop, RejectsOutOfRangeCoupledCellBeforeEngineWrites) {
     auto config = run_loop_config();
     config.surface_drainage[0].cell = 99U;  // mixed-minimal has 2 cells

@@ -129,6 +129,8 @@ struct TriCouplingStepConfig {
     std::string river_lateral_discharge_variable{"lateral_discharge"};
     std::string river_water_level_variable{"water_level"};
     bool step_engines{true};
+    // Disabled river engines receive no reads, writes, or update calls.
+    bool enable_dflowfm{true};
 };
 
 // Per-link M278 interface ledger movements for one dt_sub (link order).

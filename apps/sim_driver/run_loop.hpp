@@ -58,10 +58,10 @@ struct RunLoopResult {
 //      the coupled substep are treated as engine-advanced: rollback is
 //      REFUSED (SWMM cannot rewind), the decision evidence is recorded, and
 //      the run lands in review_required.
-// Requires a config with both engines enabled. The CALLER owns the engine
-// lifecycle: both engines must already be initialized (mock fixtures are set
-// after MockSwmmEngine::initialize, which clears them), and the caller
-// finalizes them after the run.
+// Requires SWMM; D-Flow FM is optional via enable_dflowfm. The CALLER owns
+// enabled-engine lifecycle. Disabled D-Flow FM receives no calls, contributes
+// no storage or flux, and has no checkpoint requirement. Enabled engines must
+// already be initialized; the caller finalizes them after the run.
 [[nodiscard]] RunLoopResult run_simulation(
     SimDriver& driver,
     coupling::drainage::ISwmmEngine& swmm,

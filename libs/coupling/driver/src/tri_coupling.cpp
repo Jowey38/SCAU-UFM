@@ -39,6 +39,10 @@ void validate_config(
     if (!std::isfinite(dt_sub) || dt_sub <= 0.0) {
         throw std::invalid_argument("tri coupling dt_sub must be finite and positive");
     }
+    if (!config.enable_dflowfm && (!config.surface_river.empty() ||
+        !config.drainage_river.empty() || !config.river_lateral_ids.empty())) {
+        throw std::invalid_argument("river links require enable_dflowfm");
+    }
     if (config.river_lateral_discharge_variable.empty()) {
         throw std::invalid_argument("river_lateral_discharge_variable must not be empty");
     }
@@ -323,7 +327,9 @@ TriCouplingStepReport advance_tri_coupling_step_impl(
     // Phase 4: engine stepping.
     if (config.step_engines) {
         swmm.step(dt_sub);
-        dflowfm.update(dt_sub);
+        if (config.enable_dflowfm) {
+            dflowfm.update(dt_sub);
+        }
     }
 
     // Phase 4.5 (M278): post-step emitted-volume observation. The cumulative

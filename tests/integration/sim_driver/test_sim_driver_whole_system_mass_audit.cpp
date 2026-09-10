@@ -193,6 +193,40 @@ sim::RuntimeConfig audit_config() {
 
 }  // namespace
 
+TEST(SimDriverWholeSystemMassAudit, DrainageOnlyRequiresSwmmScopeAndIgnoresRiverHooks) {
+    for (const bool complete_scope : {false, true}) {
+        auto config = audit_config();
+        config.enable_dflowfm = false;
+        config.surface_river.clear();
+        sim::SimDriver driver;
+        driver.configure(config);
+        StorageTrackingSwmm swmm;
+        StorageTrackingDFlow dflowfm;
+        swmm.initialize("tracking.inp");
+        sim::RunLoopHooks hooks{};
+        hooks.swmm_elapsed_time = [&swmm]() { return swmm.elapsed_time(); };
+        hooks.swmm_storage_volume = [&swmm]() { return swmm.storage(); };
+        if (complete_scope) hooks.swmm_external_net_volume = []() { return 0.0; };
+        const auto forbidden = []() -> double {
+            throw std::logic_error("disabled river provider called");
+        };
+        hooks.dflowfm_elapsed_time = forbidden;
+        hooks.dflowfm_storage_volume = forbidden;
+        hooks.dflowfm_external_net_volume = forbidden;
+        const auto result = sim::run_simulation(driver, swmm, dflowfm, hooks);
+        if (complete_scope) {
+            EXPECT_EQ(result.final_state, sim::SimDriverState::completed) << result.summary.reason;
+            EXPECT_EQ(result.committed_epochs, 20U);
+            EXPECT_EQ(result.summary.whole_system_mass_verdict, "conserved");
+            EXPECT_LE(result.summary.max_abs_whole_system_mass_residual, 1.0e-10);
+        } else {
+            EXPECT_EQ(result.final_state, sim::SimDriverState::review_required);
+            EXPECT_EQ(result.committed_epochs, 0U);
+            EXPECT_NE(result.summary.reason.find("external flux scope incomplete"), std::string::npos);
+        }
+    }
+}
+
 TEST(SimDriverWholeSystemMassAudit, ClosesEveryEpochAcrossThreePhysicalStores) {
     sim::SimDriver driver;
     driver.configure(audit_config());
