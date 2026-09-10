@@ -6,12 +6,14 @@ distribution: PyPI wheel "gmsh" (bundled gmsh SDK shared library + Python API)
 license: GPL-2.0-or-later (see third_party/licenses/gmsh-LICENSE-NOTE.md)
 upstream: https://gmsh.info
 
-status: spike-only (spikes/gmsh_meshgen). NOT part of the main CMake graph,
-  NOT linked by any production target, NOT vendored into extern/.
+status: production python preprocessing (python/scau_preproc/meshgen.py, M287-B)
+  under the same subprocess isolation as the spike. NOT part of the main CMake
+  graph, NOT linked by any production target, NOT vendored into extern/.
+  Pinned with numpy/netCDF4/pyproj in third_party/manifest/preproc-python.lock.
 
 isolation policy:
   - gmsh is imported only inside the mesh-generation subprocess
-    (spikes/gmsh_meshgen/generate_mesh.py). The subprocess boundary is both
+    (python/scau_preproc/meshgen.py; spike precedent spikes/gmsh_meshgen). The subprocess boundary is both
     the fault-isolation boundary (timeout kill, no partial output) and the
     GPL license boundary; the C++ core and any future orchestration layer
     communicate with it exclusively through files (JSON config in,
@@ -24,3 +26,10 @@ determinism policy:
     General.NumThreads=1, Blossom recombination;
   - same-platform rerun bitwise output equality is required evidence for
     every version bump of this manifest.
+  - cross-platform (B7): every GoldenSuite preproc fixture (G30/G32/G36/G37/G38)
+    is SAME-PLATFORM evidence (Windows x86_64, this manifest). The CI lane
+    `preproc-cross-platform` (ubuntu, preproc-python.lock) regenerates G30 with
+    tools/preproc/cross_platform_hash.py and uploads a verdict row to
+    third_party/compatibility/b7_evidence/ via artifact; the lane is
+    evidence-collecting (non-blocking) until the B7 decision fixes the gate
+    wording ("bitwise" vs "recorded 1e-12 tolerance").

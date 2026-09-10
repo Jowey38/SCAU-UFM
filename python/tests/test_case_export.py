@@ -126,11 +126,19 @@ class ExportTests(unittest.TestCase):
 
 
 def sys_executable_wrapper(script: Path) -> str:
-    """The exporter calls `<validator> validate --input <file>`; a .py file is
-    not directly executable on Windows, so wrap it in a .cmd shim."""
+    """Wrap the validator in a native executable shim for the host platform."""
+    import os
+    import shlex
     import sys
-    shim = script.with_suffix(".cmd")
-    shim.write_text(f'@"{sys.executable}" "{script}" %*\n', encoding="utf-8")
+    if os.name == "nt":
+        shim = script.with_suffix(".cmd")
+        shim.write_text(f'@"{sys.executable}" "{script}" %*\n', encoding="utf-8")
+    else:
+        shim = script.with_suffix(".sh")
+        shim.write_text(
+            f'#!/bin/sh\nexec {shlex.quote(sys.executable)} {shlex.quote(str(script))} "$@"\n',
+            encoding="utf-8", newline="\n")
+        shim.chmod(0o700)
     return str(shim)
 
 

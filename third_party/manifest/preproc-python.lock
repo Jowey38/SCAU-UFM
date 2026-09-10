@@ -1,0 +1,7 @@
+# Governed python environment for python/scau_preproc (M287 pipeline) and the
+# B7 cross-platform determinism lane. Pin bumps require a same-platform bitwise
+# rerun (gmsh.version policy) and a fresh B7 evidence row per platform.
+gmsh==4.15.2
+numpy==2.5.2
+netCDF4==1.7.4
+pyproj==3.8.0

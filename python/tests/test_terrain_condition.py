@@ -130,10 +130,12 @@ class StreamAndRasterTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "dem.asc"
             tc.write_ascii_grid(path, g)
+            first = path.read_bytes()
+            self.assertNotIn(b"\r", first)
             again = tc.read_ascii_grid(path)
             self.assertEqual(again["values"], g["values"])
             tc.write_ascii_grid(path, g)
-            self.assertEqual(path.read_bytes(), path.read_bytes())
+            self.assertEqual(path.read_bytes(), first)
 
     def test_reprojection_resamples_onto_target_grid(self):
         g = tc.read_ascii_grid(G38 / "dem_depression.asc")
@@ -179,8 +181,12 @@ class ConditionPackageTests(unittest.TestCase):
             self.assertEqual(report["operations"]["fill_depressions"], committed["operations"]["fill_depressions"])
             self.assertEqual(report["operations"]["stream_enforcement"]["cells_burned"], 19)
             self.assertEqual(report["conditioned_dem_sha256"], committed["conditioned_dem_sha256"])
-            self.assertEqual((tmp / "out/dem.asc").read_bytes(), (G38 / "conditioned_dem.asc").read_bytes())
-            self.assertEqual((tmp / "out/depression_depth.asc").read_bytes(), (G38 / "conditioned_depression_depth.asc").read_bytes())
+            # Git may check out text fixtures with CRLF; generated rasters use LF.
+            self.assertEqual((tmp / "out/dem.asc").read_bytes(),
+                             (G38 / "conditioned_dem.asc").read_text(encoding="utf-8").encode("utf-8"))
+            self.assertEqual((tmp / "out/depression_depth.asc").read_bytes(),
+                             (G38 / "conditioned_depression_depth.asc").read_text(encoding="utf-8").encode("utf-8"))
+            self.assertEqual(report["conditioned_grid_sha256"], committed["conditioned_grid_sha256"])
             self.assertEqual(report["findings"], [])
             conditioned = tc.read_ascii_grid(tmp / "out/dem.asc")
             # Every bowl cell sits exactly at the 10.30 m spill column; the stream row is 0.2 m lower than authored.
