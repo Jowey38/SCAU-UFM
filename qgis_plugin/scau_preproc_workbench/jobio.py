@@ -66,6 +66,8 @@ def build_job_config(
     dpm_rule_table: str | None = None,
     crs_policy: str | None = None,
     terrain_policy: str | None = None,
+    drainage_network: dict | None = None,
+    river_sketch: dict | None = None,
 ) -> dict:
     job = {
         "job_config_schema_version": JOB_CONFIG_SCHEMA_VERSION,
@@ -103,6 +105,8 @@ def build_job_config(
         job["crs"] = {"policy": str(Path(crs_policy))}
     if terrain_policy:
         job["terrain_condition"] = {"policy": str(Path(terrain_policy))}
+    if drainage_network is not None or river_sketch is not None:
+        job = build_network_job_config(job, drainage=drainage_network, river=river_sketch)
     return job
 
 
@@ -1196,6 +1200,86 @@ def parameter_table_rows(job: dict) -> list[tuple[str, str, str]]:
     else:
         rows.append(("fatal", "SoilTableMissing", str(soil_path)))
     return rows
+
+
+# --- N1/N2 network workbench pure helpers -----------------------------------------
+
+NETWORK_MODES = ("external", "authored")
+
+
+def _network_block(job: dict, key: str) -> dict:
+    value = job.get(key) or {}
+    if not isinstance(value, dict):
+        raise ValueError(f"{key} must be an object")
+    mode = value.get("mode", "authored") if key == "drainage_network" else "authored"
+    if key == "drainage_network" and mode not in NETWORK_MODES:
+        raise ValueError(f"unknown drainage mode {mode!r}")
+    return value
+
+
+def validate_network_geojson(path: str | Path, kind: str) -> list[tuple[str, str, str]]:
+    """Pure UI preflight; authoritative validation remains the author module."""
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        if kind == "drainage_network":
+            from scau_preproc.swmm_author import geojson_to_model
+            geojson_to_model(data)
+        elif kind == "river_sketch":
+            from scau_preproc.dflowfm_author import validate_sketch
+            validate_sketch(data)
+        else:
+            raise ValueError(f"unknown network kind {kind!r}")
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        return [("fatal", "NetworkDraftInvalid", str(error))]
+    return [("pass", "NetworkDraftValid", f"{kind}: {path}")]
+
+
+def network_rows(job: dict, kind: str) -> list[tuple[str, str, str]]:
+    block = _network_block(job, kind)
+    path = block.get("geojson")
+    if not path:
+        return [("info", "NetworkDraftMissing", f"{kind} draft not configured")]
+    rows = validate_network_geojson(path, kind)
+    if kind == "river_sketch":
+        manifest = Path(block.get("output_dir", job.get("output_dir", ""))) / "authoring_manifest.json"
+        if manifest.is_file():
+            try:
+                data = json.loads(manifest.read_text(encoding="utf-8"))
+                required = data.get("provider_required") or []
+                rows.append(("review" if required else "pass", "ProviderRequired", f"{len(required)} hydraulic field group(s)"))
+            except (OSError, ValueError):
+                rows.append(("fatal", "AuthoringManifestUnreadable", str(manifest)))
+    return rows
+
+
+def author_network(job: dict, kind: str) -> dict:
+    block = _network_block(job, kind)
+    path = block.get("geojson")
+    if not path:
+        raise ValueError(f"{kind}.geojson is required")
+    output = Path(block.get("output_dir") or job.get("output_dir", ""))
+    output.mkdir(parents=True, exist_ok=True)
+    if kind == "drainage_network":
+        from scau_preproc.swmm_author import author_network as author
+        external = block.get("external_inp") if block.get("mode") == "external" else None
+        return author(path, output / "model.inp", external_inp=external, parser_cli=block.get("parser_cli"))
+    from scau_preproc.dflowfm_author import author_river
+    return author_river(path, output, block.get("case_name", "river"))
+
+
+def build_network_job_config(job: dict, *, drainage: dict | None = None, river: dict | None = None) -> dict:
+    result = dict(job)
+    if drainage is not None:
+        if drainage.get("mode") not in NETWORK_MODES:
+            raise ValueError("drainage mode must be external or authored")
+        if drainage.get("mode") == "external" and not drainage.get("external_inp"):
+            raise ValueError("external mode requires external_inp")
+        if drainage.get("mode") == "authored" and drainage.get("external_inp"):
+            raise ValueError("authored mode cannot include external_inp")
+        result["drainage_network"] = dict(drainage)
+    if river is not None:
+        result["river_sketch"] = dict(river)
+    return result
 
 
 # --- P3 field mapping ---------------------------------------------------------------

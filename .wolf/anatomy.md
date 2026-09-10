@@ -55,3 +55,16 @@
 ## third_party/patches/
 
 - `swmm5-routing-totals.md` — governed SWMM 5.2.4 bridge patch record.
+
+## qgis_plugin/scau_preproc_workbench/
+
+- `jobio.py` — pure N1/N2 draft validation and governed author-action helpers.
+- `workbench_dialog.py` — P10 drainage and P11 river sketch tabs.
+
+## python/tests/
+
+- `test_jobio_network_workbench.py` — headless P10/P11 helper tests.
+
+## superpowers/specs/
+
+- `2026-09-10-n1d-p10-n2d-p11-workbench-evidence.md` — P10/P11 workbench evidence.

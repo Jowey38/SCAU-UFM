@@ -93,6 +93,8 @@ class WorkbenchDialog(QDialog):
         tabs.addTab(self._build_parameter_page(), "参数表")
         tabs.addTab(self._build_coupling_page(), "耦合编辑器")
         tabs.addTab(self._build_report_page(), "门禁与报告")
+        tabs.addTab(self._build_drainage_page(), "P10 管网")
+        tabs.addTab(self._build_river_page(), "P11 河网")
 
         self._run_button = QPushButton("运行流水线")
         self._run_button.clicked.connect(self._run)
@@ -973,6 +975,61 @@ class WorkbenchDialog(QDialog):
             self._iface.mapCanvas().zoomToSelected(layer)
         self._show_rows([("info", "Located", f"{name}: {expression} -> {layer.selectedFeatureCount()} feature(s)")])
 
+    # --- N1/N2 network workbench pages --------------------------------------
+
+    def _build_drainage_page(self) -> QWidget:
+        page = QWidget(); grid = QGridLayout()
+        self._drain_mode = QComboBox()
+        self._drain_mode.addItem("authored（草稿写出）", "authored")
+        self._drain_mode.addItem("external（原件复制）", "external")
+        self._drain_geojson = QLineEdit(); self._drain_geojson.setPlaceholderText("drainage_network.geojson")
+        self._drain_external = QLineEdit(); self._drain_external.setPlaceholderText("external model.inp（仅 external）")
+        for row, label, widget in ((0, "模式", self._drain_mode), (1, "草稿 GeoJSON", self._drain_geojson), (2, "外部 INP", self._drain_external)):
+            grid.addWidget(QLabel(label), row, 0); grid.addWidget(widget, row, 1)
+        browse = QPushButton("选择草稿")
+        browse.clicked.connect(lambda: self._browse(self._drain_geojson, False)); grid.addWidget(browse, 1, 2)
+        browse_external = QPushButton("选择外部 INP")
+        browse_external.clicked.connect(lambda: self._browse(self._drain_external, False)); grid.addWidget(browse_external, 2, 2)
+        self._drain_status = QLabel("模式互斥：authored 与 external 不可同时提供")
+        precheck = QPushButton("预检草稿")
+        precheck.clicked.connect(lambda: self._show_rows(jobio.validate_network_geojson(self._drain_geojson.text(), "drainage_network") if self._drain_geojson.text().strip() else [("fatal", "MissingDraft", "请选择 drainage_network.geojson")]))
+        author = QPushButton("写出 SWMM INP")
+        author.clicked.connect(self._author_drainage)
+        layout = QVBoxLayout(page); layout.addLayout(grid); layout.addWidget(self._drain_status); layout.addWidget(precheck); layout.addWidget(author)
+        layout.addWidget(QLabel("仅允许 junction/outfall/conduit/xsection；不生成产流节。external 模式原件原样复制，authored 模式保留 source.inp。")); layout.addStretch(); return page
+
+    def _build_river_page(self) -> QWidget:
+        page = QWidget(); grid = QGridLayout()
+        self._river_geojson = QLineEdit(); self._river_geojson.setPlaceholderText("river_sketch.geojson")
+        self._river_case = QLineEdit("river")
+        grid.addWidget(QLabel("草绘 GeoJSON"), 0, 0); grid.addWidget(self._river_geojson, 0, 1)
+        browse = QPushButton("选择草稿"); browse.clicked.connect(lambda: self._browse(self._river_geojson, False)); grid.addWidget(browse, 0, 2)
+        grid.addWidget(QLabel("案例名"), 1, 0); grid.addWidget(self._river_case, 1, 1)
+        self._river_provider = QLabel("provider_required：尚未写出")
+        precheck = QPushButton("预检草绘"); precheck.clicked.connect(lambda: self._show_rows(jobio.validate_network_geojson(self._river_geojson.text(), "river_sketch") if self._river_geojson.text().strip() else [("fatal", "MissingDraft", "请选择 river_sketch.geojson")]))
+        author = QPushButton("写出 UGRID + MDU")
+        author.clicked.connect(self._author_river)
+        layout = QVBoxLayout(page); layout.addLayout(grid); layout.addWidget(self._river_provider); layout.addWidget(precheck); layout.addWidget(author)
+        layout.addWidget(QLabel("河网仅作者化几何；边界类型/方向/ID、断面、糙率、初值保持 provider_required，非空时禁止案例导出。")); layout.addStretch(); return page
+
+    def _author_drainage(self) -> None:
+        try:
+            job = jobio.build_network_job_config(self._current_job(), drainage={"mode": self._drain_mode.currentData(), "geojson": self._drain_geojson.text().strip(), "external_inp": self._drain_external.text().strip() or None, "output_dir": self._output_edit.text().strip()})
+            result = jobio.author_network(job, "drainage_network")
+        except (OSError, ValueError, KeyError) as error:
+            self._show_rows([("fatal", "DrainageAuthoringFailed", str(error))]); return
+        self._show_rows([("pass", "DrainageAuthored", f"mode={result.get('mode')} sha256={result.get('inp_sha256')}")])
+
+    def _author_river(self) -> None:
+        try:
+            job = jobio.build_network_job_config(self._current_job(), river={"geojson": self._river_geojson.text().strip(), "case_name": self._river_case.text().strip(), "output_dir": self._output_edit.text().strip()})
+            result = jobio.author_network(job, "river_sketch")
+        except (OSError, ValueError, KeyError, ImportError) as error:
+            self._show_rows([("fatal", "RiverAuthoringFailed", str(error))]); return
+        required = len(result.get("provider_required") or [])
+        self._river_provider.setText(f"provider_required：{required} 组（几何可用；水力字段未推断，导出门禁关闭）")
+        self._show_rows([("review", "RiverProviderRequired", f"{required} hydraulic field group(s); manifest written")])
+
     # --- helpers ------------------------------------------------------------
 
     def _browse(self, edit: QLineEdit, is_dir: bool = True) -> None:
@@ -1016,6 +1073,13 @@ class WorkbenchDialog(QDialog):
             dpm_rule_table=self._rule_table_edit.text().strip() or None,
             crs_policy=self._crs_policy_edit.text().strip() or None,
             terrain_policy=self._terrain_policy_edit.text().strip() or None,
+            drainage_network=(
+                {"mode": self._drain_mode.currentData(), "geojson": self._drain_geojson.text().strip(),
+                 "external_inp": self._drain_external.text().strip() or None}
+                if self._drain_geojson.text().strip() else None),
+            river_sketch=(
+                {"geojson": self._river_geojson.text().strip(), "case_name": self._river_case.text().strip()}
+                if self._river_geojson.text().strip() else None),
         )
 
     def _show_rows(self, rows) -> None:
