@@ -3,6 +3,8 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <cstdint>
+#include <filesystem>
 #include <string>
 
 // Third-party firewall: the vendored SWMM public API is consumed only inside
@@ -37,15 +39,6 @@ std::atomic<bool> g_swmm_project_open{false};
     throw SwmmEngineError(text, "SWMM", "swmm_error_" + std::to_string(error_code));
 }
 
-std::string sibling_path_with_extension(const std::string& inp_path, const std::string& extension) {
-    const auto dot = inp_path.find_last_of('.');
-    const auto separator = inp_path.find_last_of("/\\");
-    if (dot == std::string::npos || (separator != std::string::npos && dot < separator)) {
-        return inp_path + extension;
-    }
-    return inp_path.substr(0, dot) + extension;
-}
-
 }  // namespace
 
 SwmmEngine::~SwmmEngine() {
@@ -59,6 +52,14 @@ SwmmEngine::~SwmmEngine() {
 }
 
 void SwmmEngine::initialize(const std::string& inp_path) {
+    const auto base = std::filesystem::temp_directory_path() / "scau_preproc_swmm";
+    std::filesystem::create_directories(base);
+    const auto token = std::to_string(reinterpret_cast<std::uintptr_t>(this));
+    initialize(inp_path, (base / (token + ".rpt")).string(), (base / (token + ".out")).string());
+}
+
+void SwmmEngine::initialize(
+    const std::string& inp_path, const std::string& report_path, const std::string& output_path) {
     if (initialized_) {
         throw SwmmEngineError("SWMM engine is already initialized");
     }
@@ -73,8 +74,6 @@ void SwmmEngine::initialize(const std::string& inp_path) {
             "swmm_project_already_open");
     }
 
-    const std::string report_path = sibling_path_with_extension(inp_path, ".rpt");
-    const std::string output_path = sibling_path_with_extension(inp_path, ".out");
     int error_code = swmm_open(inp_path.c_str(), report_path.c_str(), output_path.c_str());
     if (error_code != 0) {
         swmm_close();
@@ -198,6 +197,23 @@ double SwmmEngine::elapsed_time() const noexcept {
 int SwmmEngine::node_count() const {
     require_initialized();
     return swmm_getCount(swmm_NODE);
+}
+
+int SwmmEngine::link_count() const {
+    require_initialized();
+    return swmm_getCount(swmm_LINK);
+}
+
+std::string SwmmEngine::node_name(int node_id) const {
+    require_valid_node(node_id);
+    std::array<char, 256> name{};
+    swmm_getName(swmm_NODE, node_id, name.data(), static_cast<int>(name.size()));
+    return name.data();
+}
+
+double SwmmEngine::node_invert_elevation(int node_id) const {
+    require_valid_node(node_id);
+    return swmm_getValue(swmm_NODE_ELEV, node_id);
 }
 
 int SwmmEngine::node_index(const std::string& node_name) const {

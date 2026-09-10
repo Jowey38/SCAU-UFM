@@ -66,6 +66,8 @@ def build_job_config(
     dpm_rule_table: str | None = None,
     crs_policy: str | None = None,
     terrain_policy: str | None = None,
+    drainage_network: dict | None = None,
+    river_sketch: dict | None = None,
 ) -> dict:
     job = {
         "job_config_schema_version": JOB_CONFIG_SCHEMA_VERSION,
@@ -103,6 +105,8 @@ def build_job_config(
         job["crs"] = {"policy": str(Path(crs_policy))}
     if terrain_policy:
         job["terrain_condition"] = {"policy": str(Path(terrain_policy))}
+    if drainage_network is not None or river_sketch is not None:
+        job = build_network_job_config(job, drainage=drainage_network, river=river_sketch)
     return job
 
 
@@ -1198,6 +1202,86 @@ def parameter_table_rows(job: dict) -> list[tuple[str, str, str]]:
     return rows
 
 
+# --- N1/N2 network workbench pure helpers -----------------------------------------
+
+NETWORK_MODES = ("external", "authored")
+
+
+def _network_block(job: dict, key: str) -> dict:
+    value = job.get(key) or {}
+    if not isinstance(value, dict):
+        raise ValueError(f"{key} must be an object")
+    mode = value.get("mode", "authored") if key == "drainage_network" else "authored"
+    if key == "drainage_network" and mode not in NETWORK_MODES:
+        raise ValueError(f"unknown drainage mode {mode!r}")
+    return value
+
+
+def validate_network_geojson(path: str | Path, kind: str) -> list[tuple[str, str, str]]:
+    """Pure UI preflight; authoritative validation remains the author module."""
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        if kind == "drainage_network":
+            from scau_preproc.swmm_author import geojson_to_model
+            geojson_to_model(data)
+        elif kind == "river_sketch":
+            from scau_preproc.dflowfm_author import validate_sketch
+            validate_sketch(data)
+        else:
+            raise ValueError(f"unknown network kind {kind!r}")
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        return [("fatal", "NetworkDraftInvalid", str(error))]
+    return [("pass", "NetworkDraftValid", f"{kind}: {path}")]
+
+
+def network_rows(job: dict, kind: str) -> list[tuple[str, str, str]]:
+    block = _network_block(job, kind)
+    path = block.get("geojson")
+    if not path:
+        return [("info", "NetworkDraftMissing", f"{kind} draft not configured")]
+    rows = validate_network_geojson(path, kind)
+    if kind == "river_sketch":
+        manifest = Path(block.get("output_dir", job.get("output_dir", ""))) / "authoring_manifest.json"
+        if manifest.is_file():
+            try:
+                data = json.loads(manifest.read_text(encoding="utf-8"))
+                required = data.get("provider_required") or []
+                rows.append(("review" if required else "pass", "ProviderRequired", f"{len(required)} hydraulic field group(s)"))
+            except (OSError, ValueError):
+                rows.append(("fatal", "AuthoringManifestUnreadable", str(manifest)))
+    return rows
+
+
+def author_network(job: dict, kind: str) -> dict:
+    block = _network_block(job, kind)
+    path = block.get("geojson")
+    if not path:
+        raise ValueError(f"{kind}.geojson is required")
+    output = Path(block.get("output_dir") or job.get("output_dir", ""))
+    output.mkdir(parents=True, exist_ok=True)
+    if kind == "drainage_network":
+        from scau_preproc.swmm_author import author_network as author
+        external = block.get("external_inp") if block.get("mode") == "external" else None
+        return author(path, output / "model.inp", external_inp=external, parser_cli=block.get("parser_cli"))
+    from scau_preproc.dflowfm_author import author_river
+    return author_river(path, output, block.get("case_name", "river"))
+
+
+def build_network_job_config(job: dict, *, drainage: dict | None = None, river: dict | None = None) -> dict:
+    result = dict(job)
+    if drainage is not None:
+        if drainage.get("mode") not in NETWORK_MODES:
+            raise ValueError("drainage mode must be external or authored")
+        if drainage.get("mode") == "external" and not drainage.get("external_inp"):
+            raise ValueError("external mode requires external_inp")
+        if drainage.get("mode") == "authored" and drainage.get("external_inp"):
+            raise ValueError("authored mode cannot include external_inp")
+        result["drainage_network"] = dict(drainage)
+    if river is not None:
+        result["river_sketch"] = dict(river)
+    return result
+
+
 # --- P3 field mapping ---------------------------------------------------------------
 #
 # Source fields are discovered from the package datasets (GeoJSON property
@@ -1407,3 +1491,90 @@ def field_mapping_summary(job: dict) -> list[tuple[str, str, str]]:
         if r.get("note"):
             out.append(("review", "FieldMappingAmbiguousSeed", f"{r['dataset']}.{r['source_field']}: {r['note']}"))
     return out
+# --- E7 project index (project.ufm.json) ------------------------------------------
+#
+# A REGENERABLE, NON-AUTHORITATIVE index of one operator's work on a package:
+# which job configs were run, where their outputs live, the last known status /
+# case hash, and a snapshot of the dialog fields so the session can be reopened.
+# Nothing downstream reads it (the pipeline, exporter and goldens only trust
+# job_config.json / validation.json / pipeline_manifest.json); deleting it loses
+# convenience, never evidence.
+
+PROJECT_INDEX_SCHEMA_VERSION = 1
+PROJECT_INDEX_NAME = "project.ufm.json"
+UI_STATE_KEYS = ("package", "output_dir", "case_name", "characteristic_length_m", "recombine", "determinism_check",
+                 "coupling_maps", "validator_cli", "mesh_controls", "confirmations_dir", "field_derivation", "crs",
+                 "terrain_condition", "export_case")
+
+
+def default_project_index_path(job: dict) -> Path:
+    """Beside the output directory: one project index per output root."""
+    return Path(job["output_dir"]).parent / PROJECT_INDEX_NAME if job.get("output_dir") else Path(PROJECT_INDEX_NAME)
+
+
+def load_project_index(path: Path) -> dict | None:
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict) or data.get("project_index_schema_version") != PROJECT_INDEX_SCHEMA_VERSION:
+        return None
+    return data
+
+
+def update_project_index(path: Path, job: dict, validation: dict | None, *, repo_root: str | None = None) -> Path:
+    """Merges the current job into the index (keyed by output_dir) and refreshes
+    the UI snapshot. Atomic write; the previous file is re-read so several
+    output dirs of one project accumulate."""
+    path = Path(path)
+    index = load_project_index(path) or {
+        "project_index_schema_version": PROJECT_INDEX_SCHEMA_VERSION,
+        "authoritative": False,
+        "note": "regenerable UI index; evidence lives in job_config.json / validation.json / pipeline_manifest.json",
+        "created": _now_iso(),
+        "jobs": [],
+    }
+    index["updated"] = _now_iso()
+    index["package"] = job.get("package")
+    if repo_root:
+        index["repo_root"] = repo_root
+    manifest = _read_json(Path(job["output_dir"]) / "pipeline_manifest.json") if job.get("output_dir") else None
+    entry = {
+        "output_dir": job.get("output_dir"),
+        "job_config": str(Path(job["output_dir"]) / "job_config.json") if job.get("output_dir") else None,
+        "last_run": (validation or {}).get("started"),
+        "status": (validation or {}).get("status"),
+        "case_sha256": (manifest or {}).get("case_sha256"),
+        "findings": len((validation or {}).get("findings", [])),
+        "artifacts": {},
+    }
+    if job.get("output_dir"):
+        output = Path(job["output_dir"])
+        for name in ("validation.json", "pipeline_manifest.json", "mesh_quality.json", "mesh_quality_cells.geojson",
+                     "field_derivation.json", "coupling/effective_links.json", "conditioned_terrain/terrain_condition_report.json"):
+            if (output / name).is_file():
+                entry["artifacts"][name] = str(output / name)
+        export = (validation or {}).get("case_export")
+        if export:
+            entry["artifacts"]["case_export"] = export.get("target_dir")
+    jobs = [j for j in index.get("jobs", []) if j.get("output_dir") != entry["output_dir"]]
+    jobs.append(entry)
+    index["jobs"] = sorted(jobs, key=lambda j: str(j.get("output_dir")))
+    index["ui_state"] = {key: job[key] for key in UI_STATE_KEYS if key in job}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(index, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp.replace(path)
+    return path
+
+
+def project_index_rows(path: Path) -> list[tuple[str, str, str]]:
+    index = load_project_index(path)
+    if index is None:
+        return [("info", "NoProjectIndex", f"no {PROJECT_INDEX_NAME} at {path}")]
+    rows = [("info", "ProjectIndex", f"package={index.get('package')} jobs={len(index.get('jobs', []))} updated={index.get('updated')}")]
+    for job in index.get("jobs", []):
+        lamp = {"ok": "pass", "review": "review", "fatal": "fatal"}.get(job.get("status"), "info")
+        rows.append((lamp, "ProjectJob", f"{job.get('output_dir')}: status={job.get('status')} "
+                                         f"case={str(job.get('case_sha256'))[:12]} findings={job.get('findings')}"))
+    return rows

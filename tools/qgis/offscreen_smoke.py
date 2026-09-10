@@ -78,6 +78,17 @@ def main() -> int:
         step("parameter_tables", lambda: dialog._refresh_parameter_tables())
     if hasattr(dialog, "_refresh_field_mapping"):
         step("field_mapping", lambda: dialog._refresh_field_mapping())
+    if hasattr(dialog, "_save_project"):
+        def project_roundtrip():
+            dialog._project_edit.setText(str(output / "project.ufm.json"))
+            dialog._lc_spin.setValue(6.5)
+            dialog._save_project()
+            dialog._lc_spin.setValue(8.0)
+            dialog._open_project()
+            assert abs(dialog._lc_spin.value() - 6.5) < 1e-9, dialog._lc_spin.value()
+            assert dialog._package_edit.text() == str(package)
+            dialog._lc_spin.setValue(8.0)
+        step("project_index_roundtrip", project_roundtrip)
     if args.exercise_edits and hasattr(dialog, "_save_rule_table_version"):
         def edits():
             from qgis.PyQt.QtWidgets import QTableWidgetItem

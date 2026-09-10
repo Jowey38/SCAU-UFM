@@ -2,6 +2,8 @@
 
 > Chronological action log. Hooks and AI append to this file automatically.
 
+| 2026-09-09 | Implemented N1-A/N1-B whitelist INP parser, semantic comparator, authored network writer, source preservation, unit tests, and evidence document | `python/scau_preproc/inp_io.py`, `python/scau_preproc/swmm_author.py`, `python/tests/test_inp_io.py`, `superpowers/specs/2026-09-09-n1-swmm-authoring-evidence.md` | Python unit tests pass; real SWMM CLI integration pending C++ agent result |
+
 | 13:24 | Exported the current Surface2D development conversation as a consolidated progress report | `地面二维模型开发进展.md`, `.wolf/anatomy.md` | Documented M255-M263, G21-G23, 135/135 verification, completed and externally blocked work; no Git commit created | ~6500 |
 | 09:02 | Inspected repository/worktree paths and local Claude settings to explain root-drive development directories | `.wolf/anatomy.md`, `.wolf/cerebrum.md`, `.claude/settings.local.json` | Confirmed root-level directories are registered Git worktrees on `H:` rather than accidental loose project files | ~3000 |
 | 09:02 | Wrote a 2026-07-30 project-wide progress summary from authoritative specs, progress exports, and current repo state | `项目进展260730.md`, `superpowers/INDEX.md`, `地面二维模型开发进展.md`, `模型耦合开发进展.md` | Produced a consolidated completed-vs-pending status report with caveats about release readiness and dirty branch state | ~9000 |
