@@ -1,0 +1,29 @@
+{
+  "status": "draft_unvalidated",
+  "capability_schema_version": 1,
+  "required_capability": "dflowfm.external_net.v1",
+  "provider_kind": "mock_contract_fixture",
+  "required_fields": [
+    "provider_id",
+    "provider_version",
+    "capabilities",
+    "observations",
+    "trace"
+  ],
+  "supported_observations": [
+    "storage_m3",
+    "boundary_in_m3",
+    "boundary_out_m3",
+    "api_lateral_in_m3",
+    "api_lateral_out_m3",
+    "volume_error_cumulative_m3"
+  ],
+  "unsupported_forcing_guards": [
+    "qext_m3",
+    "rain_evaporation_m3",
+    "groundwater_m3",
+    "file_forced_lateral_m3"
+  ],
+  "fail_closed": true,
+  "real_external_provider_present": false
+}

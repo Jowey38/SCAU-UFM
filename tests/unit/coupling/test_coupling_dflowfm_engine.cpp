@@ -144,6 +144,36 @@ TEST(CouplingDFlowFMEngine, FakeBmiRuntimeRejectsInvalidStateAccess) {
     engine.finalize();
 }
 
+TEST(CouplingDFlowFMEngine, NativeProviderChecksVersionCapabilitiesAndObservation) {
+    using Engine = scau::coupling::river::DFlowFMEngine;
+    using Error = scau::coupling::river::DFlowFMEngineError;
+    for (const char* fixture : {"wrong_abi", "wrong_size", "missing_capability", "read_failed"}) {
+        Engine engine{fake_library_path()};
+        engine.initialize(fixture);
+        EXPECT_THROW(static_cast<void>(engine.observe_native_water_balance()), Error) << fixture;
+        engine.finalize();
+    }
+    for (const char* fixture : {"stale_time", "negative_storage"}) {
+        Engine engine{fake_library_path()};
+        engine.initialize(fixture);
+        EXPECT_FALSE(engine.observe_native_water_balance().scope_complete) << fixture;
+        engine.finalize();
+    }
+    Engine engine{fake_library_path()};
+    engine.initialize("valid_provider");
+    const auto observation = engine.observe_native_water_balance();
+    EXPECT_TRUE(observation.scope_complete);
+    EXPECT_DOUBLE_EQ(observation.current_time_seconds, 100.0);
+    EXPECT_DOUBLE_EQ(observation.storage_m3, 60.0);
+    EXPECT_DOUBLE_EQ(observation.boundary_in_m3, 75.0);
+    EXPECT_DOUBLE_EQ(observation.boundary_out_m3, 25.0);
+    engine.update(30.0);
+    EXPECT_DOUBLE_EQ(engine.observe_native_water_balance().current_time_seconds, 130.0);
+    engine.finalize();
+    engine.initialize("valid_provider");
+    EXPECT_DOUBLE_EQ(engine.observe_native_water_balance().current_time_seconds, 100.0);
+}
+
 TEST(CouplingDFlowFMEngine, FakeBmiRuntimeEnforcesSingleOpenProject) {
     scau::coupling::river::DFlowFMEngine first{fake_library_path()};
     first.initialize("fake_case.mdu");
