@@ -1,7 +1,10 @@
 #include <filesystem>
+#include <cstdint>
 #include <iostream>
 #include <stdexcept>
 #include <string>
+
+#include "coupling/drainage/swmm_engine.hpp"
 
 #include "stcf/case_profiles.hpp"
 #include "stcf/io_netcdf.hpp"
@@ -19,7 +22,8 @@ struct Options {
     throw std::invalid_argument(
         message
         + "\nusage: scau_preproc generate --profile <name> --output <case.stcf.nc> [--force]"
-        + "\n       scau_preproc validate --input <case.stcf.nc>");
+        + "\n       scau_preproc validate --input <case.stcf.nc>"
+        + "\n       scau_preproc swmm-parse --inp <file.inp>");
 }
 
 // Authoritative external check: read_stcf_case re-runs the full STCF v5
@@ -87,6 +91,51 @@ Options parse_options(int argc, char** argv) {
     return options;
 }
 
+int swmm_parse_command(int argc, char** argv) {
+    std::filesystem::path input;
+    for (int index = 2; index < argc; ++index) {
+        const std::string argument = argv[index];
+        if (argument == "--inp" && input.empty() && index + 1 < argc) {
+            input = argv[++index];
+        } else {
+            usage_error("usage: scau_preproc swmm-parse --inp <file.inp>");
+        }
+    }
+    if (input.empty()) {
+        usage_error("missing --inp");
+    }
+#ifdef SCAU_HAS_SWMM5
+    const auto scratch = std::filesystem::temp_directory_path() / "scau_preproc_swmm_parse";
+    std::filesystem::create_directories(scratch);
+    const auto stem = std::to_string(reinterpret_cast<std::uintptr_t>(&input));
+    const auto report = scratch / (stem + ".rpt");
+    const auto output = scratch / (stem + ".out");
+    scau::coupling::drainage::SwmmEngine engine;
+    try {
+        engine.initialize(input.string(), report.string(), output.string());
+        std::cout << "{\"engine\":\"swmm 5.2.4\",\"ok\":true,\"node_count\":"
+                  << engine.node_count() << ",\"link_count\":" << engine.link_count() << ",\"nodes\":[";
+        for (int node = 0; node < engine.node_count(); ++node) {
+            if (node != 0) std::cout << ',';
+            std::cout << "{\"id\":\"" << engine.node_name(node) << "\",\"invert_elevation_m\":"
+                      << engine.node_invert_elevation(node) << "}";
+        }
+        std::cout << "]}\n";
+        engine.finalize();
+    } catch (...) {
+        engine.finalize();
+        std::filesystem::remove(report);
+        std::filesystem::remove(output);
+        throw;
+    }
+    std::filesystem::remove(report);
+    std::filesystem::remove(output);
+    return 0;
+#else
+    throw std::runtime_error("SWMM support is not embedded in this build");
+#endif
+}
+
 void generate(const Options& options) {
     if (std::filesystem::exists(options.output) && !options.force) {
         throw std::runtime_error(
@@ -127,6 +176,9 @@ int main(int argc, char** argv) {
     try {
         if (argc >= 2 && std::string(argv[1]) == "validate") {
             return validate_command(argc, argv);
+        }
+        if (argc >= 2 && std::string(argv[1]) == "swmm-parse") {
+            return swmm_parse_command(argc, argv);
         }
         generate(parse_options(argc, argv));
         return 0;
