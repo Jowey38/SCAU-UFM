@@ -218,7 +218,7 @@ def write_ascii_grid(path: Path, grid: dict) -> None:
     ]
     lines.extend(" ".join(_fmt(v) for v in row) for row in grid["values"])
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
 def _copy_grid(grid: dict) -> dict:
