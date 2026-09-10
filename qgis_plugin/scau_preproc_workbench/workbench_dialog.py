@@ -93,6 +93,8 @@ class WorkbenchDialog(QDialog):
         tabs.addTab(self._build_parameter_page(), "参数表")
         tabs.addTab(self._build_coupling_page(), "耦合编辑器")
         tabs.addTab(self._build_report_page(), "门禁与报告")
+        tabs.addTab(self._build_drainage_page(), "P10 管网")
+        tabs.addTab(self._build_river_page(), "P11 河网")
 
         self._run_button = QPushButton("运行流水线")
         self._run_button.clicked.connect(self._run)
@@ -202,6 +204,17 @@ class WorkbenchDialog(QDialog):
         browse_rules = QPushButton("...")
         browse_rules.clicked.connect(lambda: self._browse(self._rule_table_edit, False))
         fields.addWidget(browse_rules)
+        project_row = QHBoxLayout()
+        self._project_edit = QLineEdit()
+        self._project_edit.setPlaceholderText("工程索引 project.ufm.json（可选；默认输出目录的上级；可再生、非权威）")
+        open_project = QPushButton("打开工程")
+        open_project.clicked.connect(self._open_project)
+        save_project = QPushButton("保存工程")
+        save_project.clicked.connect(self._save_project)
+        project_row.addWidget(QLabel("工程文件"))
+        project_row.addWidget(self._project_edit)
+        project_row.addWidget(open_project)
+        project_row.addWidget(save_project)
         confirmations = QHBoxLayout()
         confirmations.addWidget(QLabel("耦合确认目录"))
         confirmations.addWidget(self._confirmations_edit)
@@ -217,8 +230,70 @@ class WorkbenchDialog(QDialog):
         layout.addLayout(terrain_row)
         layout.addLayout(fields)
         layout.addLayout(confirmations)
+        layout.addLayout(project_row)
         layout.addStretch()
         return page
+
+    # --- E7 project index ---------------------------------------------------
+
+    def _project_path(self) -> Path:
+        text = self._project_edit.text().strip()
+        return Path(text) if text else jobio.default_project_index_path(self._current_job())
+
+    def _save_project(self) -> None:
+        job = self._current_job()
+        if not job["output_dir"]:
+            self._show_rows([("fatal", "MissingOutputDir", "请先选择输出目录")])
+            return
+        path = jobio.update_project_index(self._project_path(), job, jobio.load_validation_for(job),
+                                          repo_root=self._repo_edit.text().strip() or None)
+        self._project_edit.setText(str(path))
+        self._show_rows([("info", "ProjectIndexSaved", str(path))] + jobio.project_index_rows(path))
+
+    def _open_project(self) -> None:
+        text = self._project_edit.text().strip()
+        if not text:
+            chosen, _ = QFileDialog.getOpenFileName(self, "project.ufm.json", "", "UFM project (*.ufm.json *.json)")
+            if not chosen:
+                return
+            self._project_edit.setText(chosen)
+        index = jobio.load_project_index(self._project_path())
+        if index is None:
+            self._show_rows([("fatal", "ProjectIndexInvalid", str(self._project_path()))])
+            return
+        self._apply_ui_state(index)
+        self._show_rows(jobio.project_index_rows(self._project_path()))
+
+    def _apply_ui_state(self, index: dict) -> None:
+        state = index.get("ui_state") or {}
+        if index.get("repo_root") and jobio.repo_root_valid(index["repo_root"]):
+            self._repo_edit.setText(index["repo_root"])
+        if state.get("package"):
+            self._package_edit.setText(state["package"])
+        if state.get("output_dir"):
+            self._output_edit.setText(state["output_dir"])
+        if state.get("validator_cli"):
+            self._validator_edit.setText(state["validator_cli"])
+        if state.get("characteristic_length_m") is not None:
+            self._lc_spin.setValue(float(state["characteristic_length_m"]))
+        self._recombine_check.setChecked(bool(state.get("recombine", True)))
+        self._determinism_check.setChecked(bool(state.get("determinism_check", True)))
+        coupling = state.get("coupling_maps", False)
+        self._coupling_check.setChecked(bool(coupling))
+        if isinstance(coupling, dict):
+            self._coupling_mode.setCurrentIndex(max(0, self._coupling_mode.findData(coupling.get("mode", "explicit_ids"))))
+            if coupling.get("roof_node_max_distance_m") is not None:
+                self._roof_distance_spin.setValue(float(coupling["roof_node_max_distance_m"]))
+        controls = state.get("mesh_controls") or {}
+        self._controls_enable.setChecked(bool(controls.get("geojson")))
+        self._controls_edit.setText(controls.get("geojson", ""))
+        self._default_size_spin.setValue(float(controls.get("default_size_m") or 0.0))
+        self._default_dist_spin.setValue(float(controls.get("default_dist_max_m") or 0.0))
+        self._confirmations_edit.setText(state.get("confirmations_dir", "") or "")
+        self._rule_table_edit.setText((state.get("field_derivation") or {}).get("dpm_rule_table", "") or "")
+        self._crs_policy_edit.setText((state.get("crs") or {}).get("policy", "") or "")
+        self._terrain_policy_edit.setText((state.get("terrain_condition") or {}).get("policy", "") or "")
+        self._export_target_edit.setText((state.get("export_case") or {}).get("target_dir", "") or "")
 
     def _build_mesh_page(self) -> QWidget:
         page = QWidget()
@@ -900,6 +975,61 @@ class WorkbenchDialog(QDialog):
             self._iface.mapCanvas().zoomToSelected(layer)
         self._show_rows([("info", "Located", f"{name}: {expression} -> {layer.selectedFeatureCount()} feature(s)")])
 
+    # --- N1/N2 network workbench pages --------------------------------------
+
+    def _build_drainage_page(self) -> QWidget:
+        page = QWidget(); grid = QGridLayout()
+        self._drain_mode = QComboBox()
+        self._drain_mode.addItem("authored（草稿写出）", "authored")
+        self._drain_mode.addItem("external（原件复制）", "external")
+        self._drain_geojson = QLineEdit(); self._drain_geojson.setPlaceholderText("drainage_network.geojson")
+        self._drain_external = QLineEdit(); self._drain_external.setPlaceholderText("external model.inp（仅 external）")
+        for row, label, widget in ((0, "模式", self._drain_mode), (1, "草稿 GeoJSON", self._drain_geojson), (2, "外部 INP", self._drain_external)):
+            grid.addWidget(QLabel(label), row, 0); grid.addWidget(widget, row, 1)
+        browse = QPushButton("选择草稿")
+        browse.clicked.connect(lambda: self._browse(self._drain_geojson, False)); grid.addWidget(browse, 1, 2)
+        browse_external = QPushButton("选择外部 INP")
+        browse_external.clicked.connect(lambda: self._browse(self._drain_external, False)); grid.addWidget(browse_external, 2, 2)
+        self._drain_status = QLabel("模式互斥：authored 与 external 不可同时提供")
+        precheck = QPushButton("预检草稿")
+        precheck.clicked.connect(lambda: self._show_rows(jobio.validate_network_geojson(self._drain_geojson.text(), "drainage_network") if self._drain_geojson.text().strip() else [("fatal", "MissingDraft", "请选择 drainage_network.geojson")]))
+        author = QPushButton("写出 SWMM INP")
+        author.clicked.connect(self._author_drainage)
+        layout = QVBoxLayout(page); layout.addLayout(grid); layout.addWidget(self._drain_status); layout.addWidget(precheck); layout.addWidget(author)
+        layout.addWidget(QLabel("仅允许 junction/outfall/conduit/xsection；不生成产流节。external 模式原件原样复制，authored 模式保留 source.inp。")); layout.addStretch(); return page
+
+    def _build_river_page(self) -> QWidget:
+        page = QWidget(); grid = QGridLayout()
+        self._river_geojson = QLineEdit(); self._river_geojson.setPlaceholderText("river_sketch.geojson")
+        self._river_case = QLineEdit("river")
+        grid.addWidget(QLabel("草绘 GeoJSON"), 0, 0); grid.addWidget(self._river_geojson, 0, 1)
+        browse = QPushButton("选择草稿"); browse.clicked.connect(lambda: self._browse(self._river_geojson, False)); grid.addWidget(browse, 0, 2)
+        grid.addWidget(QLabel("案例名"), 1, 0); grid.addWidget(self._river_case, 1, 1)
+        self._river_provider = QLabel("provider_required：尚未写出")
+        precheck = QPushButton("预检草绘"); precheck.clicked.connect(lambda: self._show_rows(jobio.validate_network_geojson(self._river_geojson.text(), "river_sketch") if self._river_geojson.text().strip() else [("fatal", "MissingDraft", "请选择 river_sketch.geojson")]))
+        author = QPushButton("写出 UGRID + MDU")
+        author.clicked.connect(self._author_river)
+        layout = QVBoxLayout(page); layout.addLayout(grid); layout.addWidget(self._river_provider); layout.addWidget(precheck); layout.addWidget(author)
+        layout.addWidget(QLabel("河网仅作者化几何；边界类型/方向/ID、断面、糙率、初值保持 provider_required，非空时禁止案例导出。")); layout.addStretch(); return page
+
+    def _author_drainage(self) -> None:
+        try:
+            job = jobio.build_network_job_config(self._current_job(), drainage={"mode": self._drain_mode.currentData(), "geojson": self._drain_geojson.text().strip(), "external_inp": self._drain_external.text().strip() or None, "output_dir": self._output_edit.text().strip()})
+            result = jobio.author_network(job, "drainage_network")
+        except (OSError, ValueError, KeyError) as error:
+            self._show_rows([("fatal", "DrainageAuthoringFailed", str(error))]); return
+        self._show_rows([("pass", "DrainageAuthored", f"mode={result.get('mode')} sha256={result.get('inp_sha256')}")])
+
+    def _author_river(self) -> None:
+        try:
+            job = jobio.build_network_job_config(self._current_job(), river={"geojson": self._river_geojson.text().strip(), "case_name": self._river_case.text().strip(), "output_dir": self._output_edit.text().strip()})
+            result = jobio.author_network(job, "river_sketch")
+        except (OSError, ValueError, KeyError, ImportError) as error:
+            self._show_rows([("fatal", "RiverAuthoringFailed", str(error))]); return
+        required = len(result.get("provider_required") or [])
+        self._river_provider.setText(f"provider_required：{required} 组（几何可用；水力字段未推断，导出门禁关闭）")
+        self._show_rows([("review", "RiverProviderRequired", f"{required} hydraulic field group(s); manifest written")])
+
     # --- helpers ------------------------------------------------------------
 
     def _browse(self, edit: QLineEdit, is_dir: bool = True) -> None:
@@ -943,6 +1073,13 @@ class WorkbenchDialog(QDialog):
             dpm_rule_table=self._rule_table_edit.text().strip() or None,
             crs_policy=self._crs_policy_edit.text().strip() or None,
             terrain_policy=self._terrain_policy_edit.text().strip() or None,
+            drainage_network=(
+                {"mode": self._drain_mode.currentData(), "geojson": self._drain_geojson.text().strip(),
+                 "external_inp": self._drain_external.text().strip() or None}
+                if self._drain_geojson.text().strip() else None),
+            river_sketch=(
+                {"geojson": self._river_geojson.text().strip(), "case_name": self._river_case.text().strip()}
+                if self._river_geojson.text().strip() else None),
         )
 
     def _show_rows(self, rows) -> None:
@@ -990,6 +1127,11 @@ class WorkbenchDialog(QDialog):
             rows.insert(0, ("fatal", result["status"], result["stderr"][-2000:]))
         if result["status"] == "ok":
             rows.extend(jobio.mesh_quality_summary(job))
+        # E7: every run refreshes the regenerable project index.
+        try:
+            jobio.update_project_index(self._project_path(), job, result.get("validation"), repo_root=repo_root)
+        except OSError as error:
+            rows.append(("info", "ProjectIndexNotWritten", str(error)))
         self._show_rows(rows)
         can_export = jobio.exportable(result.get("validation"))
         self._export_label.setText(

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <filesystem>
 
 #include "coupling/drainage/swmm_boundary.hpp"
 
@@ -49,6 +50,7 @@ public:
     SwmmEngine& operator=(SwmmEngine&&) = delete;
 
     void initialize(const std::string& inp_path) override;
+    void initialize(const std::string& inp_path, const std::string& report_path, const std::string& output_path);
     void step(double dt_swmm) override;
     void finalize() override;
 
@@ -66,6 +68,9 @@ public:
     [[nodiscard]] bool initialized() const noexcept;
     [[nodiscard]] double elapsed_time() const noexcept;  // seconds since start
     [[nodiscard]] int node_count() const;
+    [[nodiscard]] int link_count() const;
+    [[nodiscard]] std::string node_name(int node_id) const;
+    [[nodiscard]] double node_invert_elevation(int node_id) const;
     [[nodiscard]] int node_index(const std::string& node_name) const;
     [[nodiscard]] int link_index(const std::string& link_name) const;
 

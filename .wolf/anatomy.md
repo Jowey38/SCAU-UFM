@@ -14,6 +14,15 @@
 - `2026-08-08-m273-dflowfm-external-boundary-spike.md` — M273 D-Flow external-boundary spike plan.
 - `2026-08-09-project-completion-execution-plan.md` — gated end-to-end execution plan.
 
+## python/scau_preproc/
+
+- `inp_io.py` — N1-A whitelist SWMM INP parser, writer, and semantic comparator.
+- `swmm_author.py` — N1-B drainage network authoring and source preservation.
+
+## python/tests/
+
+- `test_inp_io.py` — N1-A/N1-B parser, whitelist, round-trip, and authoring tests.
+
 ## extern/swmm5/src/solver/include/
 
 - `swmm5_massbal_bridge.h` — ABI-stable SWMM routing totals snapshot.
@@ -32,6 +41,7 @@
 
 - `2026-08-07-m272-swmm-external-net-evidence.md` — M272 implementation and verification evidence.
 - `2026-08-08-g19-promotion-decision-evidence.md` — G19 BLOCKED decision and G27 prerequisites.
+- `2026-09-09-n1-swmm-authoring-evidence.md` — N1-A/N1-B implementation and unit evidence.
 
 ## tests/golden/swmm_external_net/
 
@@ -45,3 +55,16 @@
 ## third_party/patches/
 
 - `swmm5-routing-totals.md` — governed SWMM 5.2.4 bridge patch record.
+
+## qgis_plugin/scau_preproc_workbench/
+
+- `jobio.py` — pure N1/N2 draft validation and governed author-action helpers.
+- `workbench_dialog.py` — P10 drainage and P11 river sketch tabs.
+
+## python/tests/
+
+- `test_jobio_network_workbench.py` — headless P10/P11 helper tests.
+
+## superpowers/specs/
+
+- `2026-09-10-n1d-p10-n2d-p11-workbench-evidence.md` — P10/P11 workbench evidence.

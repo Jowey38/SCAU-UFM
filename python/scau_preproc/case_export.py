@@ -114,6 +114,13 @@ def check_export_gate(output_dir: Path) -> dict:
     effective_path = output_dir / "coupling" / "effective_links.json"
     if not effective_path.is_file():
         blockers.append("coupling/effective_links.json missing")
+    package = Path((validation.get("package") or "")).resolve()
+    river_manifest_path = package / "dflowfm" / "authoring_manifest.json"
+    if river_manifest_path.is_file():
+        river_manifest = _load_json(river_manifest_path, "D-Flow FM authoring manifest")
+        required = river_manifest.get("provider_required")
+        if not isinstance(required, list) or required:
+            blockers.append("fatal finding RiverHydraulicsProviderRequired")
     if blockers:
         raise ExportError("export gate closed: " + "; ".join(blockers))
     return {"validation": validation, "pipeline_manifest": pipeline_manifest,
