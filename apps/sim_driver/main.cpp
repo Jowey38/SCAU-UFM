@@ -56,7 +56,9 @@ int main(int argc, char** argv) {
             scau::coupling::drainage::MockSwmmEngine swmm;
             scau::coupling::river::MockDFlowFMEngine dflowfm;
             swmm.initialize(config.swmm_inp_path);
-            dflowfm.initialize(config.dflowfm_mdu_path);
+            if (config.enable_dflowfm) {
+                dflowfm.initialize(config.dflowfm_mdu_path);
+            }
             sim::RunLoopHooks hooks{};
             hooks.swmm_elapsed_time = [&swmm]() { return swmm.elapsed_time(); };
             hooks.dflowfm_elapsed_time = [&dflowfm]() { return dflowfm.elapsed_time(); };
@@ -70,7 +72,7 @@ int main(int argc, char** argv) {
             }
             const int code = run_with_engines(driver, swmm, dflowfm, hooks);
             swmm.finalize();
-            dflowfm.finalize();
+            if (config.enable_dflowfm) dflowfm.finalize();
             return code;
         }
 
@@ -78,7 +80,9 @@ int main(int argc, char** argv) {
         scau::coupling::drainage::SwmmEngine swmm;
         scau::coupling::river::DFlowFMEngine dflowfm;
         swmm.initialize(config.swmm_inp_path);
-        dflowfm.initialize(config.dflowfm_mdu_path);
+        if (config.enable_dflowfm) {
+            dflowfm.initialize(config.dflowfm_mdu_path);
+        }
         sim::RunLoopHooks hooks{};
         hooks.resolve_swmm_node = [&swmm](const std::string& node_name) {
             return swmm.node_index(node_name);
@@ -113,7 +117,7 @@ int main(int argc, char** argv) {
         };
         const int code = run_with_engines(driver, swmm, dflowfm, hooks);
         swmm.finalize();
-        dflowfm.finalize();
+        if (config.enable_dflowfm) dflowfm.finalize();
         return code;
 #else
         std::cerr << "scau_sim: engine_mode=real requires SCAU_EMBED_SWMM and "

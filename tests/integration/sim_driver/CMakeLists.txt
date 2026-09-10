@@ -1,5 +1,15 @@
 set(SIM_DRIVER_CASE "${CMAKE_CURRENT_BINARY_DIR}/sim_driver_mixed_minimal.stcf.nc")
 
+if(SCAU_EMBED_SWMM AND SCAU_ENABLE_DFLOWFM_BMI_RUNTIME)
+    add_test(NAME test_sim_driver_drainage_only_real
+        COMMAND ${CMAKE_COMMAND}
+            -DSIM=$<TARGET_FILE:scau_sim>
+            -DCASE_DIR=${PROJECT_SOURCE_DIR}/tests/golden/case_export_synthetic_package/cases
+            -DOUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/drainage_only_real
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/run_drainage_only.cmake)
+    set_tests_properties(test_sim_driver_drainage_only_real PROPERTIES TIMEOUT 120)
+endif()
+
 add_test(
     NAME generate_sim_driver_run_loop_case
     COMMAND ${CMAKE_COMMAND}

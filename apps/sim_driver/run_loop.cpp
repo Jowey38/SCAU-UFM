@@ -125,9 +125,8 @@ RunLoopResult run_simulation(
     coupling::river::IDFlowFMEngine& dflowfm,
     const RunLoopHooks& hooks) {
     const RuntimeConfig& config = driver.config();
-    if (!config.enable_swmm || !config.enable_dflowfm) {
-        throw std::invalid_argument(
-            "run_simulation is the tri-model loop; both engines must be enabled");
+    if (!config.enable_swmm) {
+        throw std::invalid_argument("run_simulation requires SWMM to be enabled");
     }
 
     // Case loading and surface initialization (strict CF/UGRID path).
@@ -202,7 +201,11 @@ RunLoopResult run_simulation(
         initial_sample.interface_inflight_volume =
             drainage_river_interface.inflight_volume();
         initial_sample.swmm_storage_volume = hooks.swmm_storage_volume();
-        if (hooks.dflowfm_storage_volume) {
+        if (!config.enable_dflowfm) {
+            // An absent subsystem has no storage or external exchange.
+            initial_sample.dflowfm_volume = 0.0;
+            initial_sample.dflowfm_external_net_volume = 0.0;
+        } else if (hooks.dflowfm_storage_volume) {
             initial_sample.dflowfm_volume = hooks.dflowfm_storage_volume();
         } else {
             const driver_ns::DFlowFMVolumeObservation dflow_observation =
@@ -217,14 +220,14 @@ RunLoopResult run_simulation(
             initial_sample.swmm_external_net_volume =
                 hooks.swmm_external_net_volume();
         }
-        if (hooks.dflowfm_external_net_volume) {
+        if (config.enable_dflowfm && hooks.dflowfm_external_net_volume) {
             initial_sample.dflowfm_external_net_volume =
                 hooks.dflowfm_external_net_volume();
         }
         if (hooks.swmm_external_net_volume) {
             initial_sample.swmm_coupling_lateral_volume = 0.0;
         }
-        if (hooks.dflowfm_external_net_volume) {
+        if (config.enable_dflowfm && hooks.dflowfm_external_net_volume) {
             initial_sample.dflowfm_coupling_lateral_volume = 0.0;
         }
         mass_baseline = initial_sample;
@@ -358,6 +361,7 @@ RunLoopResult run_simulation(
         driver_ns::TriCouplingStepConfig tri_config{};
         tri_config.river_water_level_variable = config.river_water_level_variable;
         tri_config.step_engines = true;
+        tri_config.enable_dflowfm = config.enable_dflowfm;
         for (std::size_t index = 0U; index < config.surface_drainage.size(); ++index) {
             const auto& link_config = config.surface_drainage[index];
             driver_ns::SurfaceDrainageLink link{};
@@ -480,7 +484,8 @@ RunLoopResult run_simulation(
         const double swmm_elapsed =
             hooks.swmm_elapsed_time ? hooks.swmm_elapsed_time() : logical_time;
         const double dflowfm_elapsed =
-            hooks.dflowfm_elapsed_time ? hooks.dflowfm_elapsed_time() : logical_time;
+            config.enable_dflowfm && hooks.dflowfm_elapsed_time
+                ? hooks.dflowfm_elapsed_time() : logical_time;
         std::vector<driver_ns::PreparedModuleCheckpoint> prepared{
             driver_ns::prepare_surface2d_checkpoint(state, epoch_id, logical_time),
             driver_ns::prepare_coupling_checkpoint(coupling_snapshot, epoch_id,
@@ -488,12 +493,14 @@ RunLoopResult run_simulation(
             driver_ns::prepare_sim_driver_checkpoint(
                 driver.completed_coupling_steps() + 1U, epoch_id, logical_time),
             driver_ns::prepare_swmm_checkpoint(swmm_elapsed, epoch_id, logical_time),
-            driver_ns::prepare_dflowfm_checkpoint_record(dflowfm_elapsed, nullptr,
-                                                         epoch_id, logical_time),
         };
+        if (config.enable_dflowfm) {
+            prepared.push_back(driver_ns::prepare_dflowfm_checkpoint_record(
+                dflowfm_elapsed, nullptr, epoch_id, logical_time));
+        }
         driver_ns::CheckpointRequirements requirements{};
         requirements.require_swmm = true;
-        requirements.require_dflowfm = true;
+        requirements.require_dflowfm = config.enable_dflowfm;
         const driver_ns::CheckpointCommitRecord commit_record =
             driver_ns::coordinate_checkpoint_commit(prepared, requirements);
         if (commit_record.status != driver_ns::CheckpointCommitStatus::committed) {
@@ -522,7 +529,10 @@ RunLoopResult run_simulation(
                 state, loaded.dpm_fields, geometry, config.h_wet);
             current_sample.coupling_deficit_volume = audit_after.deficit_mass;
             current_sample.swmm_storage_volume = hooks.swmm_storage_volume();
-            if (hooks.dflowfm_storage_volume) {
+            if (!config.enable_dflowfm) {
+                current_sample.dflowfm_volume = 0.0;
+                current_sample.dflowfm_external_net_volume = 0.0;
+            } else if (hooks.dflowfm_storage_volume) {
                 current_sample.dflowfm_volume = hooks.dflowfm_storage_volume();
             } else {
                 const driver_ns::DFlowFMVolumeObservation dflow_observation =
@@ -541,7 +551,7 @@ RunLoopResult run_simulation(
                 current_sample.swmm_external_net_volume =
                     hooks.swmm_external_net_volume();
             }
-            if (hooks.dflowfm_external_net_volume) {
+            if (config.enable_dflowfm && hooks.dflowfm_external_net_volume) {
                 current_sample.dflowfm_external_net_volume =
                     hooks.dflowfm_external_net_volume();
             }
@@ -562,7 +572,7 @@ RunLoopResult run_simulation(
                 current_sample.swmm_coupling_lateral_volume =
                     cumulative_swmm_lateral_volume;
             }
-            if (hooks.dflowfm_external_net_volume) {
+            if (config.enable_dflowfm && hooks.dflowfm_external_net_volume) {
                 current_sample.dflowfm_coupling_lateral_volume =
                     cumulative_dflowfm_lateral_volume;
             }
