@@ -1,4 +1,6 @@
 #include <cstring>
+#include <cstdint>
+#include <string>
 
 #ifdef _WIN32
 #define SCAU_BMI_EXPORT extern "C" __declspec(dllexport)
@@ -8,6 +10,13 @@
 
 namespace {
 
+std::string g_case;
+struct WaterBalance {
+    std::uint32_t abi_version;
+    std::uint32_t struct_size;
+    std::uint64_t valid_components;
+    double values[19];
+};
 bool g_initialized = false;
 double g_start_time = 100.0;
 double g_current_time = 100.0;
@@ -22,6 +31,7 @@ SCAU_BMI_EXPORT int initialize(const char* config_file) {
     if (config_file == nullptr || config_file[0] == '\0') {
         return 11;
     }
+    g_case = config_file;
     g_initialized = true;
     g_start_time = 100.0;
     g_current_time = 100.0;
@@ -32,6 +42,24 @@ SCAU_BMI_EXPORT int initialize(const char* config_file) {
     g_vol1[1] = 20.0;
     g_vol1[2] = 30.0;
     return 0;
+}
+
+SCAU_BMI_EXPORT int dflowfm_get_water_balance_v1(void* output, std::uint32_t size) {
+    if (!g_initialized || size != sizeof(WaterBalance)) return 1;
+    WaterBalance value{};
+    value.abi_version = g_case == "wrong_abi" ? 2U : 1U;
+    value.struct_size = static_cast<std::uint32_t>(sizeof(value));
+    if (g_case == "wrong_size") value.struct_size = 0U;
+    value.valid_components = g_case == "missing_capability" ? 0xFEULL : 0xFFULL;
+    value.values[0] = g_current_time;
+    value.values[1] = 60.0;
+    value.values[3] = 75.0;
+    value.values[4] = 25.0;
+    if (g_case == "stale_time") value.values[0] -= 1.0;
+    if (g_case == "negative_storage") value.values[1] = -1.0;
+    if (g_case == "unproven_forcing") value.values[9] = 1.0;
+    std::memcpy(output, &value, sizeof(value));
+    return g_case == "read_failed" ? 7 : 0;
 }
 
 SCAU_BMI_EXPORT int update(double dt) {
