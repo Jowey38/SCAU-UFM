@@ -1,4 +1,6 @@
 #include "run_loop.hpp"
+#include "surface_timeseries.hpp"
+#include <memory>
 
 #include <algorithm>
 #include <cmath>
@@ -162,6 +164,11 @@ RunLoopResult run_simulation(
         outfall_node_ids.push_back(resolve_node_name(link.outfall_name, hooks));
     }
 
+    std::unique_ptr<SurfaceTimeseries> timeseries;
+    if (!config.surface_timeseries_path.empty()) {
+        timeseries = std::make_unique<SurfaceTimeseries>(config);
+        timeseries->append(config.start_time, state);
+    }
     driver.initialize();
     driver.start();
 
@@ -689,8 +696,13 @@ RunLoopResult run_simulation(
         }
         summary.epochs.push_back(record);
         summary.final_time = logical_time;
+        if (timeseries && ((epoch + 1U) % config.surface_output_every_epochs == 0U ||
+                           epoch + 1U == n_epochs)) {
+            timeseries->append(logical_time, state);
+        }
     }
 
+    if (timeseries) timeseries->complete();
     driver.complete();
     finish("completed", "");
     return result;

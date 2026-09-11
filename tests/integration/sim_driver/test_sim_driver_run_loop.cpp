@@ -1,4 +1,7 @@
 #include <cstdlib>
+#include <filesystem>
+#include <chrono>
+#include <netcdf.h>
 #include <stdexcept>
 #include <string>
 
@@ -203,6 +206,57 @@ TEST(SimDriverRunLoop, DrainageOnlyNeverCallsDisabledRiver) {
     for (const auto& epoch : result.summary.epochs) {
         EXPECT_EQ(epoch.checkpoint_status, "committed");
     }
+}
+
+TEST(SimDriverRunLoop, OptionalTimeseriesPreservesStateAndWritesCommittedFrames) {
+    auto config = run_loop_config();
+    config.enable_dflowfm = false;
+    config.surface_river.clear();
+    const auto output = std::filesystem::temp_directory_path() /
+        ("scau_timeseries_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".nc");
+    const auto run = [](const sim::RuntimeConfig& cfg) {
+        sim::SimDriver driver;
+        driver.configure(cfg);
+        scau::coupling::drainage::MockSwmmEngine swmm;
+        scau::coupling::river::MockDFlowFMEngine river;
+        swmm.initialize("mock.inp");
+        swmm.set_node_head_fixture(11, 0.0);
+        return sim::run_simulation(driver, swmm, river);
+    };
+    const auto baseline = run(config);
+    config.surface_timeseries_path = output.string();
+    config.surface_output_every_epochs = 3U;
+    const auto observed = run(config);
+    EXPECT_EQ(observed.summary.final_surface_state_hash, baseline.summary.final_surface_state_hash);
+    EXPECT_DOUBLE_EQ(observed.summary.total_drained_volume, baseline.summary.total_drained_volume);
+    EXPECT_FALSE(std::filesystem::exists(output.string() + ".partial"));
+    int file = -1;
+    ASSERT_EQ(nc_open(output.string().c_str(), NC_NOWRITE, &file), NC_NOERR);
+    int dim = -1;
+    ASSERT_EQ(nc_inq_dimid(file, "time", &dim), NC_NOERR);
+    std::size_t count = 0;
+    ASSERT_EQ(nc_inq_dimlen(file, dim, &count), NC_NOERR);
+    EXPECT_EQ(count, 5U);
+    int var = -1;
+    ASSERT_EQ(nc_inq_varid(file, "time", &var), NC_NOERR);
+    std::vector<double> times(count);
+    ASSERT_EQ(nc_get_var_double(file, var, times.data()), NC_NOERR);
+    EXPECT_EQ(times, (std::vector<double>{0.0, 3.0, 6.0, 9.0, 10.0}));
+    EXPECT_EQ(nc_inq_varid(file, "wet_mask", &var), NC_NOERR);
+    EXPECT_EQ(nc_close(file), NC_NOERR);
+    EXPECT_THROW(static_cast<void>(run(config)), std::invalid_argument);
+    std::filesystem::remove(output);
+    config.dt_surface = 1.0;
+    const auto rejected = run(config);
+    EXPECT_EQ(rejected.committed_epochs, 0U);
+    EXPECT_FALSE(std::filesystem::exists(output));
+    const auto partial = output.string() + ".partial";
+    ASSERT_EQ(nc_open(partial.c_str(), NC_NOWRITE, &file), NC_NOERR);
+    ASSERT_EQ(nc_inq_dimid(file, "time", &dim), NC_NOERR);
+    ASSERT_EQ(nc_inq_dimlen(file, dim, &count), NC_NOERR);
+    EXPECT_EQ(count, 1U);  // only the initial frame, never the rejected epoch
+    EXPECT_EQ(nc_close(file), NC_NOERR);
+    std::filesystem::remove(partial);
 }
 
 TEST(SimDriverRunLoop, DrainageOnlyCflRollbackDoesNotAdvanceSwmm) {

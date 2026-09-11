@@ -97,6 +97,9 @@ struct RuntimeConfig {
     // Project-standard variable name; real BMI kernels expose "s1".
     std::string river_water_level_variable{"water_level"};
     std::string output_summary_path;
+    // Empty disables output entirely; frequency counts committed epochs.
+    std::string surface_timeseries_path;
+    std::size_t surface_output_every_epochs{1U};
     std::vector<SurfaceDrainageLinkConfig> surface_drainage{};
     std::vector<SurfaceRiverLinkConfig> surface_river{};
     std::vector<DrainageRiverLinkConfig> drainage_river{};
