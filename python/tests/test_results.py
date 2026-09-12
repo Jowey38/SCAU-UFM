@@ -35,6 +35,20 @@ class ResultsTests(unittest.TestCase):
             self.assertEqual(result, summarize(path, 0.5))
             self.assertEqual(path.read_bytes(), before)
 
+    def test_point_and_profile_series_follow_requested_cell_order(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "result.nc"
+            self.fixture(path)
+            self.assertIsNone(summarize(path, 0.5)["series"])
+            series = summarize(path, 0.5, [1, 0])["series"]
+            self.assertEqual(series["cells"], [1, 0])
+            self.assertEqual(series["time_s"], [0, 2, 5])
+            self.assertEqual(series["h"], [[0, 0, 0], [0, 1, 0]])   # profile order, not file order
+            self.assertEqual(series["hu"], [[0, 0, 0], [0, 0, 0]])
+            for bad in ([], [0, 0], [2], [-1], [True]):
+                with self.subTest(bad=bad), self.assertRaises(ValueError):
+                    summarize(path, 0.5, bad)
+
     def test_invalid_results_are_rejected(self):
         mutations = [
             lambda ds: ds.setncattr("run_status", "incomplete"),

@@ -10,7 +10,13 @@ import netCDF4
 import numpy as np
 
 
-def summarize(path: Path, threshold: float) -> dict:
+def summarize(path: Path, threshold: float, cells: list[int] | None = None) -> dict:
+    """Validate a completed result file and derive per-cell maps.
+
+    `cells` optionally selects an ordered list of cell indices whose full
+    h/eta/hu/hv series are emitted (point series, or a profile when the
+    order follows a transect). Indices are validated against the file.
+    """
     if not np.isfinite(threshold) or threshold <= 0:
         raise ValueError("threshold must be finite and positive")
     if path.name.endswith(".partial"):
@@ -57,7 +63,17 @@ def summarize(path: Path, threshold: float) -> dict:
         arrival = [float(time[np.flatnonzero(wet[:, c])[0]]) if wet[:, c].any() else None
                    for c in range(h.shape[1])]
         duration = np.sum(wet[:-1] * np.diff(time)[:, None], axis=0)
+        series = None
+        if cells is not None:
+            if not cells or len(set(cells)) != len(cells):
+                raise ValueError("cell selection must be a non-empty list of distinct indices")
+            for index in cells:
+                if not isinstance(index, int) or isinstance(index, bool) or not 0 <= index < h.shape[1]:
+                    raise ValueError(f"linkage failure: cell index {index!r} is outside 0..{h.shape[1] - 1}")
+            series = {"cells": list(cells), "time_s": time.tolist(),
+                      **{name: fields[name][:, cells].T.tolist() for name in ("h", "eta", "hu", "hv")}}
         return {"results_schema_version": 1, "source_sha256": hashlib.sha256(raw).hexdigest(),
+                "series": series,
                 "source_stcf": str(source_path), "source_stcf_sha256": source_stcf_sha256,
                 "threshold_m": threshold, "duration_method": "left_sample_piecewise_constant",
                 "time_units": "model logical seconds", "frames": len(time), "cells": h.shape[1],
@@ -70,9 +86,11 @@ def main() -> int:
     parser.add_argument("input", type=Path)
     parser.add_argument("--threshold", type=float, default=0.01)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--cells", type=int, nargs="+", default=None,
+                        help="ordered cell indices for point/profile series extraction")
     args = parser.parse_args()
     try:
-        result = summarize(args.input, args.threshold)
+        result = summarize(args.input, args.threshold, args.cells)
         with args.output.open("x", encoding="utf-8", newline="\n") as stream:
             stream.write(json.dumps(result, sort_keys=True, indent=2, allow_nan=False) + "\n")
     except (OSError, ValueError, RuntimeError) as error:

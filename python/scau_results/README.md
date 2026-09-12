@@ -8,7 +8,11 @@ Enable writer with `surface_timeseries_path = <new-file.nc>` and optionally `sur
 PYTHONPATH=python python -m scau_results run.nc --threshold 0.01 --output derived.json
 ```
 
-Reads one immutable byte snapshot, checks completion/schema/units/time order and finite fields, then writes a new JSON file with source SHA256, per-cell maximum depth, first sampled threshold crossing, and duration using left-sample piecewise-constant intervals. Never-wet arrival is null. Output is deterministic for identical input and threshold.
+Reads one immutable byte snapshot, checks completion/schema/units/time order, source STCF existence and finite fields, then writes a new JSON file with source and source-STCF SHA256, per-cell maximum depth, first sampled threshold crossing, and duration using left-sample piecewise-constant intervals. Never-wet arrival is null. Output is deterministic for identical input and threshold.
+
+`--cells 379 50` adds `series`: full h/eta/hu/hv rows for the requested cells in the requested order (point series; a transect-ordered list yields a profile). Empty, duplicate, boolean or out-of-range indices are rejected as linkage failures. No spatial lookup is performed; cell indices must come from the case mesh.
+
+The 180 s synthetic surface+SWMM example run has the whole-system audit disabled; its extracted series demonstrate the pipeline only and are not physical validation evidence.
 
 Local evidence: writer parity/roundtrip integration passes; actual surface+real SWMM run produced four frames across 180 seconds; Python tests cover analytic arrival/duration and malformed result rejection.
 
