@@ -213,6 +213,10 @@ RuntimeConfig parse_runtime_config_text(const std::string& text) {
             }
         } else if (key == "river_water_level_variable") {
             config.river_water_level_variable = value;
+        } else if (key == "surface_timeseries_path") {
+            config.surface_timeseries_path = value;
+        } else if (key == "surface_output_every_epochs") {
+            config.surface_output_every_epochs = parse_index(value, key);
         } else if (key == "output_summary_path") {
             config.output_summary_path = value;
         } else if (key == "surface_drainage_link") {
