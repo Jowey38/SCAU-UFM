@@ -14,6 +14,7 @@ class ResultsTests(unittest.TestCase):
             ds.createDimension("cell", 2)
             ds.surface_results_schema_version = "1"
             ds.run_status = "completed"
+            ds.source_stcf = str(path)
             time = ds.createVariable("time", "f8", ("time",))
             time.units = "s"
             time[:] = [0, 2, 5]

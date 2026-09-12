@@ -35,6 +35,13 @@ def summarize(path: Path, threshold: float) -> dict:
         time = np.asarray(time_data)
         if time.ndim != 1 or len(time) < 2 or not np.all(np.isfinite(time)) or np.any(np.diff(time) <= 0):
             raise ValueError("compatibility error: invalid or non-increasing times")
+        source_stcf = getattr(ds, "source_stcf", "")
+        if not source_stcf:
+            raise ValueError("provenance validation failure: source_stcf is missing")
+        source_path = Path(source_stcf)
+        if not source_path.is_file():
+            raise ValueError(f"provenance validation failure: source_stcf is absent: {source_stcf}")
+        source_stcf_sha256 = hashlib.sha256(source_path.read_bytes()).hexdigest()
         fields = {}
         for name in expected:
             array = ds[name][:]
@@ -51,6 +58,7 @@ def summarize(path: Path, threshold: float) -> dict:
                    for c in range(h.shape[1])]
         duration = np.sum(wet[:-1] * np.diff(time)[:, None], axis=0)
         return {"results_schema_version": 1, "source_sha256": hashlib.sha256(raw).hexdigest(),
+                "source_stcf": str(source_path), "source_stcf_sha256": source_stcf_sha256,
                 "threshold_m": threshold, "duration_method": "left_sample_piecewise_constant",
                 "time_units": "model logical seconds", "frames": len(time), "cells": h.shape[1],
                 "max_depth_m": np.max(h, axis=0).tolist(), "arrival_time_s": arrival,
