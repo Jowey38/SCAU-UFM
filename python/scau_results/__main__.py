@@ -35,7 +35,64 @@ def load_manifest(path: Path, raw: bytes) -> dict:
     return manifest
 
 
-def summarize(path: Path, threshold: float, cells: list[int] | None = None) -> dict:
+def _point_in_polygon(x: float, y: float, poly: np.ndarray) -> bool:
+    """Even-odd rule with boundary points counted as inside."""
+    n = len(poly)
+    inside = False
+    for i in range(n):
+        x1, y1 = poly[i]
+        x2, y2 = poly[(i + 1) % n]
+        cross = (x2 - x1) * (y - y1) - (y2 - y1) * (x - x1)
+        if abs(cross) <= 1e-9 * max(1.0, abs(x2 - x1) + abs(y2 - y1)) and \
+                min(x1, x2) - 1e-9 <= x <= max(x1, x2) + 1e-9 and min(y1, y2) - 1e-9 <= y <= max(y1, y2) + 1e-9:
+            return True
+        if (y1 > y) != (y2 > y):
+            x_int = x1 + (y - y1) * (x2 - x1) / (y2 - y1)
+            if x < x_int:
+                inside = not inside
+    return inside
+
+
+def locate_cells(ds, points: list[tuple[float, float]]) -> list[int]:
+    """Map (x, y) in the mesh's own projected coordinate system to cell indices.
+
+    Fail-closed: the mesh must carry projection_x/y_coordinate node arrays in
+    metres and a face_node_connectivity table. A point outside every face is a
+    linkage failure; a point on a shared edge resolves to the lowest index
+    (deterministic). No CRS transformation is attempted.
+    """
+    required = ("mesh2_node_x", "mesh2_node_y", "mesh2_face_nodes")
+    if any(name not in ds.variables for name in required):
+        raise ValueError("linkage failure: result lacks UGRID node coordinates / face connectivity")
+    for axis, std in (("mesh2_node_x", "projection_x_coordinate"), ("mesh2_node_y", "projection_y_coordinate")):
+        if getattr(ds[axis], "standard_name", None) != std or getattr(ds[axis], "units", None) != "m":
+            raise ValueError(f"linkage failure: {axis} is not a projected metre coordinate")
+    nx, ny = np.asarray(ds["mesh2_node_x"][:]), np.asarray(ds["mesh2_node_y"][:])
+    faces = ds["mesh2_face_nodes"][:]
+    fill = getattr(ds["mesh2_face_nodes"], "_FillValue", None)
+    start = int(getattr(ds["mesh2_face_nodes"], "start_index", 0))
+    faces = np.ma.filled(faces, -1 if fill is None else fill)
+    polys = []
+    for row in faces:
+        idx = [int(v) - start for v in row if (fill is None or v != fill) and v >= 0]
+        if len(idx) < 3:
+            raise ValueError("linkage failure: degenerate face in connectivity")
+        polys.append(np.column_stack([nx[idx], ny[idx]]))
+    result = []
+    for x, y in points:
+        if not (np.isfinite(x) and np.isfinite(y)):
+            raise ValueError("linkage failure: non-finite sample coordinate")
+        hit = next((i for i, poly in enumerate(polys)
+                    if poly[:, 0].min() <= x <= poly[:, 0].max() and poly[:, 1].min() <= y <= poly[:, 1].max()
+                    and _point_in_polygon(x, y, poly)), None)
+        if hit is None:
+            raise ValueError(f"linkage failure: point ({x}, {y}) is outside the mesh")
+        result.append(hit)
+    return result
+
+
+def summarize(path: Path, threshold: float, cells: list[int] | None = None,
+              points: list[tuple[float, float]] | None = None) -> dict:
     """Validate a completed result file and derive per-cell maps.
 
     `cells` optionally selects an ordered list of cell indices whose full
@@ -96,6 +153,14 @@ def summarize(path: Path, threshold: float, cells: list[int] | None = None) -> d
                    for c in range(h.shape[1])]
         duration = np.sum(wet[:-1] * np.diff(time)[:, None], axis=0)
         series = None
+        sampled = None
+        if points is not None:
+            if cells is not None:
+                raise ValueError("use either --cells or --points, not both")
+            located = locate_cells(ds, points)
+            sampled = {"points_xy": [list(p) for p in points], "cells": located,
+                       "coordinate_system": "mesh projected coordinates (metres); no CRS declared in file"}
+            cells = sorted(set(located), key=located.index)
         if cells is not None:
             if not cells or len(set(cells)) != len(cells):
                 raise ValueError("cell selection must be a non-empty list of distinct indices")
@@ -106,7 +171,7 @@ def summarize(path: Path, threshold: float, cells: list[int] | None = None) -> d
                       **{name: fields[name][:, cells].T.tolist() for name in ("h", "eta", "hu", "hv")}}
         return {"results_schema_version": 2, "source_sha256": hashlib.sha256(raw).hexdigest(),
                 "source_hash": fnv1a64(raw), "final_surface_state_hash": ds.final_surface_state_hash,
-                "committed_epochs": int(ds.committed_epochs), "series": series,
+                "committed_epochs": int(ds.committed_epochs), "series": series, "sampled": sampled,
                 "source_stcf": str(source_path), "source_stcf_sha256": source_stcf_sha256,
                 "threshold_m": threshold, "duration_method": "left_sample_piecewise_constant",
                 "time_units": "model logical seconds", "frames": len(time), "cells": h.shape[1],
@@ -121,9 +186,16 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--cells", type=int, nargs="+", default=None,
                         help="ordered cell indices for point/profile series extraction")
+    parser.add_argument("--points", type=float, nargs="+", default=None, metavar="XY",
+                        help="x y pairs in the mesh's own projected metres; located to cells, no CRS transform")
     args = parser.parse_args()
+    points = None
+    if args.points is not None:
+        if len(args.points) % 2 or not args.points:
+            parser.exit(2, "results error: --points needs x y pairs\n")
+        points = list(zip(args.points[0::2], args.points[1::2]))
     try:
-        result = summarize(args.input, args.threshold, args.cells)
+        result = summarize(args.input, args.threshold, args.cells, points)
         with args.output.open("x", encoding="utf-8", newline="\n") as stream:
             stream.write(json.dumps(result, sort_keys=True, indent=2, allow_nan=False) + "\n")
     except (OSError, ValueError, RuntimeError) as error:

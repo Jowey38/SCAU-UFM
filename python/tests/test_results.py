@@ -40,6 +40,51 @@ class ResultsTests(unittest.TestCase):
                 "final_surface_state_hash": FINAL_HASH, "committed_epochs": 2, "frames": 3, **overrides}
         Path(str(path) + ".manifest.json").write_text(json.dumps(body), encoding="utf-8")
 
+    def add_mesh(self, path, projected=True):
+        # cell 0: unit square (0,0)-(1,1); cell 1: triangle (1,0),(2,0),(1,1) sharing edge x=1
+        with netCDF4.Dataset(path, "a") as ds:
+            ds.createDimension("nMesh2_node", 5)
+            ds.createDimension("nMesh2_max_face_nodes", 4)
+            x = ds.createVariable("mesh2_node_x", "f8", ("nMesh2_node",))
+            y = ds.createVariable("mesh2_node_y", "f8", ("nMesh2_node",))
+            if projected:
+                x.standard_name, x.units = "projection_x_coordinate", "m"
+                y.standard_name, y.units = "projection_y_coordinate", "m"
+            else:
+                x.standard_name, x.units = "longitude", "degrees_east"
+                y.standard_name, y.units = "latitude", "degrees_north"
+            x[:] = [0, 1, 1, 0, 2]
+            y[:] = [0, 0, 1, 1, 0]
+            faces = ds.createVariable("mesh2_face_nodes", "i4", ("cell", "nMesh2_max_face_nodes"), fill_value=-1)
+            faces.start_index = 0
+            faces[:] = [[0, 1, 2, 3], [1, 4, 2, -1]]
+        self.write_manifest(path)
+
+    def test_spatial_sampling_locates_cells_and_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "result.nc"
+            self.fixture(path)
+            self.add_mesh(path)
+            out = summarize(path, 0.5, points=[(0.5, 0.5), (1.5, 0.25), (1.0, 0.5)])
+            self.assertEqual(out["sampled"]["cells"], [0, 1, 0])          # shared edge -> lowest index
+            self.assertEqual(out["series"]["cells"], [0, 1])              # de-duplicated, first-seen order
+            self.assertEqual(out["series"]["h"][0], [0, 1, 0])
+            self.assertIn("no CRS declared", out["sampled"]["coordinate_system"])
+            for bad in ([(5.0, 5.0)], [(0.5, -0.1)], [(float("nan"), 0.5)]):
+                with self.subTest(bad=bad), self.assertRaisesRegex(ValueError, "linkage failure"):
+                    summarize(path, 0.5, points=bad)
+            with self.assertRaisesRegex(ValueError, "either"):
+                summarize(path, 0.5, cells=[0], points=[(0.5, 0.5)])
+            geo = Path(tmp) / "geo.nc"
+            self.fixture(geo)
+            self.add_mesh(geo, projected=False)
+            with self.assertRaisesRegex(ValueError, "projected metre"):
+                summarize(geo, 0.5, points=[(0.5, 0.5)])
+            bare = Path(tmp) / "bare.nc"
+            self.fixture(bare)
+            with self.assertRaisesRegex(ValueError, "lacks UGRID"):
+                summarize(bare, 0.5, points=[(0.5, 0.5)])
+
     def test_fnv1a64_matches_reference_vectors(self):
         self.assertEqual(fnv1a64(b""), "fnv1a64:cbf29ce484222325")
         self.assertEqual(fnv1a64(b"a"), "fnv1a64:af63dc4c8601ec8c")
