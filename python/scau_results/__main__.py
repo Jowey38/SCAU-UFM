@@ -10,6 +10,31 @@ import netCDF4
 import numpy as np
 
 
+SCHEMA_VERSION = "2"
+
+
+def fnv1a64(data: bytes) -> str:
+    """Repo-convention content hash, byte-compatible with the C++ writer."""
+    h = 0xCBF29CE484222325
+    for b in data:
+        h = ((h ^ b) * 0x100000001B3) & 0xFFFFFFFFFFFFFFFF
+    return f"fnv1a64:{h:016x}"
+
+
+def load_manifest(path: Path, raw: bytes) -> dict:
+    manifest_path = Path(str(path) + ".manifest.json")
+    if not manifest_path.is_file():
+        raise ValueError("provenance validation failure: sidecar manifest is missing")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("manifest_schema_version") != 1:
+        raise ValueError("migration required: unsupported manifest schema")
+    if manifest.get("output") != path.name:
+        raise ValueError("provenance validation failure: manifest names a different output")
+    if manifest.get("output_hash") != fnv1a64(raw):
+        raise ValueError("provenance validation failure: output bytes do not match manifest")
+    return manifest
+
+
 def summarize(path: Path, threshold: float, cells: list[int] | None = None) -> dict:
     """Validate a completed result file and derive per-cell maps.
 
@@ -22,11 +47,15 @@ def summarize(path: Path, threshold: float, cells: list[int] | None = None) -> d
     if path.name.endswith(".partial"):
         raise ValueError("result validation failure: unpublished partial output")
     raw = path.read_bytes()
+    manifest = load_manifest(path, raw)
     with netCDF4.Dataset("results", memory=raw) as ds:
-        if getattr(ds, "surface_results_schema_version", None) != "1":
+        if getattr(ds, "surface_results_schema_version", None) != SCHEMA_VERSION:
             raise ValueError("migration required: unsupported surface results schema")
         if getattr(ds, "run_status", None) != "completed":
             raise ValueError("result validation failure: incomplete run")
+        for attr in ("source_stcf_hash", "final_surface_state_hash", "committed_epochs"):
+            if str(getattr(ds, attr, "")) != str(manifest.get(attr, "")) or not getattr(ds, attr, ""):
+                raise ValueError(f"provenance validation failure: {attr} disagrees with manifest")
         expected = {"h": "m", "eta": "m", "hu": "m2 s-1", "hv": "m2 s-1", "wet_mask": "1"}
         for name, units in expected.items():
             if name not in ds.variables or ds[name].dimensions != ("time", "cell"):
@@ -47,7 +76,10 @@ def summarize(path: Path, threshold: float, cells: list[int] | None = None) -> d
         source_path = Path(source_stcf)
         if not source_path.is_file():
             raise ValueError(f"provenance validation failure: source_stcf is absent: {source_stcf}")
-        source_stcf_sha256 = hashlib.sha256(source_path.read_bytes()).hexdigest()
+        source_bytes = source_path.read_bytes()
+        if fnv1a64(source_bytes) != ds.source_stcf_hash:
+            raise ValueError("provenance validation failure: source_stcf bytes changed since the run")
+        source_stcf_sha256 = hashlib.sha256(source_bytes).hexdigest()
         fields = {}
         for name in expected:
             array = ds[name][:]
@@ -72,8 +104,9 @@ def summarize(path: Path, threshold: float, cells: list[int] | None = None) -> d
                     raise ValueError(f"linkage failure: cell index {index!r} is outside 0..{h.shape[1] - 1}")
             series = {"cells": list(cells), "time_s": time.tolist(),
                       **{name: fields[name][:, cells].T.tolist() for name in ("h", "eta", "hu", "hv")}}
-        return {"results_schema_version": 1, "source_sha256": hashlib.sha256(raw).hexdigest(),
-                "series": series,
+        return {"results_schema_version": 2, "source_sha256": hashlib.sha256(raw).hexdigest(),
+                "source_hash": fnv1a64(raw), "final_surface_state_hash": ds.final_surface_state_hash,
+                "committed_epochs": int(ds.committed_epochs), "series": series,
                 "source_stcf": str(source_path), "source_stcf_sha256": source_stcf_sha256,
                 "threshold_m": threshold, "duration_method": "left_sample_piecewise_constant",
                 "time_units": "model logical seconds", "frames": len(time), "cells": h.shape[1],

@@ -1,10 +1,16 @@
 #include "surface_timeseries.hpp"
 
 #include <cmath>
+#include <cstdint>
+#include <fstream>
+#include <iomanip>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
 #include <netcdf.h>
+
+#include "coupling/driver/checkpoint_payloads.hpp"
 
 namespace scau::apps::sim_driver {
 namespace {
@@ -14,10 +20,36 @@ void check(int rc) {
 void text(int file, int var, const char* name, const std::string& value) {
     check(nc_put_att_text(file, var, name, value.size(), value.c_str()));
 }
+std::string json_escape(const std::string& value) {
+    std::string out;
+    for (const char c : value) {
+        if (c == '"' || c == '\\') out += '\\';
+        out += c;
+    }
+    return out;
+}
+}
+
+std::string hash_file_bytes(const std::filesystem::path& path) {
+    std::ifstream stream(path, std::ios::binary);
+    if (!stream) throw std::runtime_error("cannot hash missing file: " + path.string());
+    std::uint64_t hash = 0xCBF29CE484222325ULL;
+    char buffer[1 << 16];
+    while (stream.read(buffer, sizeof(buffer)) || stream.gcount() > 0) {
+        for (std::streamsize i = 0; i < stream.gcount(); ++i) {
+            hash ^= static_cast<std::uint8_t>(buffer[i]);
+            hash *= 0x100000001B3ULL;
+        }
+    }
+    std::ostringstream out;
+    out << "fnv1a64:" << std::hex << std::setw(16) << std::setfill('0') << hash;
+    return out.str();
 }
 
 SurfaceTimeseries::SurfaceTimeseries(const RuntimeConfig& config)
-    : h_wet_(config.h_wet), output_(config.surface_timeseries_path),
+    : h_wet_(config.h_wet), source_stcf_(config.stcf_case_path),
+      source_stcf_hash_(hash_file_bytes(config.stcf_case_path)),
+      output_(config.surface_timeseries_path),
       partial_(config.surface_timeseries_path + ".partial") {
     if (std::filesystem::exists(output_) || std::filesystem::exists(partial_)) {
         throw std::invalid_argument("surface timeseries output or partial file already exists");
@@ -36,9 +68,10 @@ SurfaceTimeseries::SurfaceTimeseries(const RuntimeConfig& config)
         text(file_, time_var_, "units", "s");
         text(file_, time_var_, "long_name", "model logical time");
         text(file_, NC_GLOBAL, "time_origin_semantics", "model logical seconds; no civil-date interpretation");
-        text(file_, NC_GLOBAL, "surface_results_schema_version", "1");
+        text(file_, NC_GLOBAL, "surface_results_schema_version", "2");
         text(file_, NC_GLOBAL, "run_status", "incomplete");
-        text(file_, NC_GLOBAL, "source_stcf", config.stcf_case_path);
+        text(file_, NC_GLOBAL, "source_stcf", source_stcf_);
+        text(file_, NC_GLOBAL, "source_stcf_hash", source_stcf_hash_);
         text(file_, NC_GLOBAL, "output_every_epochs", std::to_string(config.surface_output_every_epochs));
         check(nc_put_att_double(file_, NC_GLOBAL, "h_wet", NC_DOUBLE, 1, &h_wet_));
         check(nc_put_att_double(file_, NC_GLOBAL, "dt_couple", NC_DOUBLE, 1, &config.dt_couple));
@@ -97,10 +130,14 @@ void SurfaceTimeseries::append(double time, const surface2d::SurfaceState& state
     ++frames_;
 }
 
-void SurfaceTimeseries::complete() {
+void SurfaceTimeseries::complete(const surface2d::SurfaceState& final_state,
+                                 std::size_t committed_epochs) {
     if (file_ < 0 || frames_ == 0) throw std::logic_error("cannot complete empty surface timeseries");
+    const std::string final_hash = coupling::driver::hash_surface_state(final_state);
     check(nc_redef(file_));
     text(file_, NC_GLOBAL, "run_status", "completed");
+    text(file_, NC_GLOBAL, "final_surface_state_hash", final_hash);
+    text(file_, NC_GLOBAL, "committed_epochs", std::to_string(committed_epochs));
     check(nc_enddef(file_));
     const int rc = nc_close(file_);
     file_ = -1;
@@ -109,6 +146,26 @@ void SurfaceTimeseries::complete() {
     // concurrently created destination. Unsupported filesystems fail closed.
     std::filesystem::create_hard_link(partial_, output_);
     std::filesystem::remove(partial_);
+
+    // Sidecar manifest: the only place the published output's own byte hash
+    // can live. Written with "x"-style exclusivity; a pre-existing manifest
+    // is a publication conflict, not something to overwrite.
+    const std::filesystem::path manifest = output_.string() + ".manifest.json";
+    if (std::filesystem::exists(manifest)) {
+        throw std::runtime_error("surface timeseries manifest already exists: " + manifest.string());
+    }
+    std::ofstream out(manifest, std::ios::binary);
+    if (!out) throw std::runtime_error("cannot write manifest: " + manifest.string());
+    out << "{\n"
+        << "  \"manifest_schema_version\": 1,\n"
+        << "  \"output\": \"" << json_escape(output_.filename().string()) << "\",\n"
+        << "  \"output_hash\": \"" << hash_file_bytes(output_) << "\",\n"
+        << "  \"source_stcf\": \"" << json_escape(source_stcf_) << "\",\n"
+        << "  \"source_stcf_hash\": \"" << source_stcf_hash_ << "\",\n"
+        << "  \"final_surface_state_hash\": \"" << final_hash << "\",\n"
+        << "  \"committed_epochs\": " << committed_epochs << ",\n"
+        << "  \"frames\": " << frames_ << "\n"
+        << "}\n";
 }
 
 }  // namespace scau::apps::sim_driver

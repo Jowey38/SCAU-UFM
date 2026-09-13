@@ -702,7 +702,7 @@ RunLoopResult run_simulation(
         }
     }
 
-    if (timeseries) timeseries->complete();
+    if (timeseries) timeseries->complete(state, driver.completed_coupling_steps());
     driver.complete();
     finish("completed", "");
     return result;

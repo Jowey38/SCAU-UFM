@@ -1,7 +1,11 @@
 #include <cstdlib>
-#include <filesystem>
 #include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <netcdf.h>
+
+#include "surface_timeseries.hpp"
 #include <stdexcept>
 #include <string>
 
@@ -243,9 +247,32 @@ TEST(SimDriverRunLoop, OptionalTimeseriesPreservesStateAndWritesCommittedFrames)
     ASSERT_EQ(nc_get_var_double(file, var, times.data()), NC_NOERR);
     EXPECT_EQ(times, (std::vector<double>{0.0, 3.0, 6.0, 9.0, 10.0}));
     EXPECT_EQ(nc_inq_varid(file, "wet_mask", &var), NC_NOERR);
+    // Provenance: the file binds source bytes and the final state; the sidecar
+    // manifest binds the published output bytes and must agree with both.
+    std::size_t len = 0;
+    ASSERT_EQ(nc_inq_attlen(file, NC_GLOBAL, "final_surface_state_hash", &len), NC_NOERR);
+    std::string attr_hash(len, '\0');
+    ASSERT_EQ(nc_get_att_text(file, NC_GLOBAL, "final_surface_state_hash", attr_hash.data()), NC_NOERR);
+    EXPECT_EQ(attr_hash, observed.summary.final_surface_state_hash);
+    ASSERT_EQ(nc_inq_attlen(file, NC_GLOBAL, "source_stcf_hash", &len), NC_NOERR);
+    std::string source_hash(len, '\0');
+    ASSERT_EQ(nc_get_att_text(file, NC_GLOBAL, "source_stcf_hash", source_hash.data()), NC_NOERR);
+    EXPECT_EQ(source_hash, sim::hash_file_bytes(config.stcf_case_path));
     EXPECT_EQ(nc_close(file), NC_NOERR);
+    const auto manifest_path = output.string() + ".manifest.json";
+    ASSERT_TRUE(std::filesystem::exists(manifest_path));
+    const std::string manifest = [&] {
+        std::ifstream stream(manifest_path);  // closed before the file is removed below
+        return std::string((std::istreambuf_iterator<char>(stream)), {});
+    }();
+    EXPECT_NE(manifest.find("\"output_hash\": \"" + sim::hash_file_bytes(output) + "\""), std::string::npos);
+    EXPECT_NE(manifest.find("\"final_surface_state_hash\": \"" + attr_hash + "\""), std::string::npos);
+    EXPECT_NE(manifest.find("\"source_stcf_hash\": \"" + source_hash + "\""), std::string::npos);
+    EXPECT_NE(manifest.find("\"committed_epochs\": 10"), std::string::npos);
+    EXPECT_NE(manifest.find("\"frames\": 5"), std::string::npos);
     EXPECT_THROW(static_cast<void>(run(config)), std::invalid_argument);
     std::filesystem::remove(output);
+    std::filesystem::remove(manifest_path);
     config.dt_surface = 1.0;
     const auto rejected = run(config);
     EXPECT_EQ(rejected.committed_epochs, 0U);
