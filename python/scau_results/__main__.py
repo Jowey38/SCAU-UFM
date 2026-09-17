@@ -53,14 +53,8 @@ def _point_in_polygon(x: float, y: float, poly: np.ndarray) -> bool:
     return inside
 
 
-def locate_cells(ds, points: list[tuple[float, float]]) -> list[int]:
-    """Map (x, y) in the mesh's own projected coordinate system to cell indices.
-
-    Fail-closed: the mesh must carry projection_x/y_coordinate node arrays in
-    metres and a face_node_connectivity table. A point outside every face is a
-    linkage failure; a point on a shared edge resolves to the lowest index
-    (deterministic). No CRS transformation is attempted.
-    """
+def mesh_polygons(ds) -> list[np.ndarray]:
+    """Face polygons in the mesh's own projected metres; fail-closed on other frames."""
     required = ("mesh2_node_x", "mesh2_node_y", "mesh2_face_nodes")
     if any(name not in ds.variables for name in required):
         raise ValueError("linkage failure: result lacks UGRID node coordinates / face connectivity")
@@ -78,6 +72,13 @@ def locate_cells(ds, points: list[tuple[float, float]]) -> list[int]:
         if len(idx) < 3:
             raise ValueError("linkage failure: degenerate face in connectivity")
         polys.append(np.column_stack([nx[idx], ny[idx]]))
+    return polys
+
+
+def locate_cells(ds, points: list[tuple[float, float]]) -> list[int]:
+    """Map (x, y) to cell indices; outside-mesh or non-finite points are linkage failures.
+    A point on a shared edge resolves to the lowest index (deterministic)."""
+    polys = mesh_polygons(ds)
     result = []
     for x, y in points:
         if not (np.isfinite(x) and np.isfinite(y)):
@@ -92,7 +93,9 @@ def locate_cells(ds, points: list[tuple[float, float]]) -> list[int]:
 
 
 def summarize(path: Path, threshold: float, cells: list[int] | None = None,
-              points: list[tuple[float, float]] | None = None) -> dict:
+              points: list[tuple[float, float]] | None = None,
+              geotiff_dir: Path | None = None, pixel_size: float | None = None,
+              crs: str | None = None) -> dict:
     """Validate a completed result file and derive per-cell maps.
 
     `cells` optionally selects an ordered list of cell indices whose full
@@ -152,6 +155,19 @@ def summarize(path: Path, threshold: float, cells: list[int] | None = None,
         arrival = [float(time[np.flatnonzero(wet[:, c])[0]]) if wet[:, c].any() else None
                    for c in range(h.shape[1])]
         duration = np.sum(wet[:-1] * np.diff(time)[:, None], axis=0)
+        max_depth = np.max(h, axis=0)
+        geotiff = None
+        if geotiff_dir is not None:
+            if pixel_size is None:
+                raise ValueError("GeoTIFF export requires an explicit --pixel-size")
+            from scau_results import geotiff as gt
+            resolved_crs, crs_source = gt.resolve_crs(source_path, crs)
+            arrival_raster = np.array([np.nan if a is None else a for a in arrival], dtype=float)
+            geotiff = gt.export_maps(geotiff_dir, mesh_polygons(ds),
+                                     {"max_depth_m": max_depth, "arrival_time_s": arrival_raster,
+                                      "duration_s": duration}, pixel_size, resolved_crs)
+            geotiff["crs_source"] = crs_source
+            geotiff["never_wet_encoding"] = "nan (same as uncovered pixels; distinguish via duration_s == 0)"
         series = None
         sampled = None
         if points is not None:
@@ -172,10 +188,11 @@ def summarize(path: Path, threshold: float, cells: list[int] | None = None,
         return {"results_schema_version": 2, "source_sha256": hashlib.sha256(raw).hexdigest(),
                 "source_hash": fnv1a64(raw), "final_surface_state_hash": ds.final_surface_state_hash,
                 "committed_epochs": int(ds.committed_epochs), "series": series, "sampled": sampled,
+                "geotiff": geotiff,
                 "source_stcf": str(source_path), "source_stcf_sha256": source_stcf_sha256,
                 "threshold_m": threshold, "duration_method": "left_sample_piecewise_constant",
                 "time_units": "model logical seconds", "frames": len(time), "cells": h.shape[1],
-                "max_depth_m": np.max(h, axis=0).tolist(), "arrival_time_s": arrival,
+                "max_depth_m": max_depth.tolist(), "arrival_time_s": arrival,
                 "duration_s": duration.tolist()}
 
 
@@ -188,6 +205,11 @@ def main() -> int:
                         help="ordered cell indices for point/profile series extraction")
     parser.add_argument("--points", type=float, nargs="+", default=None, metavar="XY",
                         help="x y pairs in the mesh's own projected metres; located to cells, no CRS transform")
+    parser.add_argument("--geotiff-dir", type=Path, default=None,
+                        help="write max_depth_m/arrival_time_s/duration_s GeoTIFFs here (requires --pixel-size)")
+    parser.add_argument("--pixel-size", type=float, default=None, help="raster cell size in mesh metres")
+    parser.add_argument("--crs", default=None,
+                        help="EPSG CRS for GeoTIFF GeoKeys; must agree with the governed pipeline manifest if one is found")
     args = parser.parse_args()
     points = None
     if args.points is not None:
@@ -195,7 +217,8 @@ def main() -> int:
             parser.exit(2, "results error: --points needs x y pairs\n")
         points = list(zip(args.points[0::2], args.points[1::2]))
     try:
-        result = summarize(args.input, args.threshold, args.cells, points)
+        result = summarize(args.input, args.threshold, args.cells, points,
+                           args.geotiff_dir, args.pixel_size, args.crs)
         with args.output.open("x", encoding="utf-8", newline="\n") as stream:
             stream.write(json.dumps(result, sort_keys=True, indent=2, allow_nan=False) + "\n")
     except (OSError, ValueError, RuntimeError) as error:
