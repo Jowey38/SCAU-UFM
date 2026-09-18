@@ -105,7 +105,10 @@ class ResultsTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "final_surface_state_hash"):
                 summarize(path, 0.5)
             self.write_manifest(path)
-            self.assertEqual(summarize(path, 0.5)["committed_epochs"], 2)
+            ok = summarize(path, 0.5)
+            self.assertEqual(ok["committed_epochs"], 2)
+            self.assertEqual(ok["source_stcf_hash"], fnv1a64(b"SOURCE-STCF"))
+            self.assertEqual(ok["source_hash"], fnv1a64(path.read_bytes()))
             path.with_suffix(".stcf.nc").write_bytes(b"MODIFIED")
             with self.assertRaisesRegex(ValueError, "bytes changed"):
                 summarize(path, 0.5)

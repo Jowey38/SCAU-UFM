@@ -1578,3 +1578,89 @@ def project_index_rows(path: Path) -> list[tuple[str, str, str]]:
         rows.append((lamp, "ProjectJob", f"{job.get('output_dir')}: status={job.get('status')} "
                                          f"case={str(job.get('case_sha256'))[:12]} findings={job.get('findings')}"))
     return rows
+
+
+# --- P9 results page (M288-C) -------------------------------------------------
+# The page is a thin shell: every check lives in scau_results (system python),
+# which owns provenance, schema and derived-map rules. This module only shapes
+# its JSON for tables and never re-derives physics.
+
+
+def run_results(result_nc: str, repo_root: str, output_json: Path, *,
+                threshold_m: float = 0.01, points: list[tuple[float, float]] | None = None,
+                geotiff_dir: Path | None = None, pixel_size_m: float | None = None,
+                python_launcher: list[str] | None = None, timeout_s: float = 300.0) -> dict:
+    """Runs `python -m scau_results` and returns {"status", "stderr", "derived"}.
+
+    Fail-closed results (missing manifest, tampered bytes, outside-mesh point)
+    are returned as data for the findings table, never raised."""
+    if not repo_root_valid(repo_root):
+        return {"status": "repo_root_invalid", "stderr": f"invalid repo root {repo_root!r}", "derived": None}
+    if not Path(result_nc).is_file():
+        return {"status": "fatal", "stderr": f"result file not found: {result_nc}", "derived": None}
+    if output_json.exists():
+        return {"status": "fatal", "stderr": f"refusing to overwrite {output_json}", "derived": None}
+    command = list(python_launcher or DEFAULT_PYTHON_LAUNCHER) + [
+        "-m", "scau_results", str(result_nc), "--threshold", repr(float(threshold_m)),
+        "--output", str(output_json)]
+    if points:
+        command += ["--points"] + [repr(float(v)) for xy in points for v in xy]
+    if geotiff_dir is not None:
+        if pixel_size_m is None:
+            return {"status": "fatal", "stderr": "GeoTIFF export needs a pixel size", "derived": None}
+        command += ["--geotiff-dir", str(geotiff_dir), "--pixel-size", repr(float(pixel_size_m))]
+    try:
+        completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout_s,
+                                   cwd=str(Path(repo_root) / "python"), env=subprocess_env())
+    except subprocess.TimeoutExpired:
+        return {"status": "timeout", "stderr": f"scau_results exceeded {timeout_s}s", "derived": None}
+    except OSError as error:
+        return {"status": "launcher_error", "stderr": str(error), "derived": None}
+    derived = _read_json(output_json) if completed.returncode == 0 else None
+    return {"status": "ok" if derived is not None else "fatal",
+            "stderr": (completed.stderr or "").strip(), "derived": derived}
+
+
+def results_summary_rows(result: dict) -> list[tuple[str, str, str]]:
+    if result.get("status") != "ok" or not result.get("derived"):
+        return [("fatal", "ResultsRejected", result.get("stderr") or result.get("status", "unknown"))]
+    d = result["derived"]
+    rows = [("pass", "ResultsValidated",
+             f"frames={d['frames']} cells={d['cells']} committed_epochs={d['committed_epochs']} "
+             f"threshold={d['threshold_m']} m"),
+            ("info", "Provenance",
+             f"output={d['source_hash']} source_stcf={d['source_stcf_hash']} "
+             f"final_state={d['final_surface_state_hash']}")]
+    depths = d.get("max_depth_m") or []
+    wet = sum(1 for a in d.get("arrival_time_s", []) if a is not None)
+    rows.append(("info", "DerivedMaps",
+                 f"max_depth max={max(depths) if depths else 0:.3f} m; cells ever wet={wet}/{len(depths)}"))
+    g = d.get("geotiff")
+    if g:
+        lamp = "pass" if g.get("georeferenced") else "review"
+        rows.append((lamp, "GeoTIFF",
+                     f"{len(g['files'])} raster(s) {g['width']}x{g['height']} @ {g['pixel_size_m']} m; "
+                     f"crs={g.get('crs') or 'undeclared'} ({g.get('crs_source')})"))
+    s = d.get("sampled")
+    if s:
+        rows.append(("info", "SampledCells", f"points={len(s['points_xy'])} -> cells={s['cells']}"))
+    return rows
+
+
+def results_series_rows(derived: dict | None) -> list[tuple[str, ...]]:
+    """(time_s, cell, h, eta, hu, hv) rows in sampled order for a table widget."""
+    series = (derived or {}).get("series")
+    if not series:
+        return []
+    rows = []
+    for k, cell in enumerate(series["cells"]):
+        for i, t in enumerate(series["time_s"]):
+            rows.append((f"{t:g}", str(cell), f"{series['h'][k][i]:.4f}", f"{series['eta'][k][i]:.4f}",
+                         f"{series['hu'][k][i]:.4g}", f"{series['hv'][k][i]:.4g}"))
+    return rows
+
+
+def results_raster_paths(derived: dict | None) -> list[tuple[str, str]]:
+    """(layer name, path) for every GeoTIFF the CLI reported, in a stable order."""
+    files = ((derived or {}).get("geotiff") or {}).get("files") or {}
+    return [(name, files[name]["path"]) for name in sorted(files)]

@@ -14,6 +14,7 @@ is rendered as a graduated heat map; certification stays with the C++ layer.
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 
 from qgis.core import (
@@ -95,6 +96,7 @@ class WorkbenchDialog(QDialog):
         tabs.addTab(self._build_report_page(), "门禁与报告")
         tabs.addTab(self._build_drainage_page(), "P10 管网")
         tabs.addTab(self._build_river_page(), "P11 河网")
+        tabs.addTab(self._build_results_page(), "P9 结果")
 
         self._run_button = QPushButton("运行流水线")
         self._run_button.clicked.connect(self._run)
@@ -1011,6 +1013,72 @@ class WorkbenchDialog(QDialog):
         author.clicked.connect(self._author_river)
         layout = QVBoxLayout(page); layout.addLayout(grid); layout.addWidget(self._river_provider); layout.addWidget(precheck); layout.addWidget(author)
         layout.addWidget(QLabel("河网仅作者化几何；边界类型/方向/ID、断面、糙率、初值保持 provider_required，非空时禁止案例导出。")); layout.addStretch(); return page
+
+    def _build_results_page(self) -> QWidget:
+        page = QWidget(); grid = QGridLayout()
+        self._results_nc = QLineEdit(); self._results_nc.setPlaceholderText("run.nc（需同目录 run.nc.manifest.json）")
+        grid.addWidget(QLabel("时序结果"), 0, 0); grid.addWidget(self._results_nc, 0, 1)
+        browse = QPushButton("选择结果"); browse.clicked.connect(lambda: self._browse(self._results_nc, False)); grid.addWidget(browse, 0, 2)
+        self._results_threshold = QDoubleSpinBox(); self._results_threshold.setDecimals(3); self._results_threshold.setRange(0.001, 10.0); self._results_threshold.setValue(0.01); self._results_threshold.setSuffix(" m")
+        grid.addWidget(QLabel("湿阈值"), 1, 0); grid.addWidget(self._results_threshold, 1, 1)
+        self._results_pixel = QDoubleSpinBox(); self._results_pixel.setDecimals(2); self._results_pixel.setRange(0.1, 1000.0); self._results_pixel.setValue(2.0); self._results_pixel.setSuffix(" m")
+        self._results_geotiff = QCheckBox("导出 GeoTIFF 并加载图层"); self._results_geotiff.setChecked(True)
+        grid.addWidget(QLabel("像元"), 2, 0); grid.addWidget(self._results_pixel, 2, 1); grid.addWidget(self._results_geotiff, 2, 2)
+        self._results_points = QLineEdit(); self._results_points.setPlaceholderText("x1 y1 x2 y2 …（网格投影米）")
+        grid.addWidget(QLabel("取样点"), 3, 0); grid.addWidget(self._results_points, 3, 1)
+        pick = QPushButton("画布点击取点"); pick.clicked.connect(self._pick_result_point); grid.addWidget(pick, 3, 2)
+        run = QPushButton("校验并派生"); run.clicked.connect(self._run_results)
+        self._results_series = QTableWidget(0, 6); self._results_series.setHorizontalHeaderLabels(["t (s)", "cell", "h", "eta", "hu", "hv"])
+        layout = QVBoxLayout(page); layout.addLayout(grid); layout.addWidget(run); layout.addWidget(self._results_series)
+        layout.addWidget(QLabel("结果只读；校验/派生均由 scau_results 完成，缺 manifest、字节篡改、源 STCF 改动或 CRS 冲突一律拒绝。栅格 CRS 仅来自哈希校验的 pipeline manifest。")); return page
+
+    def _pick_result_point(self) -> None:
+        if self._iface is None:
+            self._show_rows([("info", "NoCanvas", "离屏模式无画布；请手填取样点")]); return
+        from qgis.gui import QgsMapToolEmitPoint
+        canvas = self._iface.mapCanvas()
+        tool = QgsMapToolEmitPoint(canvas)
+
+        def on_click(point, _button):
+            existing = self._results_points.text().strip()
+            self._results_points.setText(f"{existing} {point.x():.3f} {point.y():.3f}".strip())
+            canvas.unsetMapTool(tool)
+        tool.canvasClicked.connect(on_click)
+        canvas.setMapTool(tool)
+
+    def _run_results(self) -> None:
+        nc = self._results_nc.text().strip()
+        if not nc:
+            self._show_rows([("fatal", "MissingResult", "请选择 run.nc")]); return
+        try:
+            raw = self._results_points.text().split()
+            if len(raw) % 2:
+                raise ValueError("取样点需 x y 成对")
+            points = [(float(raw[i]), float(raw[i + 1])) for i in range(0, len(raw), 2)] or None
+        except ValueError as error:
+            self._show_rows([("fatal", "BadSamplePoints", str(error))]); return
+        out_dir = Path(nc).parent / "derived"; out_dir.mkdir(exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%dT%H%M%S")
+        want_tif = self._results_geotiff.isChecked()
+        result = jobio.run_results(nc, self._repo_edit.text().strip(), out_dir / f"derived_{stamp}.json",
+                                   threshold_m=self._results_threshold.value(), points=points,
+                                   geotiff_dir=out_dir / f"maps_{stamp}" if want_tif else None,
+                                   pixel_size_m=self._results_pixel.value() if want_tif else None)
+        rows = jobio.results_summary_rows(result)
+        derived = result.get("derived")
+        self._results_series.setRowCount(0)
+        for row in jobio.results_series_rows(derived):
+            r = self._results_series.rowCount(); self._results_series.insertRow(r)
+            for c, text in enumerate(row):
+                self._results_series.setItem(r, c, QTableWidgetItem(text))
+        for name, path in jobio.results_raster_paths(derived):
+            layer = QgsRasterLayer(path, f"scau_{name}")
+            if layer.isValid():
+                QgsProject.instance().addMapLayer(layer)
+                rows.append(("pass", "RasterLoaded", f"{name}: crs={layer.crs().authid() or 'none'}"))
+            else:
+                rows.append(("fatal", "RasterInvalid", path))
+        self._show_rows(rows)
 
     def _author_drainage(self) -> None:
         try:
