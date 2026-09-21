@@ -130,6 +130,18 @@ std::string to_json(const RunSummary& summary) {
                 << escape_json_string(record.writeoff_endpoint_ids[endpoint_index])
                 << "\"";
         }
+        out << "], \"link_exchanges\": [";
+        for (std::size_t link_index = 0U; link_index < record.link_exchanges.size(); ++link_index) {
+            const auto& link = record.link_exchanges[link_index];
+            out << (link_index == 0U ? "" : ", ")
+                << "{\"engine\": \"" << escape_json_string(link.engine)
+                << "\", \"node\": " << link.node
+                << ", \"node_name\": \"" << escape_json_string(link.node_name) << "\""
+                << ", \"cell\": " << link.cell
+                << ", \"v_granted\": " << link.v_granted
+                << ", \"v_repay\": " << link.v_repay
+                << ", \"v_returned\": " << link.v_returned << "}";
+        }
         out << "]}";
     }
     out << (summary.epochs.empty() ? "]\n" : "\n  ]\n");

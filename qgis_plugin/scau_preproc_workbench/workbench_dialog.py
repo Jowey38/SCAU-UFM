@@ -1029,7 +1029,18 @@ class WorkbenchDialog(QDialog):
         pick = QPushButton("画布点击取点"); pick.clicked.connect(self._pick_result_point); grid.addWidget(pick, 3, 2)
         run = QPushButton("校验并派生"); run.clicked.connect(self._run_results)
         self._results_series = QTableWidget(0, 6); self._results_series.setHorizontalHeaderLabels(["t (s)", "cell", "h", "eta", "hu", "hv"])
+        link_grid = QGridLayout()
+        self._results_summary = QLineEdit(); self._results_summary.setPlaceholderText("run_summary.json（含 link_exchanges）")
+        self._results_rpt = QLineEdit(); self._results_rpt.setPlaceholderText("SWMM .rpt（可选）")
+        link_grid.addWidget(QLabel("运行摘要"), 0, 0); link_grid.addWidget(self._results_summary, 0, 1)
+        b1 = QPushButton("选择"); b1.clicked.connect(lambda: self._browse(self._results_summary, False)); link_grid.addWidget(b1, 0, 2)
+        link_grid.addWidget(QLabel("SWMM 报告"), 1, 0); link_grid.addWidget(self._results_rpt, 1, 1)
+        b2 = QPushButton("选择"); b2.clicked.connect(lambda: self._browse(self._results_rpt, False)); link_grid.addWidget(b2, 1, 2)
+        link_btn = QPushButton("1D/2D 联看"); link_btn.clicked.connect(self._run_linked_view)
+        self._results_linked = QTableWidget(0, 8)
+        self._results_linked.setHorizontalHeaderLabels(["engine", "node", "cell", "ledger in m³", "returned m³", "rpt lateral m³", "gap m³", "rpt max depth m"])
         layout = QVBoxLayout(page); layout.addLayout(grid); layout.addWidget(run); layout.addWidget(self._results_series)
+        layout.addLayout(link_grid); layout.addWidget(link_btn); layout.addWidget(self._results_linked)
         layout.addWidget(QLabel("结果只读；校验/派生均由 scau_results 完成，缺 manifest、字节篡改、源 STCF 改动或 CRS 冲突一律拒绝。栅格 CRS 仅来自哈希校验的 pipeline manifest。")); return page
 
     def _pick_result_point(self) -> None:
@@ -1079,6 +1090,23 @@ class WorkbenchDialog(QDialog):
             else:
                 rows.append(("fatal", "RasterInvalid", path))
         self._show_rows(rows)
+
+    def _run_linked_view(self) -> None:
+        summary = self._results_summary.text().strip()
+        if not summary:
+            self._show_rows([("fatal", "MissingSummary", "请选择 run_summary.json")]); return
+        nc = self._results_nc.text().strip()
+        manifest = nc + ".manifest.json" if nc and Path(nc + ".manifest.json").is_file() else None
+        out_dir = Path(summary).parent / "derived"; out_dir.mkdir(exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%dT%H%M%S")
+        result = jobio.run_linked_view(summary, self._repo_edit.text().strip(), out_dir / f"linked_{stamp}.json",
+                                       swmm_report=self._results_rpt.text().strip() or None, result_manifest=manifest)
+        self._results_linked.setRowCount(0)
+        for row in jobio.linked_rows(result):
+            r = self._results_linked.rowCount(); self._results_linked.insertRow(r)
+            for c, text in enumerate(row):
+                self._results_linked.setItem(r, c, QTableWidgetItem(text))
+        self._show_rows(jobio.linked_summary_rows(result))
 
     def _author_drainage(self) -> None:
         try:

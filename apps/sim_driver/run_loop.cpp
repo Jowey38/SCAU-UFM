@@ -683,6 +683,43 @@ RunLoopResult run_simulation(
             record.deficit_age_steps.push_back(age.deficit_age_steps);
             record.deficit_account_volumes.push_back(age.volume);
         }
+        // Per-link ledger truth for the 1D/2D linked view. Exchange-cell slot
+        // -> surface cell follows the layout fixed above (drainage links first,
+        // then river links).
+        const auto surface_cell_of = [&](std::size_t slot) {
+            return slot < config.surface_drainage.size()
+                ? config.surface_drainage[slot].cell
+                : config.surface_river[slot - config.surface_drainage.size()].cell;
+        };
+        for (const auto& decision : report.surface_decisions) {
+            LinkExchangeRecord link{};
+            link.engine = decision.endpoint.engine == core::SharedExchangeEngine::drainage
+                ? "drainage" : "river";
+            link.node = static_cast<int>(decision.endpoint.node_id);
+            link.v_granted = decision.exchange.v_granted;
+            link.v_repay = decision.exchange.v_repay;
+            for (std::size_t slot = 0U; slot < map.surface_cells.size(); ++slot) {
+                const bool is_drainage = slot < config.surface_drainage.size();
+                const int slot_node = is_drainage
+                    ? drainage_node_ids[slot]
+                    : config.surface_river[slot - config.surface_drainage.size()].location_id;
+                if (slot_node == link.node &&
+                    is_drainage == (decision.endpoint.engine == core::SharedExchangeEngine::drainage)) {
+                    link.cell = surface_cell_of(slot);
+                    link.node_name = is_drainage
+                        ? config.surface_drainage[slot].node_name
+                        : config.surface_river[slot - config.surface_drainage.size()].native_lateral_id;
+                    break;
+                }
+            }
+            for (const auto& ret : report.return_decisions) {
+                if (ret.source.engine == decision.endpoint.engine &&
+                    ret.source.node_id == decision.endpoint.node_id) {
+                    link.v_returned += ret.v_returned;
+                }
+            }
+            record.link_exchanges.push_back(std::move(link));
+        }
         record.writeoff_event_count = writeoff_report.event_count;
         record.writeoff_volume_total = writeoff_report.volume_written_off_total;
         for (const core::DeficitWriteoffRecord& writeoff : writeoff_report.records) {

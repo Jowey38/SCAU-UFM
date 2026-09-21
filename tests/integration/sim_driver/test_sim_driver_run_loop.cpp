@@ -152,6 +152,45 @@ TEST(SimDriverRunLoop, CompletesTriModelRunWithConservativeWriteBack) {
     EXPECT_NE(json.find("\"outcome\": \"completed\""), std::string::npos);
     EXPECT_NE(json.find("\"committed_epochs\": 10"), std::string::npos);
 
+    // Per-link ledger records (M288-C linked view): one drainage link on cell 0
+    // to node 11, plus one river link on cell 1 to location 5; the constant
+    // 0.01 m3/s overflow fixture returns exactly 0.01 m3 per 1 s epoch.
+    // Link records are GROSS ledger movements; drained_volume/returned_volume
+    // are NET per-cell write-back deltas (a cell that both drains and receives
+    // in one epoch nets out). Gross and net must agree on the balance.
+    double granted_sum = 0.0, returned_sum = 0.0;
+    for (const sim::EpochRecord& record : result.summary.epochs) {
+        ASSERT_EQ(record.link_exchanges.size(), 2U);
+        const auto& drain = record.link_exchanges[0];
+        EXPECT_EQ(drain.engine, "drainage");
+        EXPECT_EQ(drain.node, 11);
+        EXPECT_EQ(drain.cell, 0U);
+        EXPECT_DOUBLE_EQ(drain.v_returned, 0.01);
+        const auto& river = record.link_exchanges[1];
+        EXPECT_EQ(river.engine, "river");
+        EXPECT_EQ(river.node, 5);
+        EXPECT_EQ(river.cell, 1U);
+        EXPECT_DOUBLE_EQ(river.v_returned, 0.0);
+        double epoch_granted = 0.0, epoch_returned = 0.0;
+        for (const auto& link : record.link_exchanges) {
+            epoch_granted += link.v_granted + link.v_repay;
+            epoch_returned += link.v_returned;
+        }
+        EXPECT_NEAR(epoch_granted - epoch_returned,
+                    record.drained_volume - record.returned_volume, 1.0e-12);
+        EXPECT_GE(epoch_granted, record.drained_volume - 1.0e-12);   // gross >= net
+        EXPECT_GE(epoch_returned, record.returned_volume - 1.0e-12);
+        granted_sum += epoch_granted;
+        returned_sum += epoch_returned;
+    }
+    EXPECT_NEAR(granted_sum - returned_sum,
+                result.summary.total_drained_volume - result.summary.total_returned_volume, 1.0e-12);
+    EXPECT_DOUBLE_EQ(returned_sum, 10 * 0.01);                        // exact gross overflow return
+    EXPECT_NE(json.find("\"link_exchanges\": [{\"engine\": \"drainage\", \"node\": 11, "
+                        "\"node_name\": \"11\", \"cell\": 0"),
+              std::string::npos);
+    EXPECT_EQ(result.summary.epochs[0].link_exchanges[1].node_name, "lat1");
+
     swmm.finalize();
     dflowfm.finalize();
 }

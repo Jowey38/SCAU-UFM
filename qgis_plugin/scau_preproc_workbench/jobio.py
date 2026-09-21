@@ -1664,3 +1664,61 @@ def results_raster_paths(derived: dict | None) -> list[tuple[str, str]]:
     """(layer name, path) for every GeoTIFF the CLI reported, in a stable order."""
     files = ((derived or {}).get("geotiff") or {}).get("files") or {}
     return [(name, files[name]["path"]) for name in sorted(files)]
+
+
+def run_linked_view(summary_json: str, repo_root: str, output_json: Path, *,
+                    swmm_report: str | None = None, result_manifest: str | None = None,
+                    python_launcher: list[str] | None = None, timeout_s: float = 120.0) -> dict:
+    """Runs `python -m scau_results link`; fail-closed outcomes come back as data."""
+    if not repo_root_valid(repo_root):
+        return {"status": "repo_root_invalid", "stderr": f"invalid repo root {repo_root!r}", "linked": None}
+    if not Path(summary_json).is_file():
+        return {"status": "fatal", "stderr": f"run summary not found: {summary_json}", "linked": None}
+    if output_json.exists():
+        return {"status": "fatal", "stderr": f"refusing to overwrite {output_json}", "linked": None}
+    command = list(python_launcher or DEFAULT_PYTHON_LAUNCHER) + ["-m", "scau_results", "link", str(summary_json),
+                                                                  "--output", str(output_json)]
+    if swmm_report:
+        command += ["--swmm-report", str(swmm_report)]
+    if result_manifest:
+        command += ["--result-manifest", str(result_manifest)]
+    try:
+        completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout_s,
+                                   cwd=str(Path(repo_root) / "python"), env=subprocess_env())
+    except subprocess.TimeoutExpired:
+        return {"status": "timeout", "stderr": f"link exceeded {timeout_s}s", "linked": None}
+    except OSError as error:
+        return {"status": "launcher_error", "stderr": str(error), "linked": None}
+    linked = _read_json(output_json) if completed.returncode == 0 else None
+    return {"status": "ok" if linked is not None else "fatal",
+            "stderr": (completed.stderr or "").strip(), "linked": linked}
+
+
+def linked_rows(result: dict) -> list[tuple[str, ...]]:
+    """(engine, node, cell, ledger_in_m3, returned_m3, rpt_lateral_m3, gap_m3, rpt_max_depth_m)."""
+    linked = result.get("linked") or {}
+    rows = []
+    for link in linked.get("links", []):
+        native = link.get("engine_native") or {}
+        rows.append((link["engine"], str(link["node_name"]), str(link["cell"]),
+                     f"{link['granted_m3'] + link['repay_m3']:.3f}", f"{link['returned_m3']:.3f}",
+                     f"{native['lateral_inflow_volume_m3']:.0f}" if "lateral_inflow_volume_m3" in native else "-",
+                     f"{link['lateral_gap_m3']:+.2f}" if "lateral_gap_m3" in link else "-",
+                     f"{native['max_depth_m']:.2f}" if "max_depth_m" in native else "-"))
+    return rows
+
+
+def linked_summary_rows(result: dict) -> list[tuple[str, str, str]]:
+    if result.get("status") != "ok" or not result.get("linked"):
+        return [("fatal", "LinkedViewRejected", result.get("stderr") or result.get("status", "unknown"))]
+    linked = result["linked"]
+    rows = [("pass" if linked.get("result_manifest_bound") else "review", "LinkedView",
+             f"links={len(linked.get('links', []))} epochs={linked.get('committed_epochs')} "
+             f"bound_to_surface_result={'yes' if linked.get('result_manifest_bound') else 'no (no manifest given)'}")]
+    rpt = linked.get("swmm_report")
+    if rpt:
+        err = rpt.get("routing_continuity_error_pct")
+        rows.append(("review" if err is not None and abs(err) > 1.0 else "info", "SwmmReport",
+                     f"routing continuity error {err}% (engine-native; not a ledger correction)"))
+    rows.append(("info", "DFlowNative", str(linked.get("dflowfm_native"))))
+    return rows

@@ -25,3 +25,15 @@ The 180 s synthetic surface+SWMM example run has the whole-system audit disabled
 Local evidence: writer parity/roundtrip integration passes; actual surface+real SWMM run produced four frames across 180 seconds; Python tests cover analytic arrival/duration and malformed result rejection.
 
 Remaining requirements: runtime config text is not yet hashed into the manifest (only the STCF and the resulting state are); strict CF time-reference decision and independent format interoperability validation; configured variable-set contract; full disabled-mode GoldenSuite comparison; CRS identifier propagation from PreProc into the STCF/result file itself (today CRS is recovered only via a hash-verified sidecar pipeline manifest or `--crs`); compressed/tiled GeoTIFF variants; P9; native 1D result linkage; and release CI. These gaps must remain visible; do not claim full M288 completion from this prototype.
+
+## 1D/2D linked view (`link` subcommand)
+
+```sh
+PYTHONPATH=python python -m scau_results link run_summary.json --swmm-report run.rpt --result-manifest run.nc.manifest.json --output linked.json
+```
+
+The driver now records, per committed epoch, one `link_exchanges` entry per 2D<->1D link: engine, engine-side node id, config-level `node_name`, surface `cell`, and the CouplingLib ledger volumes `v_granted` / `v_repay` / `v_returned`. These are **gross** ledger movements; the epoch's `drained_volume`/`returned_volume` remain **net** per-cell write-back deltas (the C++ integration test pins gross−net agreement). `link` aggregates them per link, optionally joins SWMM's own `.rpt` Node Depth / Node Inflow summaries by `node_name` (10⁶ L → m³; the rpt rounds to 1 m³), and reports `lateral_gap_m3 = rpt lateral − ledger in` as a **diagnostic only** — the engine's number never corrects the ledger. `--result-manifest` binds the view to a surface result by `final_surface_state_hash`; a manifest from another run is a linkage failure. Only `completed` runs are linked; summaries without `link_exchanges` (older driver) are rejected.
+
+On the 180 s synthetic surface+SWMM run: J1 gap +1.8 m³, J2 gap +13.5 m³ against a −6.6 % SWMM routing continuity error — the engine's documented initially-dry-network continuity behaviour, surfaced rather than absorbed.
+
+D-Flow FM native results are deliberately **not** consumed (`dflowfm_native: not consumed`) until the C3 provider contract closes; river links still appear from the ledger with `engine_native: null`.

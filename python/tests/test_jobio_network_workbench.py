@@ -94,3 +94,32 @@ class ResultsPageHelperTests(unittest.TestCase):
             self.assertIn("refusing to overwrite", jobio.run_results(str(nc), str(root), out)["stderr"])
             out2 = Path(tmp) / "d2.json"
             self.assertIn("pixel size", jobio.run_results(str(nc), str(root), out2, geotiff_dir=Path(tmp) / "m")["stderr"])
+
+
+class LinkedViewHelperTests(unittest.TestCase):
+    def test_rows_and_lamps(self):
+        linked = {"result_manifest_bound": True, "committed_epochs": 3,
+                  "swmm_report": {"routing_continuity_error_pct": -6.627},
+                  "dflowfm_native": "not consumed: C3 provider contract incomplete",
+                  "links": [{"engine": "drainage", "node_name": "J1", "cell": 379, "granted_m3": 380.0, "repay_m3": 0.24,
+                             "returned_m3": 0.0, "lateral_gap_m3": 1.76,
+                             "engine_native": {"lateral_inflow_volume_m3": 382.0, "max_depth_m": 3.0}},
+                            {"engine": "river", "node_name": "lat1", "cell": 1, "granted_m3": 1.0, "repay_m3": 0.0,
+                             "returned_m3": 0.0, "engine_native": None}]}
+        rows = jobio.linked_rows({"status": "ok", "linked": linked})
+        self.assertEqual(rows[0], ("drainage", "J1", "379", "380.240", "0.000", "382", "+1.76", "3.00"))
+        self.assertEqual(rows[1], ("river", "lat1", "1", "1.000", "0.000", "-", "-", "-"))
+        summary = jobio.linked_summary_rows({"status": "ok", "linked": linked})
+        self.assertEqual([s[:2] for s in summary], [("pass", "LinkedView"), ("review", "SwmmReport"), ("info", "DFlowNative")])
+        unbound = dict(linked, result_manifest_bound=False)
+        self.assertEqual(jobio.linked_summary_rows({"status": "ok", "linked": unbound})[0][0], "review")
+        self.assertEqual(jobio.linked_summary_rows({"status": "fatal", "stderr": "results error: x", "linked": None}),
+                         [("fatal", "LinkedViewRejected", "results error: x")])
+        self.assertEqual(jobio.linked_rows({"status": "fatal", "linked": None}), [])
+
+    def test_run_linked_view_fails_closed_before_spawning(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "l.json"
+            root = Path(__file__).resolve().parents[2]
+            self.assertEqual(jobio.run_linked_view("/x.json", tmp, out)["status"], "repo_root_invalid")
+            self.assertIn("not found", jobio.run_linked_view(str(Path(tmp) / "x.json"), str(root), out)["stderr"])

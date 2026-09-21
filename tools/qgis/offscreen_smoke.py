@@ -152,6 +152,37 @@ def main() -> int:
             print("SMOKE results_tampered", codes, detail[:120])
             assert codes == ["ResultsRejected"], codes
             assert "output bytes do not match manifest" in detail, detail
+            # 1D/2D linked view: run_summary + SWMM .rpt beside the results file
+            nc_path = Path(args.results_nc)
+            summary_path = nc_path.with_name(nc_path.name.replace(".nc", "-summary.json"))
+            rpt_path = nc_path.with_name("dual-swmm.rpt")
+            if summary_path.is_file() and rpt_path.is_file():
+                dialog._results_nc.setText(args.results_nc)
+                dialog._results_summary.setText(str(summary_path))
+                dialog._results_rpt.setText(str(rpt_path))
+                dialog._run_linked_view()
+                codes = [dialog._findings.item(r, 1).text() for r in range(dialog._findings.rowCount())]
+                print("SMOKE linked_findings", codes)
+                assert codes[0] == "LinkedView" and dialog._findings.item(0, 0).text() == "pass", codes
+                assert dialog._results_linked.rowCount() == 2, dialog._results_linked.rowCount()
+                nodes = [dialog._results_linked.item(r, 1).text() for r in range(2)]
+                print("SMOKE linked_nodes", nodes, [dialog._results_linked.item(r, 6).text() for r in range(2)])
+                assert nodes == ["J1", "J2"], nodes
+                # a surface result from a DIFFERENT run must be refused by state hash
+                import json as _json
+                other = tdir / "other.nc"
+                other.write_bytes(b"")
+                Path(str(other) + ".manifest.json").write_text(_json.dumps(
+                    {"final_surface_state_hash": "fnv1a64:0000000000000000"}), encoding="utf-8")
+                dialog._results_nc.setText(str(other))
+                dialog._run_linked_view()
+                codes = [dialog._findings.item(r, 1).text() for r in range(dialog._findings.rowCount())]
+                detail = dialog._findings.item(0, 2).text()
+                print("SMOKE linked_wrong_run", codes, detail[:100])
+                assert codes == ["LinkedViewRejected"] and "different run" in detail, (codes, detail)
+                assert dialog._results_linked.rowCount() == 0
+            else:
+                print("SMOKE linked_view skipped (no summary/rpt beside results)")
             shutil.rmtree(tdir)
         step("results_page", results)
     if args.run:

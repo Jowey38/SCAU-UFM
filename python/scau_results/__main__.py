@@ -197,7 +197,28 @@ def summarize(path: Path, threshold: float, cells: list[int] | None = None,
                 "duration_s": duration.tolist()}
 
 
+def main_link(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="scau_results link")
+    parser.add_argument("summary", type=Path, help="run_summary.json written by scau_sim")
+    parser.add_argument("--swmm-report", type=Path, default=None, help="SWMM .rpt from the same run")
+    parser.add_argument("--result-manifest", type=Path, default=None,
+                        help="<run.nc>.manifest.json; binds the view to the surface result by state hash")
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args(argv)
+    from scau_results.linked import linked_view
+    try:
+        view = linked_view(args.summary, args.swmm_report, args.result_manifest)
+        with args.output.open("x", encoding="utf-8", newline="\n") as stream:
+            stream.write(json.dumps(view, sort_keys=True, indent=2, allow_nan=False) + "\n")
+    except (OSError, ValueError, KeyError) as error:
+        parser.exit(2, f"results error: {error}\n")
+    return 0
+
+
 def main() -> int:
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "link":
+        return main_link(sys.argv[2:])
     parser = argparse.ArgumentParser()
     parser.add_argument("input", type=Path)
     parser.add_argument("--threshold", type=float, default=0.01)

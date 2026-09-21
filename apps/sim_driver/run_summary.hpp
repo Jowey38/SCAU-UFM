@@ -11,6 +11,20 @@ namespace scau::apps::sim_driver {
 // One committed coupling epoch as recorded by the run loop. Masses are the
 // CouplingState exchange-cell audit values (phi_t * h * A over coupled cells
 // plus deficit ledger), not a whole-system audit (M270 scope).
+// One CouplingLib ledger decision at a 2D<->1D link for a committed epoch:
+// the engine-neutral truth of what crossed the interface (M288-C linked
+// view). `engine` is "drainage" or "river"; `node` is the engine-side endpoint
+// id; volumes are the ledger values, never engine-native re-reads.
+struct LinkExchangeRecord {
+    std::string engine{};
+    int node{0};
+    std::string node_name{};  // config-level id (SWMM node / river lateral id)
+    std::size_t cell{0U};
+    double v_granted{0.0};
+    double v_repay{0.0};
+    double v_returned{0.0};
+};
+
 struct EpochRecord {
     std::uint64_t epoch{0U};
     double logical_time{0.0};
@@ -38,6 +52,7 @@ struct EpochRecord {
     std::size_t writeoff_event_count{0U};
     double writeoff_volume_total{0.0};
     std::vector<std::string> writeoff_endpoint_ids{};
+    std::vector<LinkExchangeRecord> link_exchanges{};
 };
 
 struct RunSummary {
