@@ -1695,16 +1695,19 @@ def run_linked_view(summary_json: str, repo_root: str, output_json: Path, *,
 
 
 def linked_rows(result: dict) -> list[tuple[str, ...]]:
-    """(engine, node, cell, ledger_in_m3, returned_m3, rpt_lateral_m3, gap_m3, rpt_max_depth_m)."""
+    """(engine, node, cell, ledger_in_m3, returned_m3, rpt_lateral_m3, signed_gap_m3, rel_gap, diagnostic)."""
     linked = result.get("linked") or {}
     rows = []
     for link in linked.get("links", []):
         native = link.get("engine_native") or {}
+        gap = link.get("gap") or {}
+        rel = gap.get("relative_gap")
         rows.append((link["engine"], str(link["node_name"]), str(link["cell"]),
                      f"{link['granted_m3'] + link['repay_m3']:.3f}", f"{link['returned_m3']:.3f}",
                      f"{native['lateral_inflow_volume_m3']:.0f}" if "lateral_inflow_volume_m3" in native else "-",
-                     f"{link['lateral_gap_m3']:+.2f}" if "lateral_gap_m3" in link else "-",
-                     f"{native['max_depth_m']:.2f}" if "max_depth_m" in native else "-"))
+                     f"{gap['signed_gap_m3']:+.2f}" if "signed_gap_m3" in gap else "-",
+                     f"{rel:+.2%}" if isinstance(rel, (int, float)) and rel == rel and abs(rel) != float("inf") else "-",
+                     gap.get("diagnostic_code", "-")))
     return rows
 
 
@@ -1712,13 +1715,61 @@ def linked_summary_rows(result: dict) -> list[tuple[str, str, str]]:
     if result.get("status") != "ok" or not result.get("linked"):
         return [("fatal", "LinkedViewRejected", result.get("stderr") or result.get("status", "unknown"))]
     linked = result["linked"]
-    rows = [("pass" if linked.get("result_manifest_bound") else "review", "LinkedView",
+    bound = linked.get("result_manifest_bound")
+    rows = [("pass" if bound else "review", "LinkedView",
              f"links={len(linked.get('links', []))} epochs={linked.get('committed_epochs')} "
-             f"bound_to_surface_result={'yes' if linked.get('result_manifest_bound') else 'no (no manifest given)'}")]
+             f"bound_to_surface_result={'yes (full result validation)' if bound else 'no (no manifest given)'}")]
     rpt = linked.get("swmm_report")
     if rpt:
+        rows.append(("pass", "SwmmReportBound",
+                     f"bytes match this run's recorded report hash; SWMM {rpt.get('swmm_version')}; "
+                     f"{rpt.get('volume_precision')}"))
         err = rpt.get("routing_continuity_error_pct")
-        rows.append(("review" if err is not None and abs(err) > 1.0 else "info", "SwmmReport",
-                     f"routing continuity error {err}% (engine-native; not a ledger correction)"))
+        rows.append(("review" if err is not None and abs(err) > 1.0 else "info", "SwmmRoutingContinuity",
+                     f"{err}% (global model error; {rpt.get('scope_note')})"))
+    # Per-link gap diagnostics: one row per link with a detected gap. The
+    # verdict is conservative by design: we never attribute to a known engine
+    # behaviour without the full evidence set, and never correct anything.
+    for link in linked.get("links", []):
+        gap = link.get("gap")
+        if not gap or gap.get("diagnostic_code") == "NO_GAP":
+            continue
+        rows.append(("review", gap["diagnostic_code"],
+                     f"{link['node_name']}: ledger in {gap['ledger_in_m3']:.2f} m3, SWMM lateral "
+                     f"{gap['rpt_lateral_m3']:.0f} m3, signed gap {gap['signed_gap_m3']:+.2f} m3 "
+                     f"({gap['relative_gap']:+.2%}). Originals preserved; no reconciliation applied. "
+                     f"{gap['note']}"))
     rows.append(("info", "DFlowNative", str(linked.get("dflowfm_native"))))
     return rows
+
+
+def model_crs_for_result(result_nc: str) -> tuple[str | None, str]:
+    """Governed model CRS for a surface result: the `target_crs` of a PreProc
+    pipeline manifest found beside the source STCF whose `case_sha256` matches
+    the STCF bytes (the same rule scau_results.geotiff.resolve_crs applies).
+    Pure stdlib + the sidecar manifest, so the shell never imports analysis
+    code. Returns (crs or None, provenance label); never guesses."""
+    import hashlib
+    manifest_path = Path(str(result_nc) + ".manifest.json")
+    if not manifest_path.is_file():
+        return None, "result manifest missing"
+    try:
+        source = Path(str(json.loads(manifest_path.read_text(encoding="utf-8")).get("source_stcf", "")))
+    except (OSError, ValueError) as error:
+        return None, f"unreadable result manifest: {error}"
+    if not source.is_file():
+        return None, "source STCF absent"
+    candidates = [source.parent.parent / "validation" / "pipeline_manifest.json",
+                  source.with_name(source.name.replace(".stcf.nc", ".pipeline_manifest.json"))]
+    for candidate in candidates:
+        if not candidate.is_file():
+            continue
+        try:
+            manifest = json.loads(candidate.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
+            return None, f"unreadable pipeline manifest: {error}"
+        if manifest.get("case_sha256") != hashlib.sha256(source.read_bytes()).hexdigest():
+            return None, f"{candidate.name} case_sha256 does not match source STCF"
+        crs = (manifest.get("crs_governance") or {}).get("target_crs")
+        return (crs, f"pipeline_manifest:{candidate.name}") if crs else (None, "pipeline manifest has no CRS governance")
+    return None, "undeclared (no pipeline manifest beside source STCF)"

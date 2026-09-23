@@ -80,6 +80,15 @@ struct RunSummary {
     std::string recovery_action{};
     std::string dflowfm_rollback_decision{};
     std::string final_surface_state_hash{};
+    // Run identity shared with the surface-timeseries manifest: the input STCF
+    // byte hash, the SWMM input byte hash, and the SWMM report the run produced.
+    // A linked view must match ALL of these, not just the final state.
+    std::string source_stcf_hash{};
+    std::string swmm_inp_hash{};
+    std::string swmm_report_path{};
+    std::string swmm_report_hash{};
+    double start_time{0.0};
+    double dt_couple{0.0};
     bool whole_system_mass_audit_enabled{false};
     std::string whole_system_mass_verdict{};
     double final_whole_system_mass_residual{0.0};

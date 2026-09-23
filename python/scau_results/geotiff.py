@@ -49,13 +49,24 @@ def resolve_crs(source_stcf: Path, explicit: str | None) -> tuple[str | None, st
 
 
 def epsg_code(crs: str | None) -> int | None:
-    """Projected EPSG code or None for unreferenced output; rejects geographic CRS."""
+    """EPSG code of a 2-D projected CRS whose horizontal axes are metres, or
+    None for unreferenced output. The mesh and pixel size are metres, so any
+    other CRS (geographic, geocentric, vertical, compound, foot-based) would
+    silently mis-scale or mis-place the raster and is rejected."""
     if crs is None:
         return None
     from pyproj import CRS
     parsed = CRS.from_user_input(crs)
-    if parsed.is_geographic:
-        raise ValueError(f"linkage failure: geographic CRS {crs} cannot georeference a metre raster")
+    if not parsed.is_projected:
+        kind = "geographic" if parsed.is_geographic else ("vertical" if parsed.is_vertical else "non-projected")
+        raise ValueError(f"linkage failure: {kind} CRS {crs} cannot georeference a projected metre raster")
+    axes = parsed.axis_info
+    if len(axes) != 2:
+        raise ValueError(f"linkage failure: CRS {crs} has {len(axes)} axes; a 2-D projected CRS is required")
+    for axis in axes:
+        if axis.unit_name not in ("metre", "meter", "m") or abs(axis.unit_conversion_factor - 1.0) > 1e-12:
+            raise ValueError(f"linkage failure: CRS {crs} axis '{axis.name}' is in {axis.unit_name}, not metres; "
+                             "the mesh coordinates and pixel size are metres")
     code = parsed.to_epsg()
     if code is None:
         raise ValueError(f"linkage failure: CRS {crs} has no EPSG identity; GeoTIFF GeoKeys require one")
@@ -164,19 +175,46 @@ def write_geotiff(path: Path, data: np.ndarray, origin: tuple[float, float], pix
         stream.write(body)
 
 
+FLOAT32_MAX = float(np.finfo(np.float32).max)
+
+
 def export_maps(out_dir: Path, polys: list[np.ndarray], fields: dict[str, np.ndarray], pixel_size: float,
                 crs: str | None) -> dict:
+    """All-or-nothing: validate every input, stage every raster in a sibling
+    temp directory, then publish the whole set by a single directory rename.
+    A rejected request leaves no .tif behind; an existing destination is a
+    conflict, never overwritten."""
     epsg = epsg_code(crs)
-    grid, origin = rasterize(polys, pixel_size)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    written = {}
+    if not fields:
+        raise ValueError("no fields to export")
     for name, values in fields.items():
-        values = np.asarray(values, dtype=float)
-        raster = np.where(grid >= 0, values[np.clip(grid, 0, None)], NODATA).astype("<f4")
-        target = out_dir / f"{name}.tif"
-        write_geotiff(target, raster, origin, pixel_size, epsg)
-        written[name] = {"path": str(target),
-                         "sha256": hashlib.sha256(target.read_bytes()).hexdigest()}
+        arr = np.asarray(values, dtype=float)
+        finite = arr[np.isfinite(arr)]
+        if finite.size and np.max(np.abs(finite)) > FLOAT32_MAX:
+            raise ValueError(f"result validation failure: field {name!r} exceeds float32 range; "
+                             "GeoTIFF export would silently overflow to inf")
+        if arr.ndim != 1 or arr.shape[0] != len(polys):
+            raise ValueError(f"result validation failure: field {name!r} has {arr.shape} values for {len(polys)} cells")
+    if out_dir.exists():
+        raise FileExistsError(f"refusing to write into existing GeoTIFF directory {out_dir}")
+    grid, origin = rasterize(polys, pixel_size)
+    import tempfile
+    out_dir.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f".{out_dir.name}.", dir=out_dir.parent))
+    try:
+        written = {}
+        for name, values in fields.items():
+            values = np.asarray(values, dtype=float)
+            raster = np.where(grid >= 0, values[np.clip(grid, 0, None)], NODATA).astype("<f4")
+            staged = staging / f"{name}.tif"
+            write_geotiff(staged, raster, origin, pixel_size, epsg)
+            written[name] = {"path": str(out_dir / f"{name}.tif"),
+                             "sha256": hashlib.sha256(staged.read_bytes()).hexdigest()}
+        staging.rename(out_dir)   # same parent: atomic; fails if out_dir appeared meanwhile
+    except BaseException:
+        import shutil
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
     return {"files": written, "crs": crs, "epsg": epsg, "pixel_size_m": pixel_size,
             "width": int(grid.shape[1]), "height": int(grid.shape[0]),
             "origin_upper_left": [origin[0], origin[1]],

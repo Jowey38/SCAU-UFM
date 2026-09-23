@@ -1024,7 +1024,7 @@ class WorkbenchDialog(QDialog):
         self._results_pixel = QDoubleSpinBox(); self._results_pixel.setDecimals(2); self._results_pixel.setRange(0.1, 1000.0); self._results_pixel.setValue(2.0); self._results_pixel.setSuffix(" m")
         self._results_geotiff = QCheckBox("导出 GeoTIFF 并加载图层"); self._results_geotiff.setChecked(True)
         grid.addWidget(QLabel("像元"), 2, 0); grid.addWidget(self._results_pixel, 2, 1); grid.addWidget(self._results_geotiff, 2, 2)
-        self._results_points = QLineEdit(); self._results_points.setPlaceholderText("x1 y1 x2 y2 …（网格投影米）")
+        self._results_points = QLineEdit(); self._results_points.setPlaceholderText("x1 y1 x2 y2 …（必须是模型网格自身 CRS 的米制坐标，不是项目 CRS）")
         grid.addWidget(QLabel("取样点"), 3, 0); grid.addWidget(self._results_points, 3, 1)
         pick = QPushButton("画布点击取点"); pick.clicked.connect(self._pick_result_point); grid.addWidget(pick, 3, 2)
         run = QPushButton("校验并派生"); run.clicked.connect(self._run_results)
@@ -1037,22 +1037,45 @@ class WorkbenchDialog(QDialog):
         link_grid.addWidget(QLabel("SWMM 报告"), 1, 0); link_grid.addWidget(self._results_rpt, 1, 1)
         b2 = QPushButton("选择"); b2.clicked.connect(lambda: self._browse(self._results_rpt, False)); link_grid.addWidget(b2, 1, 2)
         link_btn = QPushButton("1D/2D 联看"); link_btn.clicked.connect(self._run_linked_view)
-        self._results_linked = QTableWidget(0, 8)
-        self._results_linked.setHorizontalHeaderLabels(["engine", "node", "cell", "ledger in m³", "returned m³", "rpt lateral m³", "gap m³", "rpt max depth m"])
+        self._results_linked = QTableWidget(0, 9)
+        self._results_linked.setHorizontalHeaderLabels(["engine", "node", "cell", "ledger in m³", "returned m³", "rpt lateral m³", "signed gap m³", "rel gap", "diagnostic"])
         layout = QVBoxLayout(page); layout.addLayout(grid); layout.addWidget(run); layout.addWidget(self._results_series)
         layout.addLayout(link_grid); layout.addWidget(link_btn); layout.addWidget(self._results_linked)
         layout.addWidget(QLabel("结果只读；校验/派生均由 scau_results 完成，缺 manifest、字节篡改、源 STCF 改动或 CRS 冲突一律拒绝。栅格 CRS 仅来自哈希校验的 pipeline manifest。")); return page
 
     def _pick_result_point(self) -> None:
         if self._iface is None:
-            self._show_rows([("info", "NoCanvas", "离屏模式无画布；请手填取样点")]); return
+            self._show_rows([("info", "NoCanvas", "离屏模式无画布；请手填取样点（网格自身 CRS 米）")]); return
+        nc = self._results_nc.text().strip()
+        if not nc:
+            self._show_rows([("fatal", "MissingResult", "请先选择 run.nc，画布取点需要它的模型 CRS")]); return
+        # Canvas coordinates are in the PROJECT CRS; the sampler requires the
+        # MODEL CRS. Without a governed model CRS the transform is undefined,
+        # so picking is refused rather than silently passing project coords.
+        model_crs, provenance = jobio.model_crs_for_result(nc)
+        if not model_crs:
+            self._show_rows([("fatal", "ModelCrsUndeclared",
+                              f"无法确定模型 CRS（{provenance}）；画布取点已禁用，请手填网格自身 CRS 的米制坐标")])
+            return
+        from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform
         from qgis.gui import QgsMapToolEmitPoint
         canvas = self._iface.mapCanvas()
+        target = QgsCoordinateReferenceSystem(model_crs)
+        if not target.isValid():
+            self._show_rows([("fatal", "ModelCrsInvalid", f"QGIS 无法解析模型 CRS {model_crs}")]); return
+        transform = QgsCoordinateTransform(canvas.mapSettings().destinationCrs(), target, QgsProject.instance())
         tool = QgsMapToolEmitPoint(canvas)
 
         def on_click(point, _button):
+            try:
+                model_pt = transform.transform(point)
+            except Exception as error:  # noqa: BLE001 - QgsCsException surfaces as data
+                self._show_rows([("fatal", "CanvasTransformFailed", str(error))])
+                canvas.unsetMapTool(tool); return
             existing = self._results_points.text().strip()
-            self._results_points.setText(f"{existing} {point.x():.3f} {point.y():.3f}".strip())
+            self._results_points.setText(f"{existing} {model_pt.x()!r} {model_pt.y()!r}".strip())
+            self._show_rows([("info", "CanvasPointPicked",
+                              f"{canvas.mapSettings().destinationCrs().authid()} -> {model_crs} ({provenance})")])
             canvas.unsetMapTool(tool)
         tool.canvasClicked.connect(on_click)
         canvas.setMapTool(tool)

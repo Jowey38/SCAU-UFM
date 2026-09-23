@@ -61,6 +61,12 @@ std::string to_json(const RunSummary& summary) {
         << escape_json_string(summary.dflowfm_rollback_decision) << "\",\n";
     out << "  \"final_surface_state_hash\": \""
         << escape_json_string(summary.final_surface_state_hash) << "\",\n";
+    out << "  \"source_stcf_hash\": \"" << escape_json_string(summary.source_stcf_hash) << "\",\n";
+    out << "  \"swmm_inp_hash\": \"" << escape_json_string(summary.swmm_inp_hash) << "\",\n";
+    out << "  \"swmm_report_path\": \"" << escape_json_string(summary.swmm_report_path) << "\",\n";
+    out << "  \"swmm_report_hash\": \"" << escape_json_string(summary.swmm_report_hash) << "\",\n";
+    out << "  \"start_time\": " << summary.start_time << ",\n";
+    out << "  \"dt_couple\": " << summary.dt_couple << ",\n";
     out << "  \"whole_system_mass_audit_enabled\": "
         << (summary.whole_system_mass_audit_enabled ? "true" : "false") << ",\n";
     out << "  \"whole_system_mass_verdict\": \""

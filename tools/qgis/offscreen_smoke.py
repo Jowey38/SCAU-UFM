@@ -164,10 +164,19 @@ def main() -> int:
                 codes = [dialog._findings.item(r, 1).text() for r in range(dialog._findings.rowCount())]
                 print("SMOKE linked_findings", codes)
                 assert codes[0] == "LinkedView" and dialog._findings.item(0, 0).text() == "pass", codes
+                assert "SwmmReportBound" in codes, codes            # report bytes proven to be this run's
+                assert codes.count("ROUTING_GAP_ATTRIBUTION_INSUFFICIENT") == 2, codes   # J1 and J2, no attribution
+                assert "KNOWN_ROUTING_CONTINUITY_GAP" not in codes, codes
                 assert dialog._results_linked.rowCount() == 2, dialog._results_linked.rowCount()
                 nodes = [dialog._results_linked.item(r, 1).text() for r in range(2)]
-                print("SMOKE linked_nodes", nodes, [dialog._results_linked.item(r, 6).text() for r in range(2)])
+                print("SMOKE linked_nodes", nodes, [(dialog._results_linked.item(r, 6).text(),
+                                                     dialog._results_linked.item(r, 8).text()) for r in range(2)])
                 assert nodes == ["J1", "J2"], nodes
+                # canvas picking must refuse when the model CRS is undeclared (synthetic package)
+                dialog._pick_result_point()
+                pick = [dialog._findings.item(r, 1).text() for r in range(dialog._findings.rowCount())]
+                print("SMOKE canvas_pick_offscreen", pick)
+                assert pick == ["NoCanvas"], pick                   # offscreen: no iface; never passes project coords
                 # a surface result from a DIFFERENT run must be refused by state hash
                 import json as _json
                 other = tdir / "other.nc"
@@ -179,7 +188,10 @@ def main() -> int:
                 codes = [dialog._findings.item(r, 1).text() for r in range(dialog._findings.rowCount())]
                 detail = dialog._findings.item(0, 2).text()
                 print("SMOKE linked_wrong_run", codes, detail[:100])
-                assert codes == ["LinkedViewRejected"] and "different run" in detail, (codes, detail)
+                # full result validation runs first, so a fabricated manifest is
+                # refused at schema/bytes before the state-hash comparison
+                assert codes == ["LinkedViewRejected"], codes
+                assert any(k in detail for k in ("different run", "manifest", "provenance", "does not exist")), detail
                 assert dialog._results_linked.rowCount() == 0
             else:
                 print("SMOKE linked_view skipped (no summary/rpt beside results)")

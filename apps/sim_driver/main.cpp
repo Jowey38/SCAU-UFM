@@ -1,4 +1,5 @@
 #include <exception>
+#include <filesystem>
 #include <iostream>
 #include <string>
 
@@ -8,6 +9,7 @@
 #include "run_summary.hpp"
 #include "runtime_config_io.hpp"
 #include "sim_driver.hpp"
+#include "surface_timeseries.hpp"
 
 #if defined(SCAU_HAS_SWMM5)
 #include "coupling/drainage/swmm_engine.hpp"
@@ -21,11 +23,20 @@ namespace {
 
 namespace sim = scau::apps::sim_driver;
 
+// Engines are finalized BEFORE the summary is written so the SWMM report is
+// closed and its bytes can be bound into the summary (linked-view provenance).
 int run_with_engines(sim::SimDriver& driver,
                      scau::coupling::drainage::ISwmmEngine& swmm,
                      scau::coupling::river::IDFlowFMEngine& dflowfm,
-                     const sim::RunLoopHooks& hooks) {
-    const sim::RunLoopResult result = sim::run_simulation(driver, swmm, dflowfm, hooks);
+                     const sim::RunLoopHooks& hooks,
+                     bool finalize_dflowfm) {
+    sim::RunLoopResult result = sim::run_simulation(driver, swmm, dflowfm, hooks);
+    swmm.finalize();
+    if (finalize_dflowfm) dflowfm.finalize();
+    if (!result.summary.swmm_report_path.empty() &&
+        std::filesystem::is_regular_file(result.summary.swmm_report_path)) {
+        result.summary.swmm_report_hash = sim::hash_file_bytes(result.summary.swmm_report_path);
+    }
     const std::string& output_path = driver.config().output_summary_path;
     if (!output_path.empty()) {
         sim::write_summary_json(output_path, result.summary);
@@ -70,10 +81,7 @@ int main(int argc, char** argv) {
                     "scau_sim mock mode requires a harness-owned SWMM storage "
                     "provider; disable whole-system audit or use real mode");
             }
-            const int code = run_with_engines(driver, swmm, dflowfm, hooks);
-            swmm.finalize();
-            if (config.enable_dflowfm) dflowfm.finalize();
-            return code;
+            return run_with_engines(driver, swmm, dflowfm, hooks, config.enable_dflowfm);
         }
 
 #if defined(SCAU_HAS_SWMM5) && defined(SCAU_HAS_DFLOWFM_BMI_RUNTIME)
@@ -115,10 +123,8 @@ int main(int argc, char** argv) {
             }
             return observation.storage_m3;
         };
-        const int code = run_with_engines(driver, swmm, dflowfm, hooks);
-        swmm.finalize();
-        if (config.enable_dflowfm) dflowfm.finalize();
-        return code;
+        hooks.swmm_report_path = [&swmm]() { return swmm.report_path(); };
+        return run_with_engines(driver, swmm, dflowfm, hooks, config.enable_dflowfm);
 #else
         std::cerr << "scau_sim: engine_mode=real requires SCAU_EMBED_SWMM and "
                      "SCAU_ENABLE_DFLOWFM_BMI_RUNTIME builds\n";

@@ -85,6 +85,57 @@ class ResultsTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "lacks UGRID"):
                 summarize(bare, 0.5, points=[(0.5, 0.5)])
 
+    def test_illegal_ugrid_connectivity_fails_closed(self):
+        # Review P2: a 1-based file's node "0" used to become Python index -1
+        # (the LAST node) and sampling silently succeeded on a wrong polygon.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "result.nc"
+            self.fixture(path)
+            self.add_mesh(path)
+            with netCDF4.Dataset(path, "a") as ds:
+                ds["mesh2_face_nodes"].start_index = 1
+                ds["mesh2_face_nodes"][:] = [[1, 2, 3, 4], [0, 2, 3, -1]]
+            self.write_manifest(path)
+            with self.assertRaisesRegex(ValueError, "references node 0.*start_index=1"):
+                summarize(path, 0.5, points=[(1.5, 0.25)])
+            with netCDF4.Dataset(path, "a") as ds:
+                ds["mesh2_face_nodes"].start_index = 0
+                ds["mesh2_face_nodes"][:] = [[0, 1, 2, 3], [1, 4, 9, -1]]      # 9 >= node_count
+            self.write_manifest(path)
+            with self.assertRaisesRegex(ValueError, "references node 9"):
+                summarize(path, 0.5, points=[(0.5, 0.5)])
+            with netCDF4.Dataset(path, "a") as ds:
+                ds["mesh2_face_nodes"][:] = [[0, 1, 2, 3], [1, 1, 4, -1]]      # duplicate node
+            self.write_manifest(path)
+            with self.assertRaisesRegex(ValueError, "degenerate"):
+                summarize(path, 0.5, points=[(0.5, 0.5)])
+            with netCDF4.Dataset(path, "a") as ds:
+                ds["mesh2_face_nodes"][:] = [[0, 1, 2, 3], [1, 4, 2, -1]]
+                ds["mesh2_node_x"][4] = float("nan")
+            self.write_manifest(path)
+            with self.assertRaisesRegex(ValueError, "non-finite node"):
+                summarize(path, 0.5, points=[(0.5, 0.5)])
+
+    def test_rejected_request_leaves_no_geotiff(self):
+        # Review P2: export used to run BEFORE point validation.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "result.nc"
+            self.fixture(path)
+            self.add_mesh(path)
+            maps = Path(tmp) / "maps"
+            with self.assertRaisesRegex(ValueError, "outside the mesh"):
+                summarize(path, 0.5, points=[(100.0, 100.0)], geotiff_dir=maps, pixel_size=0.5)
+            self.assertFalse(maps.exists())
+            with self.assertRaisesRegex(ValueError, "US survey foot|not metres"):
+                summarize(path, 0.5, geotiff_dir=maps, pixel_size=0.5, crs="EPSG:2263")
+            self.assertFalse(maps.exists())
+            self.assertEqual(sorted(p.name for p in Path(tmp).iterdir() if p.name.startswith(".")), [])
+            # and the corrected request then succeeds into the same directory
+            out = summarize(path, 0.5, points=[(0.5, 0.5)], geotiff_dir=maps, pixel_size=0.5)
+            self.assertEqual(sorted(p.name for p in maps.iterdir()),
+                             ["arrival_time_s.tif", "duration_s.tif", "max_depth_m.tif"])
+            self.assertEqual(out["sampled"]["cells"], [0])
+
     def test_fnv1a64_matches_reference_vectors(self):
         self.assertEqual(fnv1a64(b""), "fnv1a64:cbf29ce484222325")
         self.assertEqual(fnv1a64(b"a"), "fnv1a64:af63dc4c8601ec8c")

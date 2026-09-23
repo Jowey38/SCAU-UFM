@@ -61,17 +61,41 @@ def mesh_polygons(ds) -> list[np.ndarray]:
     for axis, std in (("mesh2_node_x", "projection_x_coordinate"), ("mesh2_node_y", "projection_y_coordinate")):
         if getattr(ds[axis], "standard_name", None) != std or getattr(ds[axis], "units", None) != "m":
             raise ValueError(f"linkage failure: {axis} is not a projected metre coordinate")
-    nx, ny = np.asarray(ds["mesh2_node_x"][:]), np.asarray(ds["mesh2_node_y"][:])
-    faces = ds["mesh2_face_nodes"][:]
-    fill = getattr(ds["mesh2_face_nodes"], "_FillValue", None)
-    start = int(getattr(ds["mesh2_face_nodes"], "start_index", 0))
-    faces = np.ma.filled(faces, -1 if fill is None else fill)
+    nx, ny = np.asarray(ds["mesh2_node_x"][:], dtype=float), np.asarray(ds["mesh2_node_y"][:], dtype=float)
+    if nx.shape != ny.shape or nx.ndim != 1 or nx.size == 0:
+        raise ValueError("linkage failure: node coordinate arrays are empty or mismatched")
+    if not (np.all(np.isfinite(nx)) and np.all(np.isfinite(ny))):
+        raise ValueError("linkage failure: non-finite node coordinate in mesh")
+    node_count = nx.size
+    var = ds["mesh2_face_nodes"]
+    fill = getattr(var, "_FillValue", None)
+    start = int(getattr(var, "start_index", 0))
+    if start not in (0, 1):
+        raise ValueError(f"linkage failure: unsupported start_index {start}")
+    raw = var[:]
+    masked = np.ma.getmaskarray(raw)
+    faces = np.ma.filled(raw, -1 if fill is None else fill)
     polys = []
-    for row in faces:
-        idx = [int(v) - start for v in row if (fill is None or v != fill) and v >= 0]
-        if len(idx) < 3:
-            raise ValueError("linkage failure: degenerate face in connectivity")
-        polys.append(np.column_stack([nx[idx], ny[idx]]))
+    for r, row in enumerate(faces):
+        idx = []
+        for c, v in enumerate(row):
+            if masked[r, c] or (fill is not None and v == fill):
+                continue
+            k = int(v) - start
+            # Bounds AFTER the start_index shift: a 1-based file's "0" becomes
+            # -1 and would otherwise wrap to the last node via Python indexing.
+            if not 0 <= k < node_count:
+                raise ValueError(f"linkage failure: face {r} references node {int(v)} "
+                                 f"(start_index={start}) outside 0..{node_count - 1}")
+            idx.append(k)
+        if len(idx) < 3 or len(set(idx)) != len(idx):
+            raise ValueError(f"linkage failure: face {r} is degenerate (fewer than 3 distinct nodes)")
+        poly = np.column_stack([nx[idx], ny[idx]])
+        # Shoelace area: zero means collinear/duplicate geometry.
+        area = 0.5 * abs(np.dot(poly[:, 0], np.roll(poly[:, 1], -1)) - np.dot(poly[:, 1], np.roll(poly[:, 0], -1)))
+        if area <= 0.0:
+            raise ValueError(f"linkage failure: face {r} has zero area")
+        polys.append(poly)
     return polys
 
 
@@ -156,18 +180,11 @@ def summarize(path: Path, threshold: float, cells: list[int] | None = None,
                    for c in range(h.shape[1])]
         duration = np.sum(wet[:-1] * np.diff(time)[:, None], axis=0)
         max_depth = np.max(h, axis=0)
-        geotiff = None
-        if geotiff_dir is not None:
-            if pixel_size is None:
-                raise ValueError("GeoTIFF export requires an explicit --pixel-size")
-            from scau_results import geotiff as gt
-            resolved_crs, crs_source = gt.resolve_crs(source_path, crs)
-            arrival_raster = np.array([np.nan if a is None else a for a in arrival], dtype=float)
-            geotiff = gt.export_maps(geotiff_dir, mesh_polygons(ds),
-                                     {"max_depth_m": max_depth, "arrival_time_s": arrival_raster,
-                                      "duration_s": duration}, pixel_size, resolved_crs)
-            geotiff["crs_source"] = crs_source
-            geotiff["never_wet_encoding"] = "nan (same as uncovered pixels; distinguish via duration_s == 0)"
+        # Order matters: every request parameter (points, cells, CRS, pixel
+        # size) is validated BEFORE any file is written, so a rejected request
+        # never leaves GeoTIFFs behind.
+        if geotiff_dir is not None and pixel_size is None:
+            raise ValueError("GeoTIFF export requires an explicit --pixel-size")
         series = None
         sampled = None
         if points is not None:
@@ -185,6 +202,17 @@ def summarize(path: Path, threshold: float, cells: list[int] | None = None,
                     raise ValueError(f"linkage failure: cell index {index!r} is outside 0..{h.shape[1] - 1}")
             series = {"cells": list(cells), "time_s": time.tolist(),
                       **{name: fields[name][:, cells].T.tolist() for name in ("h", "eta", "hu", "hv")}}
+        geotiff = None
+        if geotiff_dir is not None:
+            from scau_results import geotiff as gt
+            resolved_crs, crs_source = gt.resolve_crs(source_path, crs)
+            gt.epsg_code(resolved_crs)   # reject incompatible CRS before rasterizing
+            arrival_raster = np.array([np.nan if a is None else a for a in arrival], dtype=float)
+            geotiff = gt.export_maps(geotiff_dir, mesh_polygons(ds),
+                                     {"max_depth_m": max_depth, "arrival_time_s": arrival_raster,
+                                      "duration_s": duration}, pixel_size, resolved_crs)
+            geotiff["crs_source"] = crs_source
+            geotiff["never_wet_encoding"] = "nan (same as uncovered pixels; distinguish via duration_s == 0)"
         return {"results_schema_version": 2, "source_sha256": hashlib.sha256(raw).hexdigest(),
                 "source_hash": fnv1a64(raw), "final_surface_state_hash": ds.final_surface_state_hash,
                 "committed_epochs": int(ds.committed_epochs), "series": series, "sampled": sampled,

@@ -98,24 +98,54 @@ class ResultsPageHelperTests(unittest.TestCase):
 
 class LinkedViewHelperTests(unittest.TestCase):
     def test_rows_and_lamps(self):
+        gap = {"ledger_in_m3": 380.24, "rpt_lateral_m3": 382.0, "signed_gap_m3": 1.76, "relative_gap": 1.76 / 380.24,
+               "diagnostic_code": "ROUTING_GAP_ATTRIBUTION_INSUFFICIENT", "note": "not been reconciled"}
         linked = {"result_manifest_bound": True, "committed_epochs": 3,
-                  "swmm_report": {"routing_continuity_error_pct": -6.627},
+                  "swmm_report": {"routing_continuity_error_pct": -6.627, "swmm_version": "5.2 (Build 5.2.4)",
+                                  "volume_precision": "3 significant figures", "scope_note": "NOT evidence about any node"},
                   "dflowfm_native": "not consumed: C3 provider contract incomplete",
                   "links": [{"engine": "drainage", "node_name": "J1", "cell": 379, "granted_m3": 380.0, "repay_m3": 0.24,
-                             "returned_m3": 0.0, "lateral_gap_m3": 1.76,
+                             "returned_m3": 0.0, "gap": gap,
                              "engine_native": {"lateral_inflow_volume_m3": 382.0, "max_depth_m": 3.0}},
                             {"engine": "river", "node_name": "lat1", "cell": 1, "granted_m3": 1.0, "repay_m3": 0.0,
-                             "returned_m3": 0.0, "engine_native": None}]}
+                             "returned_m3": 0.0, "engine_native": None, "gap": None}]}
         rows = jobio.linked_rows({"status": "ok", "linked": linked})
-        self.assertEqual(rows[0], ("drainage", "J1", "379", "380.240", "0.000", "382", "+1.76", "3.00"))
-        self.assertEqual(rows[1], ("river", "lat1", "1", "1.000", "0.000", "-", "-", "-"))
+        self.assertEqual(rows[0], ("drainage", "J1", "379", "380.240", "0.000", "382", "+1.76", "+0.46%",
+                                   "ROUTING_GAP_ATTRIBUTION_INSUFFICIENT"))
+        self.assertEqual(rows[1], ("river", "lat1", "1", "1.000", "0.000", "-", "-", "-", "-"))
         summary = jobio.linked_summary_rows({"status": "ok", "linked": linked})
-        self.assertEqual([s[:2] for s in summary], [("pass", "LinkedView"), ("review", "SwmmReport"), ("info", "DFlowNative")])
+        self.assertEqual([s[:2] for s in summary],
+                         [("pass", "LinkedView"), ("pass", "SwmmReportBound"), ("review", "SwmmRoutingContinuity"),
+                          ("review", "ROUTING_GAP_ATTRIBUTION_INSUFFICIENT"), ("info", "DFlowNative")])
+        self.assertIn("no reconciliation applied", summary[3][2])
+        self.assertIn("NOT evidence", summary[2][2])
+        # a gap inside report rounding produces no per-link warning row
+        linked["links"][0]["gap"] = dict(gap, diagnostic_code="NO_GAP")
+        codes = [s[1] for s in jobio.linked_summary_rows({"status": "ok", "linked": linked})]
+        self.assertNotIn("ROUTING_GAP_ATTRIBUTION_INSUFFICIENT", codes)
         unbound = dict(linked, result_manifest_bound=False)
         self.assertEqual(jobio.linked_summary_rows({"status": "ok", "linked": unbound})[0][0], "review")
         self.assertEqual(jobio.linked_summary_rows({"status": "fatal", "stderr": "results error: x", "linked": None}),
                          [("fatal", "LinkedViewRejected", "results error: x")])
         self.assertEqual(jobio.linked_rows({"status": "fatal", "linked": None}), [])
+
+    def test_model_crs_for_result_uses_hash_verified_manifest_only(self):
+        root = Path(__file__).resolve().parents[2]
+        golden = root / "tests/golden/preproc_crs_governance_case/cases/synthetic_city_block_epsg3395.stcf.nc"
+        synthetic = root / "tests/golden/case_export_synthetic_package/cases/mesh/case.stcf.nc"
+        with tempfile.TemporaryDirectory() as tmp:
+            nc = Path(tmp) / "r.nc"
+            self.assertEqual(jobio.model_crs_for_result(str(nc)), (None, "result manifest missing"))
+            Path(str(nc) + ".manifest.json").write_text(json.dumps({"source_stcf": str(golden)}), encoding="utf-8")
+            crs, why = jobio.model_crs_for_result(str(nc))
+            self.assertEqual(crs, "EPSG:3395")
+            self.assertTrue(why.startswith("pipeline_manifest:"))
+            Path(str(nc) + ".manifest.json").write_text(json.dumps({"source_stcf": str(synthetic)}), encoding="utf-8")
+            crs, why = jobio.model_crs_for_result(str(nc))
+            self.assertIsNone(crs)                       # that package has crs_governance: null
+            self.assertIn("no CRS governance", why)
+            Path(str(nc) + ".manifest.json").write_text(json.dumps({"source_stcf": str(Path(tmp) / "nope.stcf.nc")}), encoding="utf-8")
+            self.assertEqual(jobio.model_crs_for_result(str(nc))[0], None)
 
     def test_run_linked_view_fails_closed_before_spawning(self):
         with tempfile.TemporaryDirectory() as tmp:

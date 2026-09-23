@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <fstream>
 #include <iomanip>
+#include <iterator>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -51,8 +52,15 @@ SurfaceTimeseries::SurfaceTimeseries(const RuntimeConfig& config)
       source_stcf_hash_(hash_file_bytes(config.stcf_case_path)),
       output_(config.surface_timeseries_path),
       partial_(config.surface_timeseries_path + ".partial") {
-    if (std::filesystem::exists(output_) || std::filesystem::exists(partial_)) {
-        throw std::invalid_argument("surface timeseries output or partial file already exists");
+    // Preflight every destination of the artifact set (output, manifest and
+    // both staging files) BEFORE any engine advances, so a publication
+    // conflict cannot surface only after a long run.
+    const std::filesystem::path manifest = output_.string() + ".manifest.json";
+    const std::filesystem::path manifest_partial = manifest.string() + ".partial";
+    for (const auto& p : {output_, partial_, manifest, manifest_partial}) {
+        if (std::filesystem::exists(p)) {
+            throw std::invalid_argument("surface timeseries artifact already exists: " + p.string());
+        }
     }
     if (!output_.parent_path().empty()) std::filesystem::create_directories(output_.parent_path());
     std::filesystem::copy_file(config.stcf_case_path, partial_);
@@ -142,30 +150,50 @@ void SurfaceTimeseries::complete(const surface2d::SurfaceState& final_state,
     const int rc = nc_close(file_);
     file_ = -1;
     check(rc);
-    // Same-directory hard-link publication is atomic and never overwrites a
-    // concurrently created destination. Unsupported filesystems fail closed.
-    std::filesystem::create_hard_link(partial_, output_);
-    std::filesystem::remove(partial_);
 
-    // Sidecar manifest: the only place the published output's own byte hash
-    // can live. Written with "x"-style exclusivity; a pre-existing manifest
-    // is a publication conflict, not something to overwrite.
+    // Artifact-set publish protocol. Both files are fully written, flushed,
+    // closed and re-read from their staging names; only then are they
+    // published, NetCDF first (hard link = atomic, never overwrites), manifest
+    // second. If manifest publication fails the NetCDF is withdrawn so the set
+    // is never half-published.
     const std::filesystem::path manifest = output_.string() + ".manifest.json";
-    if (std::filesystem::exists(manifest)) {
-        throw std::runtime_error("surface timeseries manifest already exists: " + manifest.string());
+    const std::filesystem::path manifest_partial = manifest.string() + ".partial";
+    const std::string output_hash = hash_file_bytes(partial_);   // == published bytes (hard link)
+    std::string body;
+    body += "{\n";
+    body += "  \"manifest_schema_version\": 1,\n";
+    body += "  \"output\": \"" + json_escape(output_.filename().string()) + "\",\n";
+    body += "  \"output_hash\": \"" + output_hash + "\",\n";
+    body += "  \"source_stcf\": \"" + json_escape(source_stcf_) + "\",\n";
+    body += "  \"source_stcf_hash\": \"" + source_stcf_hash_ + "\",\n";
+    body += "  \"final_surface_state_hash\": \"" + final_hash + "\",\n";
+    body += "  \"committed_epochs\": " + std::to_string(committed_epochs) + ",\n";
+    body += "  \"frames\": " + std::to_string(frames_) + "\n";
+    body += "}\n";
+    {
+        std::ofstream out(manifest_partial, std::ios::binary | std::ios::trunc);
+        if (!out) throw std::runtime_error("cannot stage manifest: " + manifest_partial.string());
+        out << body;
+        out.flush();
+        if (!out) throw std::runtime_error("manifest staging write failed: " + manifest_partial.string());
+        out.close();
+        if (out.fail()) throw std::runtime_error("manifest staging close failed: " + manifest_partial.string());
     }
-    std::ofstream out(manifest, std::ios::binary);
-    if (!out) throw std::runtime_error("cannot write manifest: " + manifest.string());
-    out << "{\n"
-        << "  \"manifest_schema_version\": 1,\n"
-        << "  \"output\": \"" << json_escape(output_.filename().string()) << "\",\n"
-        << "  \"output_hash\": \"" << hash_file_bytes(output_) << "\",\n"
-        << "  \"source_stcf\": \"" << json_escape(source_stcf_) << "\",\n"
-        << "  \"source_stcf_hash\": \"" << source_stcf_hash_ << "\",\n"
-        << "  \"final_surface_state_hash\": \"" << final_hash << "\",\n"
-        << "  \"committed_epochs\": " << committed_epochs << ",\n"
-        << "  \"frames\": " << frames_ << "\n"
-        << "}\n";
+    {
+        std::ifstream verify(manifest_partial, std::ios::binary);
+        const std::string on_disk((std::istreambuf_iterator<char>(verify)), {});
+        if (on_disk != body) throw std::runtime_error("manifest staging verify failed: " + manifest_partial.string());
+    }
+
+    std::filesystem::create_hard_link(partial_, output_);
+    try {
+        std::filesystem::rename(manifest_partial, manifest);   // same directory: atomic
+    } catch (...) {
+        std::error_code ignore;
+        std::filesystem::remove(output_, ignore);               // withdraw the half-published set
+        throw;
+    }
+    std::filesystem::remove(partial_);
 }
 
 }  // namespace scau::apps::sim_driver

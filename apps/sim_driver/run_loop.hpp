@@ -37,6 +37,9 @@ struct RunLoopHooks {
     // CouplingLib-owned API lateral component has been removed exactly once.
     std::function<double()> swmm_external_net_volume{};
     std::function<double()> dflowfm_external_net_volume{};
+    // Real mode: the report file swmm_open was told to write. Recorded in the
+    // summary so a linked view can refuse a report that is not this run's.
+    std::function<std::string()> swmm_report_path{};
 };
 
 struct RunLoopResult {

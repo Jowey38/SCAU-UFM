@@ -84,9 +84,10 @@ class GeoTiffTests(unittest.TestCase):
 
     def test_unreferenced_raster_carries_only_raster_type_key(self):
         with tempfile.TemporaryDirectory() as tmp:
-            report = gt.export_maps(Path(tmp), [SQUARE], {"max_depth_m": np.array([1.0])}, 5.0, None)
+            out = Path(tmp) / "unref"
+            report = gt.export_maps(out, [SQUARE], {"max_depth_m": np.array([1.0])}, 5.0, None)
             self.assertFalse(report["georeferenced"])
-            self.assertEqual(read_tiff(Path(tmp) / "max_depth_m.tif")["geokeys"], {1025: 1})
+            self.assertEqual(read_tiff(out / "max_depth_m.tif")["geokeys"], {1025: 1})
 
     def test_epsg_resolution_rejects_geographic_and_unidentifiable(self):
         self.assertEqual(gt.epsg_code("EPSG:3395"), 3395)
@@ -95,6 +96,33 @@ class GeoTiffTests(unittest.TestCase):
             gt.epsg_code("EPSG:4326")
         with self.assertRaisesRegex(ValueError, "no EPSG"):
             gt.epsg_code("+proj=merc +lat_ts=12.34 +lon_0=5.67 +datum=WGS84")
+        # Review P1-05: projected-but-not-metre, geocentric and vertical CRSs
+        # were previously accepted and written as ModelTypeProjected.
+        with self.assertRaisesRegex(ValueError, "US survey foot|not metres"):
+            gt.epsg_code("EPSG:2263")
+        with self.assertRaisesRegex(ValueError, "non-projected|geocentric"):
+            gt.epsg_code("EPSG:4978")
+        with self.assertRaisesRegex(ValueError, "vertical|non-projected"):
+            gt.epsg_code("EPSG:5703")
+
+    def test_export_is_all_or_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "maps"
+            # float32 overflow must be rejected before any file exists
+            with self.assertRaisesRegex(ValueError, "float32"):
+                gt.export_maps(out, [SQUARE], {"a": np.array([1.0]), "b": np.array([1e100])}, 2.0, None)
+            self.assertFalse(out.exists())
+            self.assertEqual([p.name for p in Path(tmp).iterdir()], [])   # no staging leftovers
+            # existing destination is a conflict, not a merge target
+            out.mkdir()
+            (out / "stale.tif").write_bytes(b"x")
+            with self.assertRaises(FileExistsError):
+                gt.export_maps(out, [SQUARE], {"a": np.array([1.0])}, 2.0, None)
+            self.assertEqual([p.name for p in out.iterdir()], ["stale.tif"])
+            # wrong field length rejected before write
+            with self.assertRaisesRegex(ValueError, "values for 2 cells"):
+                gt.export_maps(Path(tmp) / "m2", [SQUARE, TRI], {"a": np.array([1.0])}, 2.0, None)
+            self.assertFalse((Path(tmp) / "m2").exists())
 
     def test_crs_resolution_uses_hash_verified_manifest_only(self):
         with tempfile.TemporaryDirectory() as tmp:

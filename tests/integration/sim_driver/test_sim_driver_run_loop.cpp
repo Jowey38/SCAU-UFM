@@ -309,8 +309,21 @@ TEST(SimDriverRunLoop, OptionalTimeseriesPreservesStateAndWritesCommittedFrames)
     EXPECT_NE(manifest.find("\"source_stcf_hash\": \"" + source_hash + "\""), std::string::npos);
     EXPECT_NE(manifest.find("\"committed_epochs\": 10"), std::string::npos);
     EXPECT_NE(manifest.find("\"frames\": 5"), std::string::npos);
+    EXPECT_FALSE(std::filesystem::exists(manifest_path + ".partial"));
+    // Run identity in the summary must agree with the manifest so a linked
+    // view can bind the two without relying on the final state alone.
+    EXPECT_EQ(observed.summary.source_stcf_hash, source_hash);
+    EXPECT_DOUBLE_EQ(observed.summary.dt_couple, 1.0);
+    EXPECT_TRUE(observed.summary.swmm_report_path.empty());   // mock engine writes no report
     EXPECT_THROW(static_cast<void>(run(config)), std::invalid_argument);
     std::filesystem::remove(output);
+    std::filesystem::remove(manifest_path);
+    // Preflight: a pre-existing MANIFEST alone must refuse the run before any
+    // engine advances (previously only the .nc/.partial were checked).
+    { std::ofstream(manifest_path) << "{}"; }
+    EXPECT_THROW(static_cast<void>(run(config)), std::invalid_argument);
+    EXPECT_FALSE(std::filesystem::exists(output));
+    EXPECT_FALSE(std::filesystem::exists(output.string() + ".partial"));
     std::filesystem::remove(manifest_path);
     config.dt_surface = 1.0;
     const auto rejected = run(config);

@@ -89,6 +89,8 @@ void SwmmEngine::initialize(
     initialized_ = true;
     elapsed_days_ = 0.0;
     simulation_ended_ = false;
+    inp_path_ = inp_path;
+    report_path_ = report_path;
 }
 
 void SwmmEngine::step(double dt_swmm) {

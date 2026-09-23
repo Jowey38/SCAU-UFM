@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <stdexcept>
 #include <utility>
@@ -174,6 +175,12 @@ RunLoopResult run_simulation(
 
     RunLoopResult result{};
     RunSummary& summary = result.summary;
+    summary.source_stcf_hash = hash_file_bytes(config.stcf_case_path);
+    summary.swmm_inp_hash = std::filesystem::is_regular_file(config.swmm_inp_path)
+        ? hash_file_bytes(config.swmm_inp_path) : std::string{};   // mock mode has no file
+    summary.swmm_report_path = hooks.swmm_report_path ? hooks.swmm_report_path() : std::string{};
+    summary.start_time = config.start_time;
+    summary.dt_couple = config.dt_couple;
     const std::size_t n_epochs = epoch_count(config);
     const std::size_t n_surface = surface_substep_count(config);
     std::optional<core::CouplingState> previous_coupling{};
