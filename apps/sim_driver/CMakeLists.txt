@@ -1,8 +1,11 @@
+find_package(netCDF CONFIG REQUIRED)
+
 add_library(scau_sim_driver
     run_loop.cpp
     run_summary.cpp
     runtime_config_io.cpp
     sim_driver.cpp
+    surface_timeseries.cpp
 )
 add_library(scau::sim_driver ALIAS scau_sim_driver)
 
@@ -19,6 +22,7 @@ target_link_libraries(scau_sim_driver
         scau::surface2d
     PRIVATE
         scau::warnings
+        netCDF::netcdf
 )
 target_compile_features(scau_sim_driver PUBLIC cxx_std_20)
 

@@ -1,3 +1,5 @@
+find_package(netCDF CONFIG REQUIRED)
+
 set(SIM_DRIVER_CASE "${CMAKE_CURRENT_BINARY_DIR}/sim_driver_mixed_minimal.stcf.nc")
 
 if(SCAU_EMBED_SWMM AND SCAU_ENABLE_DFLOWFM_BMI_RUNTIME)
@@ -24,6 +26,7 @@ set_tests_properties(generate_sim_driver_run_loop_case PROPERTIES
 add_executable(test_sim_driver_run_loop test_sim_driver_run_loop.cpp)
 target_link_libraries(test_sim_driver_run_loop
     PRIVATE
+        netCDF::netcdf
         scau::sim_driver
         scau::warnings
         GTest::gtest_main

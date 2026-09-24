@@ -2,6 +2,13 @@
 
 > Chronological action log. Hooks and AI append to this file automatically.
 
+| 2026-09-22 | M288 step 5 1D/2D linked view: driver emits per-link gross ledger records (engine/node/node_name/cell/v_granted/v_repay/v_returned) per committed epoch; scau_results link joins SWMM .rpt by node name (gap = diagnostic only), binds to surface result by state hash; P9 linked table; synced to PR #109 head c7d47fe | apps/sim_driver/run_summary.*, run_loop.cpp, python/scau_results/linked.py, jobio.py, workbench_dialog.py, offscreen_smoke.py | CTest driver 5/5; Python 109/109; QGIS 4.0.0 smoke ok incl. wrong-run rejection; real run shows J2 gap +13.5 m3 vs SWMM -6.6% continuity error (bug-209 class, surfaced not absorbed) | ~14000 |
+| 2026-09-18 | M288 step 4 P9 results page: thin QGIS shell over scau_results subprocess (validate/sample/GeoTIFF/load layers/canvas pick); offscreen QGIS 4.0.0 smoke ok incl. byte-tamper rejection; synced to PR #109 head 3ed2955 | qgis_plugin/.../jobio.py, workbench_dialog.py, tools/qgis/offscreen_smoke.py, python/tests/test_jobio_network_workbench.py | Python 104/104; smoke first surfaced CLI omitting source_stcf_hash from output (fixed) and a tamper test that hit the wrong check (fixed) | ~10000 |
+| 2026-09-18 | M288 step 3 GeoTIFF: dependency-free baseline writer + hash-verified CRS resolution; GDAL 3.12.2 read-back confirmed EPSG:3395/geotransform/NaN nodata; synced to PR #109 head 0b3abf6 | python/scau_results/geotiff.py, __main__.py, tests/test_results_geotiff.py | Python 101/101; found+fixed TIFF inline-value rule for 4-byte GDAL_NODATA (GDAL warned on offset form) | ~11000 |
+| 2026-09-13 | M288 step 1 provenance manifest: writer records FNV-1a64 source-STCF and final-state hashes, publishes sidecar manifest with output byte hash; CLI enforces three-way agreement; schema v2; synced to PR #109 head 4bba14f | apps/sim_driver/surface_timeseries.*, python/scau_results/__main__.py, tests | CTest run_loop+drainage_only 3/3; Python 95/95; real run manifest hash == summary hash | ~9000 |
+| 2026-09-12 | Added `--cells` point/profile series extraction to scau_results with strict index validation; synced to PR #109 head 608d542 after resolving a task-list doc conflict | python/scau_results/__main__.py, python/tests/test_results.py, python/scau_results/README.md | Python 93/93 pass; real-run extraction works but is not physical validation (audit disabled) | ~4000 |
+| 2026-09-12 | Added default-off surface timeseries and read-only results prototype, then added source STCF existence/hash validation; PR #109 remains draft pending full M288 gates | apps/sim_driver/surface_timeseries.*, python/scau_results/*, tests/integration/sim_driver, python/tests/test_results.py | Local full MSVC CTest 174/174 before prototype final changes; targeted writer and Python result tests pass; CI PR #109 all prior nine checks passed | ~12000 |
+
 | 2026-09-09 | Implemented N1-A/N1-B whitelist INP parser, semantic comparator, authored network writer, source preservation, unit tests, and evidence document | `python/scau_preproc/inp_io.py`, `python/scau_preproc/swmm_author.py`, `python/tests/test_inp_io.py`, `superpowers/specs/2026-09-09-n1-swmm-authoring-evidence.md` | Python unit tests pass; real SWMM CLI integration pending C++ agent result |
 
 | 13:24 | Exported the current Surface2D development conversation as a consolidated progress report | `地面二维模型开发进展.md`, `.wolf/anatomy.md` | Documented M255-M263, G21-G23, 135/135 verification, completed and externally blocked work; no Git commit created | ~6500 |
@@ -3528,3 +3535,212 @@
 | 08:54 | Edited ../../scau-m285/CMakePresets.json | 7→12 lines | ~75 |
 | 08:54 | Edited ../../scau-m285/CMakePresets.json | expanded (+12 lines) | ~158 |
 | 08:54 | Edited ../../scau-m285/.github/workflows/ci.yml | expanded (+33 lines) | ~447 |
+| 10:36 | Session end: 75 writes across 40 files (terrain_condition.py, crs_governance.py, meshgen.py, pipeline.py, terrain_condition_policy.json) | 116 reads | ~114900 tok |
+
+## Session: 2026-09-10 12:24
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-10 12:28
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 13:12 | Created spikes/dflowfm/provider_contract/interface.md | — | ~642 |
+| 13:13 | Created spikes/dflowfm/provider_contract/capability.json | — | ~182 |
+| 17:43 | Edited python/tests/test_case_export.py | expanded (+8 lines) | ~154 |
+| 17:44 | Edited python/scau_preproc/terrain_condition.py | inline fix | ~22 |
+| 17:44 | Edited python/tests/test_terrain_condition.py | 4→6 lines | ~80 |
+| 17:44 | Edited python/tests/test_terrain_condition.py | 2→6 lines | ~157 |
+| 17:45 | Edited tests/golden/preproc_terrain_condition_case/cases/terrain_condition_report.json | inline fix | ~27 |
+| 17:54 | Created 开发收口任务清单.md | — | ~429 |
+| 17:58 | Edited 开发收口任务清单.md | inline fix | ~35 |
+| 17:59 | Edited 开发收口任务清单.md | inline fix | ~84 |
+| 18:19 | Edited libs/coupling/driver/include/coupling/driver/tri_coupling.hpp | 1→3 lines | ~36 |
+| 18:19 | Edited libs/coupling/driver/src/tri_coupling.cpp | added 1 condition(s) | ~77 |
+| 18:20 | Edited libs/coupling/driver/src/tri_coupling.cpp | added 1 condition(s) | ~30 |
+| 18:20 | Edited apps/sim_driver/run_loop.cpp | modified if() | ~32 |
+| 18:20 | Edited apps/sim_driver/run_loop.cpp | added 1 condition(s) | ~93 |
+| 18:21 | Edited apps/sim_driver/run_loop.cpp | inline fix | ~18 |
+| 19:31 | Edited apps/sim_driver/run_loop.cpp | 1→2 lines | ~27 |
+| 21:34 | Edited apps/sim_driver/run_loop.cpp | modified dflowfm_elapsed_time() | ~44 |
+| 23:19 | Edited apps/sim_driver/run_loop.cpp | added 1 condition(s) | ~120 |
+| 23:19 | Edited apps/sim_driver/run_loop.cpp | added 1 condition(s) | ~79 |
+| 23:19 | Edited apps/sim_driver/main.cpp | added 1 condition(s) | ~45 |
+| 00:13 | Edited apps/sim_driver/main.cpp | added 1 condition(s) | ~40 |
+| 00:14 | Edited tests/integration/sim_driver/test_sim_driver_run_loop.cpp | modified TEST() | ~514 |
+| 00:24 | Edited tests/integration/sim_driver/test_sim_driver_whole_system_mass_audit.cpp | added 2 condition(s) | ~471 |
+| 00:28 | Edited apps/sim_driver/main.cpp | inline fix | ~16 |
+| 00:28 | Edited apps/sim_driver/main.cpp | inline fix | ~15 |
+| 00:29 | Created ../../scau-b7-close-20260910/qgis-smoke-close.cmd | — | ~52 |
+| 00:31 | Edited apps/sim_driver/run_loop.hpp | 4→4 lines | ~81 |
+| 00:34 | Created ../../scau-b7-close-20260910/dual-swmm.inp | — | ~165 |
+| 00:34 | Created ../../scau-b7-close-20260910/dual-real.conf | — | ~175 |
+| 00:36 | Created tests/integration/sim_driver/run_drainage_only.cmake | — | ~456 |
+| 00:36 | Edited tests/integration/sim_driver/CMakeLists.txt | added 1 condition(s) | ~159 |
+| 00:42 | Edited spikes/dflowfm/provider_contract/interface.md | inline fix | ~62 |
+| 00:43 | Edited spikes/dflowfm/provider_contract/interface.md | inline fix | ~101 |
+| 00:44 | Edited spikes/dflowfm/provider_contract/capability.json | 1→2 lines | ~19 |
+| 00:47 | Created superpowers/specs/2026-09-10-dual-model-run-evidence.md | — | ~701 |
+| 00:50 | Created ../../scau-b7-close-20260910/dual-pr-body.md | — | ~212 |
+| 00:53 | Created docs/superpowers/plans/2026-09-10-m288-failure-revealing-review.md | — | ~1189 |
+| 00:55 | Edited 开发收口任务清单.md | inline fix | ~25 |
+| 00:55 | Edited 开发收口任务清单.md | inline fix | ~30 |
+| 00:55 | Edited 开发收口任务清单.md | inline fix | ~40 |
+| 01:05 | Edited tests/unit/coupling/fake_dflowfm_bmi.cpp | 1→3 lines | ~15 |
+| 01:05 | Edited tests/unit/coupling/fake_dflowfm_bmi.cpp | expanded (+7 lines) | ~52 |
+| 01:05 | Edited tests/unit/coupling/fake_dflowfm_bmi.cpp | 1→2 lines | ~14 |
+| 01:05 | Edited tests/unit/coupling/fake_dflowfm_bmi.cpp | added 5 condition(s) | ~233 |
+| 01:06 | Edited tests/unit/coupling/test_coupling_dflowfm_engine.cpp | modified TEST() | ~412 |
+| 07:30 | Edited spikes/dflowfm/provider_contract/interface.md | inline fix | ~130 |
+| 07:31 | Created spikes/dflowfm/provider_contract/validation_report.md | — | ~654 |
+| 07:32 | Created ../../scau-b7-close-20260910/provider-pr-body.md | — | ~155 |
+| 07:52 | Created apps/sim_driver/surface_timeseries.hpp | — | ~240 |
+| 07:53 | Created apps/sim_driver/surface_timeseries.cpp | — | ~1253 |
+| 07:54 | Edited apps/sim_driver/surface_timeseries.cpp | 3→2 lines | ~30 |
+| 07:54 | Edited apps/sim_driver/sim_driver.hpp | 1→4 lines | ~54 |
+| 07:54 | Edited apps/sim_driver/runtime_config_io.cpp | added 2 condition(s) | ~91 |
+| 07:54 | Edited apps/sim_driver/sim_driver.cpp | added 1 condition(s) | ~49 |
+| 07:55 | Edited apps/sim_driver/CMakeLists.txt | 2→3 lines | ~13 |
+| 07:55 | Edited apps/sim_driver/CMakeLists.txt | 3→4 lines | ~16 |
+| 07:55 | Edited apps/sim_driver/run_loop.cpp | 1→3 lines | ~20 |
+| 07:55 | Edited apps/sim_driver/run_loop.cpp | added 1 condition(s) | ~73 |
+| 07:56 | Edited apps/sim_driver/run_loop.cpp | added 2 condition(s) | ~86 |
+| 07:57 | Created ../../scau-b7-close-20260910/dual-results.conf | — | ~202 |
+| 07:57 | Edited apps/sim_driver/CMakeLists.txt | 1→3 lines | ~18 |
+| 07:58 | Edited tests/integration/sim_driver/test_sim_driver_run_loop.cpp | 1→4 lines | ~21 |
+| 07:59 | Edited tests/integration/sim_driver/test_sim_driver_run_loop.cpp | modified TEST() | ~540 |
+| 07:59 | Edited tests/integration/sim_driver/CMakeLists.txt | 1→3 lines | ~16 |
+| 07:59 | Edited tests/integration/sim_driver/CMakeLists.txt | 3→4 lines | ~29 |
+| 08:02 | Created python/scau_results/__init__.py | — | ~16 |
+| 08:03 | Created python/scau_results/__main__.py | — | ~969 |
+| 08:04 | Created python/tests/test_results.py | — | ~729 |
+| 08:05 | Edited apps/sim_driver/surface_timeseries.cpp | copy_file() → create_hard_link() | ~57 |
+| 08:05 | Edited python/scau_results/__main__.py | modified endswith() | ~58 |
+| 08:06 | Edited apps/sim_driver/surface_timeseries.cpp | 1→6 lines | ~148 |
+| 08:07 | Edited tests/integration/sim_driver/test_sim_driver_run_loop.cpp | expanded (+11 lines) | ~180 |
+| 08:07 | Created python/scau_results/README.md | — | ~464 |
+| 08:09 | Edited 开发收口任务清单.md | 4→4 lines | ~112 |
+| 08:09 | Edited 开发收口任务清单.md | inline fix | ~17 |
+| 08:10 | Edited python/tests/test_results.py | modified assertRaises() | ~166 |
+| 08:13 | Edited python/scau_results/__main__.py | 2→5 lines | ~61 |
+| 19:25 | Edited python/scau_results/__main__.py | 2→4 lines | ~71 |
+| 19:27 | Edited tests/unit/core/test_runtime_config_io.cpp | modified TEST() | ~227 |
+| 09:22 | Edited 开发收口任务清单.md | 2→2 lines | ~55 |
+| 09:23 | Created superpowers/specs/2026-09-10-project-closure-evidence.md | — | ~616 |
+| 09:24 | Edited apps/sim_driver/surface_timeseries.cpp | 1→2 lines | ~42 |
+| 09:24 | Edited apps/sim_driver/surface_timeseries.cpp | — | ~0 |
+| 09:29 | Session end: 84 writes across 38 files (interface.md, capability.json, test_case_export.py, terrain_condition.py, test_terrain_condition.py) | 67 reads | ~28011 tok |
+| 09:37 | Edited python/scau_results/__main__.py | modified is_file() | ~137 |
+| 09:38 | Edited python/scau_results/__main__.py | 1→2 lines | ~53 |
+| 09:38 | Edited python/tests/test_results.py | 2→3 lines | ~28 |
+| 09:41 | Edited 开发收口任务清单.md | inline fix | ~34 |
+| 09:42 | Session end: 88 writes across 38 files (interface.md, capability.json, test_case_export.py, terrain_condition.py, test_terrain_condition.py) | 69 reads | ~29568 tok |
+| 10:12 | Session end: 88 writes across 38 files (interface.md, capability.json, test_case_export.py, terrain_condition.py, test_terrain_condition.py) | 70 reads | ~30947 tok |
+| 11:25 | Edited 开发收口任务清单.md | 2→2 lines | ~66 |
+| 11:26 | Edited superpowers/specs/2026-09-10-project-closure-evidence.md | inline fix | ~146 |
+| 11:27 | Session end: 90 writes across 38 files (interface.md, capability.json, test_case_export.py, terrain_condition.py, test_terrain_condition.py) | 70 reads | ~31173 tok |
+| 11:29 | Edited python/scau_results/__main__.py | modified summarize() | ~142 |
+| 11:29 | Edited python/scau_results/__main__.py | modified len() | ~236 |
+| 11:29 | Edited python/scau_results/__main__.py | 4→6 lines | ~94 |
+| 11:31 | Edited python/tests/test_results.py | modified test_point_and_profile_series_follow_requested_cell_order() | ~236 |
+| 11:32 | Edited python/scau_results/README.md | 1→5 lines | ~236 |
+| 11:32 | Edited 开发收口任务清单.md | inline fix | ~23 |
+| 11:39 | Session end: 96 writes across 38 files (interface.md, capability.json, test_case_export.py, terrain_condition.py, test_terrain_condition.py) | 70 reads | ~32406 tok |
+| 11:56 | Session end: 96 writes across 38 files (interface.md, capability.json, test_case_export.py, terrain_condition.py, test_terrain_condition.py) | 70 reads | ~32406 tok |
+| 15:52 | Session end: 96 writes across 38 files (interface.md, capability.json, test_case_export.py, terrain_condition.py, test_terrain_condition.py) | 70 reads | ~32406 tok |
+| 09:52 | Created apps/sim_driver/surface_timeseries.hpp | — | ~363 |
+| 09:52 | Edited apps/sim_driver/surface_timeseries.cpp | added 2 condition(s) | ~457 |
+| 09:52 | Edited apps/sim_driver/surface_timeseries.cpp | 3→4 lines | ~70 |
+| 09:53 | Edited apps/sim_driver/surface_timeseries.cpp | added 2 condition(s) | ~555 |
+| 09:53 | Edited apps/sim_driver/run_loop.cpp | inline fix | ~23 |
+| 09:53 | Edited python/scau_results/__main__.py | modified fnv1a64() | ~311 |
+| 09:54 | Edited python/scau_results/__main__.py | modified in() | ~205 |
+| 09:54 | Edited python/scau_results/__main__.py | 1→4 lines | ~80 |
+| 09:54 | Edited python/scau_results/__main__.py | 2→3 lines | ~79 |
+| 09:55 | Edited python/tests/test_results.py | modified fixture() | ~892 |
+| 09:55 | Edited python/tests/test_results.py | 0 → 1 | ~22 |
+| 09:55 | Edited python/tests/test_results.py | 4→6 lines | ~107 |
+| 09:55 | Edited python/tests/test_results.py | modified assertRaisesRegex() | ~60 |
+| 09:56 | Edited tests/integration/sim_driver/test_sim_driver_run_loop.cpp | expanded (+21 lines) | ~467 |
+| 09:56 | Edited tests/integration/sim_driver/test_sim_driver_run_loop.cpp | 3→7 lines | ~36 |
+| 09:59 | Edited tests/integration/sim_driver/test_sim_driver_run_loop.cpp | 2→4 lines | ~56 |
+| 10:01 | Edited python/scau_results/README.md | modified Provenance() | ~284 |
+| 10:01 | Edited python/scau_results/README.md | inline fix | ~121 |
+| 10:01 | Edited 开发收口任务清单.md | inline fix | ~51 |
+| 10:03 | Session end: 115 writes across 38 files (interface.md, capability.json, test_case_export.py, terrain_condition.py, test_terrain_condition.py) | 70 reads | ~36821 tok |
+| 21:33 | Edited python/scau_results/__main__.py | added 2 condition(s) | ~854 |
+| 21:33 | Edited python/scau_results/__main__.py | expanded (+8 lines) | ~147 |
+| 21:34 | Edited python/scau_results/__main__.py | inline fix | ~29 |
+| 21:34 | Edited python/scau_results/__main__.py | expanded (+7 lines) | ~158 |
+| 21:34 | Edited python/tests/test_results.py | modified add_mesh() | ~746 |
+| 21:35 | Edited python/scau_results/README.md | 1→3 lines | ~204 |
+| 21:35 | Edited python/scau_results/README.md | inline fix | ~59 |
+| 21:35 | Edited 开发收口任务清单.md | inline fix | ~27 |
+| 21:37 | Session end: 123 writes across 38 files (interface.md, capability.json, test_case_export.py, terrain_condition.py, test_terrain_condition.py) | 70 reads | ~39064 tok |
+
+## Session: 2026-09-16 08:53
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-16 09:05
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 15:34 | Created python/scau_results/geotiff.py | — | ~2300 |
+| 15:34 | Edited python/scau_results/__main__.py | modified mesh_polygons() | ~57 |
+| 15:34 | Edited python/scau_results/__main__.py | modified locate_cells() | ~110 |
+| 15:35 | Edited python/scau_results/__main__.py | modified summarize() | ~76 |
+| 15:35 | Edited python/scau_results/__main__.py | expanded (+13 lines) | ~269 |
+| 15:35 | Edited python/scau_results/__main__.py | 1→2 lines | ~39 |
+| 15:35 | Edited python/scau_results/__main__.py | inline fix | ~22 |
+| 15:36 | Edited python/scau_results/__main__.py | 2→7 lines | ~145 |
+| 15:36 | Edited python/scau_results/__main__.py | 1→2 lines | ~42 |
+| 15:37 | Created python/tests/test_results_geotiff.py | — | ~1892 |
+| 15:38 | Edited python/scau_results/geotiff.py | modified _pip_vectorized() | ~253 |
+| 15:42 | Edited python/scau_results/geotiff.py | 11→13 lines | ~151 |
+| 15:42 | Edited python/scau_results/geotiff.py | 4→4 lines | ~55 |
+| 18:09 | Edited python/tests/test_results_geotiff.py | 1→3 lines | ~63 |
+| 20:13 | Edited python/scau_results/README.md | modified 2() | ~326 |
+| 21:29 | Edited python/scau_results/README.md | inline fix | ~52 |
+| 22:15 | Edited 开发收口任务清单.md | inline fix | ~40 |
+| 07:34 | Session end: 17 writes across 5 files (geotiff.py, __main__.py, test_results_geotiff.py, README.md, 开发收口任务清单.md) | 0 reads | ~5922 tok |
+| 11:15 | Edited qgis_plugin/scau_preproc_workbench/workbench_dialog.py | 1→2 lines | ~32 |
+| 11:16 | Edited qgis_plugin/scau_preproc_workbench/workbench_dialog.py | modified _build_results_page() | ~1296 |
+| 11:17 | Edited qgis_plugin/scau_preproc_workbench/workbench_dialog.py | added 1 import(s) | ~19 |
+| 11:18 | Edited tools/qgis/offscreen_smoke.py | 2→4 lines | ~106 |
+| 11:19 | Edited tools/qgis/offscreen_smoke.py | modified results() | ~655 |
+| 11:20 | Edited python/scau_results/__main__.py | 1→2 lines | ~44 |
+| 11:20 | Edited python/tests/test_results.py | 2→5 lines | ~82 |
+| 11:21 | Edited tools/qgis/offscreen_smoke.py | 15→17 lines | ~300 |
+| 11:22 | Edited tools/qgis/SMOKE_CHECKLIST.md | 1→2 lines | ~132 |
+| 11:23 | Edited tools/qgis/SMOKE_CHECKLIST.md | inline fix | ~92 |
+| 11:23 | Edited 开发收口任务清单.md | inline fix | ~42 |
+| 11:25 | Session end: 28 writes across 9 files (geotiff.py, __main__.py, test_results_geotiff.py, README.md, 开发收口任务清单.md) | 0 reads | ~8741 tok |
+| 20:57 | Edited apps/sim_driver/run_summary.hpp | expanded (+13 lines) | ~133 |
+| 21:50 | Edited apps/sim_driver/run_summary.hpp | 4→5 lines | ~35 |
+| 22:57 | Edited apps/sim_driver/run_summary.cpp | expanded (+11 lines) | ~170 |
+| 23:38 | Edited apps/sim_driver/run_loop.cpp | added 2 condition(s) | ~533 |
+| 00:01 | Edited tests/integration/sim_driver/test_sim_driver_run_loop.cpp | modified records() | ~470 |
+| 11:25 | Edited tests/integration/sim_driver/test_sim_driver_run_loop.cpp | modified records() | ~137 |
+| 11:27 | Edited tests/integration/sim_driver/test_sim_driver_run_loop.cpp | 7→10 lines | ~164 |
+
+## Session: 2026-09-21 22:35
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-21 22:37
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 22:41 | Created python/scau_results/linked.py | — | ~1681 |
+| 22:47 | Edited tests/integration/sim_driver/test_sim_driver_run_loop.cpp | 2→4 lines | ~70 |
+| 23:03 | Edited python/scau_results/__main__.py | 7→4 lines | ~79 |
+| 07:28 | Created python/tests/test_results_linked.py | — | ~1653 |
+| 07:32 | Edited qgis_plugin/scau_preproc_workbench/workbench_dialog.py | expanded (+11 lines) | ~418 |
+| 07:32 | Edited qgis_plugin/scau_preproc_workbench/workbench_dialog.py | modified _run_linked_view() | ~319 |
+| 07:32 | Edited tools/qgis/offscreen_smoke.py | modified is_file() | ~485 |
+| 07:33 | Edited tools/qgis/offscreen_smoke.py | expanded (+8 lines) | ~249 |
+| 08:25 | Edited superpowers/specs/2026-09-10-project-closure-evidence.md | "ab28aae" → "c7d47fe" | ~299 |

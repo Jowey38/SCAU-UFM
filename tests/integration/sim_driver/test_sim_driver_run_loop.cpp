@@ -1,4 +1,11 @@
 #include <cstdlib>
+#include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <netcdf.h>
+
+#include "surface_timeseries.hpp"
 #include <stdexcept>
 #include <string>
 
@@ -145,6 +152,45 @@ TEST(SimDriverRunLoop, CompletesTriModelRunWithConservativeWriteBack) {
     EXPECT_NE(json.find("\"outcome\": \"completed\""), std::string::npos);
     EXPECT_NE(json.find("\"committed_epochs\": 10"), std::string::npos);
 
+    // Per-link ledger records (M288-C linked view): one drainage link on cell 0
+    // to node 11, plus one river link on cell 1 to location 5; the constant
+    // 0.01 m3/s overflow fixture returns exactly 0.01 m3 per 1 s epoch.
+    // Link records are GROSS ledger movements; drained_volume/returned_volume
+    // are NET per-cell write-back deltas (a cell that both drains and receives
+    // in one epoch nets out). Gross and net must agree on the balance.
+    double granted_sum = 0.0, returned_sum = 0.0;
+    for (const sim::EpochRecord& record : result.summary.epochs) {
+        ASSERT_EQ(record.link_exchanges.size(), 2U);
+        const auto& drain = record.link_exchanges[0];
+        EXPECT_EQ(drain.engine, "drainage");
+        EXPECT_EQ(drain.node, 11);
+        EXPECT_EQ(drain.cell, 0U);
+        EXPECT_DOUBLE_EQ(drain.v_returned, 0.01);
+        const auto& river = record.link_exchanges[1];
+        EXPECT_EQ(river.engine, "river");
+        EXPECT_EQ(river.node, 5);
+        EXPECT_EQ(river.cell, 1U);
+        EXPECT_DOUBLE_EQ(river.v_returned, 0.0);
+        double epoch_granted = 0.0, epoch_returned = 0.0;
+        for (const auto& link : record.link_exchanges) {
+            epoch_granted += link.v_granted + link.v_repay;
+            epoch_returned += link.v_returned;
+        }
+        EXPECT_NEAR(epoch_granted - epoch_returned,
+                    record.drained_volume - record.returned_volume, 1.0e-12);
+        EXPECT_GE(epoch_granted, record.drained_volume - 1.0e-12);   // gross >= net
+        EXPECT_GE(epoch_returned, record.returned_volume - 1.0e-12);
+        granted_sum += epoch_granted;
+        returned_sum += epoch_returned;
+    }
+    EXPECT_NEAR(granted_sum - returned_sum,
+                result.summary.total_drained_volume - result.summary.total_returned_volume, 1.0e-12);
+    EXPECT_DOUBLE_EQ(returned_sum, 10 * 0.01);                        // exact gross overflow return
+    EXPECT_NE(json.find("\"link_exchanges\": [{\"engine\": \"drainage\", \"node\": 11, "
+                        "\"node_name\": \"11\", \"cell\": 0"),
+              std::string::npos);
+    EXPECT_EQ(result.summary.epochs[0].link_exchanges[1].node_name, "lat1");
+
     swmm.finalize();
     dflowfm.finalize();
 }
@@ -203,6 +249,93 @@ TEST(SimDriverRunLoop, DrainageOnlyNeverCallsDisabledRiver) {
     for (const auto& epoch : result.summary.epochs) {
         EXPECT_EQ(epoch.checkpoint_status, "committed");
     }
+}
+
+TEST(SimDriverRunLoop, OptionalTimeseriesPreservesStateAndWritesCommittedFrames) {
+    auto config = run_loop_config();
+    config.enable_dflowfm = false;
+    config.surface_river.clear();
+    const auto output = std::filesystem::temp_directory_path() /
+        ("scau_timeseries_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".nc");
+    const auto run = [](const sim::RuntimeConfig& cfg) {
+        sim::SimDriver driver;
+        driver.configure(cfg);
+        scau::coupling::drainage::MockSwmmEngine swmm;
+        scau::coupling::river::MockDFlowFMEngine river;
+        swmm.initialize("mock.inp");
+        swmm.set_node_head_fixture(11, 0.0);
+        return sim::run_simulation(driver, swmm, river);
+    };
+    const auto baseline = run(config);
+    config.surface_timeseries_path = output.string();
+    config.surface_output_every_epochs = 3U;
+    const auto observed = run(config);
+    EXPECT_EQ(observed.summary.final_surface_state_hash, baseline.summary.final_surface_state_hash);
+    EXPECT_DOUBLE_EQ(observed.summary.total_drained_volume, baseline.summary.total_drained_volume);
+    EXPECT_FALSE(std::filesystem::exists(output.string() + ".partial"));
+    int file = -1;
+    ASSERT_EQ(nc_open(output.string().c_str(), NC_NOWRITE, &file), NC_NOERR);
+    int dim = -1;
+    ASSERT_EQ(nc_inq_dimid(file, "time", &dim), NC_NOERR);
+    std::size_t count = 0;
+    ASSERT_EQ(nc_inq_dimlen(file, dim, &count), NC_NOERR);
+    EXPECT_EQ(count, 5U);
+    int var = -1;
+    ASSERT_EQ(nc_inq_varid(file, "time", &var), NC_NOERR);
+    std::vector<double> times(count);
+    ASSERT_EQ(nc_get_var_double(file, var, times.data()), NC_NOERR);
+    EXPECT_EQ(times, (std::vector<double>{0.0, 3.0, 6.0, 9.0, 10.0}));
+    EXPECT_EQ(nc_inq_varid(file, "wet_mask", &var), NC_NOERR);
+    // Provenance: the file binds source bytes and the final state; the sidecar
+    // manifest binds the published output bytes and must agree with both.
+    std::size_t len = 0;
+    ASSERT_EQ(nc_inq_attlen(file, NC_GLOBAL, "final_surface_state_hash", &len), NC_NOERR);
+    std::string attr_hash(len, '\0');
+    ASSERT_EQ(nc_get_att_text(file, NC_GLOBAL, "final_surface_state_hash", attr_hash.data()), NC_NOERR);
+    EXPECT_EQ(attr_hash, observed.summary.final_surface_state_hash);
+    ASSERT_EQ(nc_inq_attlen(file, NC_GLOBAL, "source_stcf_hash", &len), NC_NOERR);
+    std::string source_hash(len, '\0');
+    ASSERT_EQ(nc_get_att_text(file, NC_GLOBAL, "source_stcf_hash", source_hash.data()), NC_NOERR);
+    EXPECT_EQ(source_hash, sim::hash_file_bytes(config.stcf_case_path));
+    EXPECT_EQ(nc_close(file), NC_NOERR);
+    const auto manifest_path = output.string() + ".manifest.json";
+    ASSERT_TRUE(std::filesystem::exists(manifest_path));
+    const std::string manifest = [&] {
+        std::ifstream stream(manifest_path);  // closed before the file is removed below
+        return std::string((std::istreambuf_iterator<char>(stream)), {});
+    }();
+    EXPECT_NE(manifest.find("\"output_hash\": \"" + sim::hash_file_bytes(output) + "\""), std::string::npos);
+    EXPECT_NE(manifest.find("\"final_surface_state_hash\": \"" + attr_hash + "\""), std::string::npos);
+    EXPECT_NE(manifest.find("\"source_stcf_hash\": \"" + source_hash + "\""), std::string::npos);
+    EXPECT_NE(manifest.find("\"committed_epochs\": 10"), std::string::npos);
+    EXPECT_NE(manifest.find("\"frames\": 5"), std::string::npos);
+    EXPECT_FALSE(std::filesystem::exists(manifest_path + ".partial"));
+    // Run identity in the summary must agree with the manifest so a linked
+    // view can bind the two without relying on the final state alone.
+    EXPECT_EQ(observed.summary.source_stcf_hash, source_hash);
+    EXPECT_DOUBLE_EQ(observed.summary.dt_couple, 1.0);
+    EXPECT_TRUE(observed.summary.swmm_report_path.empty());   // mock engine writes no report
+    EXPECT_THROW(static_cast<void>(run(config)), std::invalid_argument);
+    std::filesystem::remove(output);
+    std::filesystem::remove(manifest_path);
+    // Preflight: a pre-existing MANIFEST alone must refuse the run before any
+    // engine advances (previously only the .nc/.partial were checked).
+    { std::ofstream(manifest_path) << "{}"; }
+    EXPECT_THROW(static_cast<void>(run(config)), std::invalid_argument);
+    EXPECT_FALSE(std::filesystem::exists(output));
+    EXPECT_FALSE(std::filesystem::exists(output.string() + ".partial"));
+    std::filesystem::remove(manifest_path);
+    config.dt_surface = 1.0;
+    const auto rejected = run(config);
+    EXPECT_EQ(rejected.committed_epochs, 0U);
+    EXPECT_FALSE(std::filesystem::exists(output));
+    const auto partial = output.string() + ".partial";
+    ASSERT_EQ(nc_open(partial.c_str(), NC_NOWRITE, &file), NC_NOERR);
+    ASSERT_EQ(nc_inq_dimid(file, "time", &dim), NC_NOERR);
+    ASSERT_EQ(nc_inq_dimlen(file, dim, &count), NC_NOERR);
+    EXPECT_EQ(count, 1U);  // only the initial frame, never the rejected epoch
+    EXPECT_EQ(nc_close(file), NC_NOERR);
+    std::filesystem::remove(partial);
 }
 
 TEST(SimDriverRunLoop, DrainageOnlyCflRollbackDoesNotAdvanceSwmm) {

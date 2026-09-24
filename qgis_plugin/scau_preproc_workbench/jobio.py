@@ -1578,3 +1578,198 @@ def project_index_rows(path: Path) -> list[tuple[str, str, str]]:
         rows.append((lamp, "ProjectJob", f"{job.get('output_dir')}: status={job.get('status')} "
                                          f"case={str(job.get('case_sha256'))[:12]} findings={job.get('findings')}"))
     return rows
+
+
+# --- P9 results page (M288-C) -------------------------------------------------
+# The page is a thin shell: every check lives in scau_results (system python),
+# which owns provenance, schema and derived-map rules. This module only shapes
+# its JSON for tables and never re-derives physics.
+
+
+def run_results(result_nc: str, repo_root: str, output_json: Path, *,
+                threshold_m: float = 0.01, points: list[tuple[float, float]] | None = None,
+                geotiff_dir: Path | None = None, pixel_size_m: float | None = None,
+                python_launcher: list[str] | None = None, timeout_s: float = 300.0) -> dict:
+    """Runs `python -m scau_results` and returns {"status", "stderr", "derived"}.
+
+    Fail-closed results (missing manifest, tampered bytes, outside-mesh point)
+    are returned as data for the findings table, never raised."""
+    if not repo_root_valid(repo_root):
+        return {"status": "repo_root_invalid", "stderr": f"invalid repo root {repo_root!r}", "derived": None}
+    if not Path(result_nc).is_file():
+        return {"status": "fatal", "stderr": f"result file not found: {result_nc}", "derived": None}
+    if output_json.exists():
+        return {"status": "fatal", "stderr": f"refusing to overwrite {output_json}", "derived": None}
+    command = list(python_launcher or DEFAULT_PYTHON_LAUNCHER) + [
+        "-m", "scau_results", str(result_nc), "--threshold", repr(float(threshold_m)),
+        "--output", str(output_json)]
+    if points:
+        command += ["--points"] + [repr(float(v)) for xy in points for v in xy]
+    if geotiff_dir is not None:
+        if pixel_size_m is None:
+            return {"status": "fatal", "stderr": "GeoTIFF export needs a pixel size", "derived": None}
+        command += ["--geotiff-dir", str(geotiff_dir), "--pixel-size", repr(float(pixel_size_m))]
+    try:
+        completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout_s,
+                                   cwd=str(Path(repo_root) / "python"), env=subprocess_env())
+    except subprocess.TimeoutExpired:
+        return {"status": "timeout", "stderr": f"scau_results exceeded {timeout_s}s", "derived": None}
+    except OSError as error:
+        return {"status": "launcher_error", "stderr": str(error), "derived": None}
+    derived = _read_json(output_json) if completed.returncode == 0 else None
+    return {"status": "ok" if derived is not None else "fatal",
+            "stderr": (completed.stderr or "").strip(), "derived": derived}
+
+
+def results_summary_rows(result: dict) -> list[tuple[str, str, str]]:
+    if result.get("status") != "ok" or not result.get("derived"):
+        return [("fatal", "ResultsRejected", result.get("stderr") or result.get("status", "unknown"))]
+    d = result["derived"]
+    rows = [("pass", "ResultsValidated",
+             f"frames={d['frames']} cells={d['cells']} committed_epochs={d['committed_epochs']} "
+             f"threshold={d['threshold_m']} m"),
+            ("info", "Provenance",
+             f"output={d['source_hash']} source_stcf={d['source_stcf_hash']} "
+             f"final_state={d['final_surface_state_hash']}")]
+    depths = d.get("max_depth_m") or []
+    wet = sum(1 for a in d.get("arrival_time_s", []) if a is not None)
+    rows.append(("info", "DerivedMaps",
+                 f"max_depth max={max(depths) if depths else 0:.3f} m; cells ever wet={wet}/{len(depths)}"))
+    g = d.get("geotiff")
+    if g:
+        lamp = "pass" if g.get("georeferenced") else "review"
+        rows.append((lamp, "GeoTIFF",
+                     f"{len(g['files'])} raster(s) {g['width']}x{g['height']} @ {g['pixel_size_m']} m; "
+                     f"crs={g.get('crs') or 'undeclared'} ({g.get('crs_source')})"))
+    s = d.get("sampled")
+    if s:
+        rows.append(("info", "SampledCells", f"points={len(s['points_xy'])} -> cells={s['cells']}"))
+    return rows
+
+
+def results_series_rows(derived: dict | None) -> list[tuple[str, ...]]:
+    """(time_s, cell, h, eta, hu, hv) rows in sampled order for a table widget."""
+    series = (derived or {}).get("series")
+    if not series:
+        return []
+    rows = []
+    for k, cell in enumerate(series["cells"]):
+        for i, t in enumerate(series["time_s"]):
+            rows.append((f"{t:g}", str(cell), f"{series['h'][k][i]:.4f}", f"{series['eta'][k][i]:.4f}",
+                         f"{series['hu'][k][i]:.4g}", f"{series['hv'][k][i]:.4g}"))
+    return rows
+
+
+def results_raster_paths(derived: dict | None) -> list[tuple[str, str]]:
+    """(layer name, path) for every GeoTIFF the CLI reported, in a stable order."""
+    files = ((derived or {}).get("geotiff") or {}).get("files") or {}
+    return [(name, files[name]["path"]) for name in sorted(files)]
+
+
+def run_linked_view(summary_json: str, repo_root: str, output_json: Path, *,
+                    swmm_report: str | None = None, result_manifest: str | None = None,
+                    python_launcher: list[str] | None = None, timeout_s: float = 120.0) -> dict:
+    """Runs `python -m scau_results link`; fail-closed outcomes come back as data."""
+    if not repo_root_valid(repo_root):
+        return {"status": "repo_root_invalid", "stderr": f"invalid repo root {repo_root!r}", "linked": None}
+    if not Path(summary_json).is_file():
+        return {"status": "fatal", "stderr": f"run summary not found: {summary_json}", "linked": None}
+    if output_json.exists():
+        return {"status": "fatal", "stderr": f"refusing to overwrite {output_json}", "linked": None}
+    command = list(python_launcher or DEFAULT_PYTHON_LAUNCHER) + ["-m", "scau_results", "link", str(summary_json),
+                                                                  "--output", str(output_json)]
+    if swmm_report:
+        command += ["--swmm-report", str(swmm_report)]
+    if result_manifest:
+        command += ["--result-manifest", str(result_manifest)]
+    try:
+        completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout_s,
+                                   cwd=str(Path(repo_root) / "python"), env=subprocess_env())
+    except subprocess.TimeoutExpired:
+        return {"status": "timeout", "stderr": f"link exceeded {timeout_s}s", "linked": None}
+    except OSError as error:
+        return {"status": "launcher_error", "stderr": str(error), "linked": None}
+    linked = _read_json(output_json) if completed.returncode == 0 else None
+    return {"status": "ok" if linked is not None else "fatal",
+            "stderr": (completed.stderr or "").strip(), "linked": linked}
+
+
+def linked_rows(result: dict) -> list[tuple[str, ...]]:
+    """(engine, node, cell, ledger_in_m3, returned_m3, rpt_lateral_m3, signed_gap_m3, rel_gap, diagnostic)."""
+    linked = result.get("linked") or {}
+    rows = []
+    for link in linked.get("links", []):
+        native = link.get("engine_native") or {}
+        gap = link.get("gap") or {}
+        rel = gap.get("relative_gap")
+        rows.append((link["engine"], str(link["node_name"]), str(link["cell"]),
+                     f"{link['granted_m3'] + link['repay_m3']:.3f}", f"{link['returned_m3']:.3f}",
+                     f"{native['lateral_inflow_volume_m3']:.0f}" if "lateral_inflow_volume_m3" in native else "-",
+                     f"{gap['signed_gap_m3']:+.2f}" if "signed_gap_m3" in gap else "-",
+                     f"{rel:+.2%}" if isinstance(rel, (int, float)) and rel == rel and abs(rel) != float("inf") else "-",
+                     gap.get("diagnostic_code", "-")))
+    return rows
+
+
+def linked_summary_rows(result: dict) -> list[tuple[str, str, str]]:
+    if result.get("status") != "ok" or not result.get("linked"):
+        return [("fatal", "LinkedViewRejected", result.get("stderr") or result.get("status", "unknown"))]
+    linked = result["linked"]
+    bound = linked.get("result_manifest_bound")
+    rows = [("pass" if bound else "review", "LinkedView",
+             f"links={len(linked.get('links', []))} epochs={linked.get('committed_epochs')} "
+             f"bound_to_surface_result={'yes (full result validation)' if bound else 'no (no manifest given)'}")]
+    rpt = linked.get("swmm_report")
+    if rpt:
+        rows.append(("pass", "SwmmReportBound",
+                     f"bytes match this run's recorded report hash; SWMM {rpt.get('swmm_version')}; "
+                     f"{rpt.get('volume_precision')}"))
+        err = rpt.get("routing_continuity_error_pct")
+        rows.append(("review" if err is not None and abs(err) > 1.0 else "info", "SwmmRoutingContinuity",
+                     f"{err}% (global model error; {rpt.get('scope_note')})"))
+    # Per-link gap diagnostics: one row per link with a detected gap. The
+    # verdict is conservative by design: we never attribute to a known engine
+    # behaviour without the full evidence set, and never correct anything.
+    for link in linked.get("links", []):
+        gap = link.get("gap")
+        if not gap or gap.get("diagnostic_code") == "NO_GAP":
+            continue
+        rows.append(("review", gap["diagnostic_code"],
+                     f"{link['node_name']}: ledger in {gap['ledger_in_m3']:.2f} m3, SWMM lateral "
+                     f"{gap['rpt_lateral_m3']:.0f} m3, signed gap {gap['signed_gap_m3']:+.2f} m3 "
+                     f"({gap['relative_gap']:+.2%}). Originals preserved; no reconciliation applied. "
+                     f"{gap['note']}"))
+    rows.append(("info", "DFlowNative", str(linked.get("dflowfm_native"))))
+    return rows
+
+
+def model_crs_for_result(result_nc: str) -> tuple[str | None, str]:
+    """Governed model CRS for a surface result: the `target_crs` of a PreProc
+    pipeline manifest found beside the source STCF whose `case_sha256` matches
+    the STCF bytes (the same rule scau_results.geotiff.resolve_crs applies).
+    Pure stdlib + the sidecar manifest, so the shell never imports analysis
+    code. Returns (crs or None, provenance label); never guesses."""
+    import hashlib
+    manifest_path = Path(str(result_nc) + ".manifest.json")
+    if not manifest_path.is_file():
+        return None, "result manifest missing"
+    try:
+        source = Path(str(json.loads(manifest_path.read_text(encoding="utf-8")).get("source_stcf", "")))
+    except (OSError, ValueError) as error:
+        return None, f"unreadable result manifest: {error}"
+    if not source.is_file():
+        return None, "source STCF absent"
+    candidates = [source.parent.parent / "validation" / "pipeline_manifest.json",
+                  source.with_name(source.name.replace(".stcf.nc", ".pipeline_manifest.json"))]
+    for candidate in candidates:
+        if not candidate.is_file():
+            continue
+        try:
+            manifest = json.loads(candidate.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
+            return None, f"unreadable pipeline manifest: {error}"
+        if manifest.get("case_sha256") != hashlib.sha256(source.read_bytes()).hexdigest():
+            return None, f"{candidate.name} case_sha256 does not match source STCF"
+        crs = (manifest.get("crs_governance") or {}).get("target_crs")
+        return (crs, f"pipeline_manifest:{candidate.name}") if crs else (None, "pipeline manifest has no CRS governance")
+    return None, "undeclared (no pipeline manifest beside source STCF)"

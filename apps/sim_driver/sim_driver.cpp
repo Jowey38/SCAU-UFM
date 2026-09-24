@@ -87,6 +87,9 @@ void validate_runtime_config(const RuntimeConfig& config) {
         throw std::invalid_argument("cfl_safety must not exceed 1.0");
     }
     require_positive_finite(config.c_rollback, "c_rollback");
+    if (config.surface_output_every_epochs == 0U) {
+        throw std::invalid_argument("surface_output_every_epochs must be positive");
+    }
     if (config.n_writeoff_steps == 0U) {
         throw std::invalid_argument("n_writeoff_steps must be positive");
     }

@@ -84,6 +84,20 @@ TEST(RuntimeConfigIo, ParsesFullConfigAndPassesValidation) {
     EXPECT_NO_THROW(validate_runtime_config(config));
 }
 
+TEST(RuntimeConfigIo, TimeseriesIsOptInAndRequiresPositiveFrequency) {
+    const auto baseline = parse_runtime_config_text(kFullConfig);
+    EXPECT_TRUE(baseline.surface_timeseries_path.empty());
+    auto enabled = parse_runtime_config_text(std::string(kFullConfig) +
+        "surface_timeseries_path = results.nc\nsurface_output_every_epochs = 3\n");
+    EXPECT_EQ(enabled.surface_timeseries_path, "results.nc");
+    EXPECT_EQ(enabled.surface_output_every_epochs, 3U);
+    EXPECT_NO_THROW(validate_runtime_config(enabled));
+    enabled.surface_output_every_epochs = 0U;
+    EXPECT_THROW(validate_runtime_config(enabled), std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(parse_runtime_config_text(
+        "version = 2\nsurface_output_every_epochs = -1\n")), std::invalid_argument);
+}
+
 TEST(RuntimeConfigIo, RejectsUnknownAndDuplicateKeys) {
     EXPECT_THROW(
         static_cast<void>(parse_runtime_config_text("version = 2\nno_such_key = 1\n")),

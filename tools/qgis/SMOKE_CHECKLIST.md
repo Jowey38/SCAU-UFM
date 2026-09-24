@@ -5,7 +5,7 @@ Run after every plugin change on **both** tracks; paste the `SMOKE …` lines of
 
 | Track | Interpreter | Status (2026-09-09) |
 |---|---|---|
-| QGIS 4.0.0 (Qt6, python-qgis.bat) | `"<QGIS 4>/bin/python-qgis.bat"` | **executed**: construct, data_tree, report_browser, parameter_tables, field_mapping, project_index_roundtrip, run_pipeline, *_after_run all `ok`; `--exercise-edits` writes exactly the three `v001` files |
+| QGIS 4.0.0 (Qt6, python-qgis.bat) | `"<QGIS 4>/bin/python-qgis.bat"` | **executed**: construct, data_tree, report_browser, parameter_tables, field_mapping, project_index_roundtrip, run_pipeline, *_after_run all `ok`; `--exercise-edits` writes exactly the three `v001` files; **2026-09-18** `--results-nc` P9 page `ok` incl. tamper rejection |
 | QGIS 3.40 LTR (Qt5, python-qgis-ltr.bat) | `"<QGIS 3.40>/bin/python-qgis-ltr.bat"` | **not installed on the development host** — item open; the plugin declares `qgisMinimumVersion=3.40` and uses only `qgis.PyQt` enum forms valid on Qt5/Qt6 |
 
 ## Recipe (Windows, from Git Bash via a .bat wrapper)
@@ -28,6 +28,7 @@ add `--terrain-policy <policy.json>` for the B3 field.
 - [ ] `project_index_roundtrip` — `project.ufm.json` save → edit field → open restores it
 - [ ] `run_pipeline` (`--run`) — `PipelineOk`; export gate label updates; `project.ufm.json` refreshed beside the output dir
 - [ ] `--exercise-edits` on a package copy — `dpm_rule_table.v001.json` (approval reset), `soil_parameters.v001.csv`, `field_mapping.v001.json`
+- [ ] `--results-nc <run.nc>` (P9) — `ResultsValidated` + `Provenance` rows; one sample point resolves to `cells=[379]` on the synthetic case; 3 `RasterLoaded` rows and `scau_{max_depth_m,arrival_time_s,duration_s}` layers; series table has 4 rows; a byte-tampered same-name copy yields exactly `ResultsRejected … output bytes do not match manifest`; **1D/2D 联看**: with `dual-results-summary.json` + `dual-swmm.rpt` beside the results file, `LinkedView` lamp is `pass`, `SwmmReportBound` present (report bytes match the run's recorded hash), J1 and J2 each raise `ROUTING_GAP_ATTRIBUTION_INSUFFICIENT` (never `KNOWN_ROUTING_CONTINUITY_GAP`), canvas picking offscreen yields only `NoCanvas`, and a fabricated manifest yields `LinkedViewRejected` from full result validation
 - [ ] Interactive only: toolbar icon shows `icon.svg`; menu entry under `SCAU-UFM`; Plugin Reloader picks up a redeploy
 
 ## Deployment / reload

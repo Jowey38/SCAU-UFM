@@ -74,6 +74,10 @@ public:
     [[nodiscard]] int node_index(const std::string& node_name) const;
     [[nodiscard]] int link_index(const std::string& link_name) const;
 
+    // Paths handed to swmm_open; the report is only complete after finalize().
+    [[nodiscard]] const std::string& report_path() const noexcept { return report_path_; }
+    [[nodiscard]] const std::string& inp_path() const noexcept { return inp_path_; }
+
     // Whole-domain current hydraulic storage (nodes + links) in m3. This is a
     // concrete embedded-SWMM observation, not part of the generic engine ABI.
     [[nodiscard]] double total_stored_volume() const;
@@ -92,6 +96,8 @@ private:
     bool initialized_{false};
     double elapsed_days_{0.0};
     bool simulation_ended_{false};
+    std::string inp_path_{};
+    std::string report_path_{};
 };
 
 [[nodiscard]] core::EngineReport make_swmm_engine_report(const SwmmEngine& engine);
