@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 
 #include "coupling/drainage/swmm_boundary.hpp"
+#include "coupling/driver/dflowfm_external_net_provider.hpp"
 #include "coupling/river/dflowfm_boundary.hpp"
 #include "run_loop.hpp"
 #include "run_summary.hpp"
@@ -85,6 +86,14 @@ sim::RuntimeConfig run_loop_config() {
     river.exchange_width = 1.0;
     config.surface_river.push_back(river);
     return config;
+}
+
+// A native observation binds the run to the river model INPUT bytes, so a
+// C3 run needs a real MDU file even with the mock engine (the mock ignores it).
+std::string write_fixture_mdu(const char* name) {
+    const auto path = std::filesystem::temp_directory_path() / name;
+    std::ofstream(path) << "[model]\nProgram = D-Flow FM\n[geometry]\nNetFile = fixture_net.nc\n";
+    return path.string();
 }
 
 }  // namespace
@@ -193,6 +202,166 @@ TEST(SimDriverRunLoop, CompletesTriModelRunWithConservativeWriteBack) {
 
     swmm.finalize();
     dflowfm.finalize();
+}
+
+// C3 provider contract in the run loop (mock engines, harness-owned native
+// observation). The mock river cannot produce a native water balance, so the
+// hook is a fixture that mirrors what the concrete provider returns: cumulative
+// gross classes since initialize. Locks: identity frozen from the config and
+// emitted in the summary; one native record per committed epoch; wrong series
+// -> review_required with refused rollback; wrong identity -> no run at all.
+TEST(SimDriverRunLoop, RecordsAndValidatesC3ProviderContract) {
+    auto config = run_loop_config();
+    config.dflowfm_mdu_path = write_fixture_mdu("scau_c3_fixture.mdu");
+    sim::SimDriver driver;
+    driver.configure(config);
+
+    scau::coupling::drainage::MockSwmmEngine swmm;
+    scau::coupling::river::MockDFlowFMEngine dflowfm;
+    swmm.initialize("mock.inp");
+    dflowfm.initialize(config.dflowfm_mdu_path);
+    swmm.set_node_head_fixture(11, 0.0);
+    dflowfm.set_water_level_fixture(5, 0.2);
+
+    // Fixture provider: api-lateral inflow accumulates what the driver wrote
+    // into the mock lateral (the lateral_discharge the mock retains, times dt).
+    double cumulative_lateral = 0.0;
+    sim::RunLoopHooks hooks{};
+    hooks.dflowfm_native_observation = [&]() {
+        scau::coupling::driver::DFlowFMExternalNetObservation o{};
+        o.scope_complete = true;
+        o.storage_m3 = 100.0 + cumulative_lateral;
+        o.api_lateral_in_m3 = cumulative_lateral;
+        return o;
+    };
+    hooks.dflowfm_elapsed_time = [&]() {
+        // Called at each commit after the engine advanced: fold this epoch's
+        // written lateral (the compound native variable the driver targets
+        // when native_lateral_id is set) into the cumulative fixture.
+        cumulative_lateral += dflowfm.get_value("laterals/lat1/water_discharge", 0) * 1.0;
+        return dflowfm.elapsed_time();
+    };
+
+    const sim::RunLoopResult result = sim::run_simulation(driver, swmm, dflowfm, hooks);
+    ASSERT_EQ(result.summary.outcome, "completed") << result.summary.reason;
+
+    EXPECT_TRUE(result.summary.dflowfm_enabled);
+    EXPECT_TRUE(result.summary.dflowfm_native_observed);
+    EXPECT_EQ(result.summary.dflowfm_provider_id, "dflowfm");
+    EXPECT_EQ(result.summary.dflowfm_capability, "dflowfm.external_net.v1");
+    EXPECT_EQ(result.summary.dflowfm_mdu_hash, sim::hash_file_bytes(config.dflowfm_mdu_path));
+    EXPECT_EQ(result.summary.dflowfm_mdu_path, config.dflowfm_mdu_path);
+    ASSERT_EQ(result.summary.dflowfm_boundaries.size(), 1U);
+    EXPECT_EQ(result.summary.dflowfm_boundaries[0].boundary_id, "lat1");
+    EXPECT_EQ(result.summary.dflowfm_boundaries[0].provider_object_id, 5);
+    EXPECT_EQ(result.summary.dflowfm_boundaries[0].surface_cell, 1U);
+    EXPECT_EQ(result.summary.dflowfm_boundaries[0].exchange_kind, "api_lateral");
+
+    double ledger_river_in = 0.0;
+    for (const sim::EpochRecord& record : result.summary.epochs) {
+        ASSERT_TRUE(record.has_dflowfm_native);
+        ledger_river_in += record.link_exchanges[1].v_granted + record.link_exchanges[1].v_repay;
+        // Cumulative native api-lateral equals the cumulative river ledger
+        // (same definition: what the driver wrote as lateral discharge * dt).
+        EXPECT_NEAR(record.dflowfm_native.api_lateral_in_m3, ledger_river_in, 1.0e-9);
+    }
+    EXPECT_NEAR(result.summary.epochs.back().dflowfm_native.api_lateral_in_m3,
+                result.summary.total_dflowfm_lateral_volume, 1.0e-9);
+
+    const std::string json = sim::to_json(result.summary);
+    EXPECT_NE(json.find("\"dflowfm\": {\"provider_id\": \"dflowfm\", "
+                        "\"capability\": \"dflowfm.external_net.v1\""), std::string::npos);
+    EXPECT_NE(json.find("\"boundaries\": [{\"boundary_id\": \"lat1\", \"provider_object_id\": 5, "
+                        "\"surface_cell\": 1, \"exchange_kind\": \"api_lateral\"}]"),
+              std::string::npos);
+    EXPECT_NE(json.find("\"dflowfm_native\": {\"storage_m3\": "), std::string::npos);
+
+    swmm.finalize();
+    dflowfm.finalize();
+}
+
+TEST(SimDriverRunLoop, C3NativeSeriesViolationLandsInReviewRequired) {
+    auto config = run_loop_config();
+    config.dflowfm_mdu_path = write_fixture_mdu("scau_c3_fixture.mdu");
+    sim::SimDriver driver;
+    driver.configure(config);
+    scau::coupling::drainage::MockSwmmEngine swmm;
+    scau::coupling::river::MockDFlowFMEngine dflowfm;
+    swmm.initialize("mock.inp");
+    dflowfm.initialize(config.dflowfm_mdu_path);
+    swmm.set_node_head_fixture(11, 0.0);
+    dflowfm.set_water_level_fixture(5, 0.2);
+
+    // Cumulative boundary inflow that runs BACKWARDS at the third commit.
+    int calls = 0;
+    sim::RunLoopHooks hooks{};
+    hooks.dflowfm_native_observation = [&]() {
+        scau::coupling::driver::DFlowFMExternalNetObservation o{};
+        o.scope_complete = true;
+        o.storage_m3 = 100.0;
+        o.boundary_in_m3 = (calls == 3) ? 1.0 : static_cast<double>(calls) * 2.0;
+        ++calls;
+        return o;
+    };
+    const sim::RunLoopResult result = sim::run_simulation(driver, swmm, dflowfm, hooks);
+    EXPECT_EQ(result.summary.outcome, "review_required");
+    EXPECT_EQ(result.summary.recovery_action, "refused_engine_rollback");
+    EXPECT_NE(result.summary.reason.find("dflowfm_contract_native_monotonicity_violated"),
+              std::string::npos);
+    EXPECT_EQ(result.committed_epochs, 2U);          // epochs 0 and 1 committed; 2 rejected
+    EXPECT_EQ(result.summary.epochs.size(), 2U);
+}
+
+TEST(SimDriverRunLoop, C3NativeWithoutMduBytesIsRejectedBeforeRunning) {
+    // mock.mdu is not a file: binding a native observation to an unhashable
+    // river input would leave the native result unprovable -> fail closed.
+    sim::SimDriver driver;
+    driver.configure(run_loop_config());
+    scau::coupling::drainage::MockSwmmEngine swmm;
+    scau::coupling::river::MockDFlowFMEngine dflowfm;
+    swmm.initialize("mock.inp");
+    dflowfm.initialize("mock.mdu");
+    sim::RunLoopHooks hooks{};
+    hooks.dflowfm_native_observation = []() {
+        scau::coupling::driver::DFlowFMExternalNetObservation o{};
+        o.scope_complete = true;
+        return o;
+    };
+    try {
+        (void)sim::run_simulation(driver, swmm, dflowfm, hooks);
+        FAIL() << "native scope without MDU bytes must be rejected";
+    } catch (const scau::coupling::river::DFlowFMEngineError& error) {
+        EXPECT_EQ(error.error_code(), "dflowfm_contract_case_identity_missing");
+    }
+    EXPECT_DOUBLE_EQ(dflowfm.elapsed_time(), 0.0);
+}
+
+TEST(SimDriverRunLoop, C3RejectsDuplicateBoundaryIdentityBeforeRunning) {
+    // mixed-minimal has two cells and both are coupled, so a second river link
+    // cannot pass SimDriver::configure's single-writer rule; the identity
+    // collision is therefore exercised on the exact contract the run loop
+    // freezes from a config (same builder, same validator, before any engine).
+    auto config = run_loop_config();
+    sim::SurfaceRiverLinkConfig twin = config.surface_river[0];
+    twin.cell = 0U;
+    twin.location_id = 6;                     // different object, SAME name -> reject
+    config.surface_river.push_back(twin);
+    try {
+        (void)sim::validate_dflowfm_contract_for_config(config, /*native_observed=*/false);
+        FAIL() << "duplicate boundary_id must be rejected";
+    } catch (const scau::coupling::river::DFlowFMEngineError& error) {
+        EXPECT_EQ(error.error_code(), "dflowfm_contract_boundary_id_duplicate");
+    }
+    config.surface_river[1].native_lateral_id = "lat2";
+    config.surface_river[1].location_id = 5;  // same object, different name -> reject
+    try {
+        (void)sim::validate_dflowfm_contract_for_config(config, false);
+        FAIL() << "duplicate provider_object_id must be rejected";
+    } catch (const scau::coupling::river::DFlowFMEngineError& error) {
+        EXPECT_EQ(error.error_code(), "dflowfm_contract_provider_object_duplicate");
+    }
+    config.surface_river[1].location_id = 6;
+    EXPECT_NO_THROW((void)sim::validate_dflowfm_contract_for_config(config, false));
 }
 
 TEST(SimDriverRunLoop, CflRollbackStopsBeforeEnginesAdvance) {

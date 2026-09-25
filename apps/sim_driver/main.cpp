@@ -124,6 +124,11 @@ int main(int argc, char** argv) {
             return observation.storage_m3;
         };
         hooks.swmm_report_path = [&swmm]() { return swmm.report_path(); };
+        if (config.enable_dflowfm) {
+            hooks.dflowfm_native_observation = [&dflowfm]() {
+                return scau::coupling::driver::observe_dflowfm_external_net(dflowfm);
+            };
+        }
         return run_with_engines(driver, swmm, dflowfm, hooks, config.enable_dflowfm);
 #else
         std::cerr << "scau_sim: engine_mode=real requires SCAU_EMBED_SWMM and "

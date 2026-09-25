@@ -25,6 +25,28 @@ struct LinkExchangeRecord {
     double v_returned{0.0};
 };
 
+// C3 boundary identity as frozen for this run: the case-owned lateral id,
+// the engine-side object id and the surface cell. The `river` link records
+// above reference the same (node = provider_object_id, node_name = boundary_id).
+struct DFlowFMBoundaryRecord {
+    std::string boundary_id{};
+    int provider_object_id{0};
+    std::size_t surface_cell{0U};
+    std::string exchange_kind{};
+};
+
+// Engine-native cumulative water balance at a committed epoch (real mode
+// only). Values are since engine initialize, in m3; boundary_* are the open
+// river boundaries in aggregate, api_lateral_* the CouplingLib-driven laterals.
+struct DFlowFMNativeEpochRecord {
+    double storage_m3{0.0};
+    double boundary_in_m3{0.0};
+    double boundary_out_m3{0.0};
+    double api_lateral_in_m3{0.0};
+    double api_lateral_out_m3{0.0};
+    double volume_error_cumulative_m3{0.0};
+};
+
 struct EpochRecord {
     std::uint64_t epoch{0U};
     double logical_time{0.0};
@@ -53,6 +75,9 @@ struct EpochRecord {
     double writeoff_volume_total{0.0};
     std::vector<std::string> writeoff_endpoint_ids{};
     std::vector<LinkExchangeRecord> link_exchanges{};
+    // Set only when the run bound the native D-Flow FM water balance.
+    bool has_dflowfm_native{false};
+    DFlowFMNativeEpochRecord dflowfm_native{};
 };
 
 struct RunSummary {
@@ -89,6 +114,18 @@ struct RunSummary {
     std::string swmm_report_hash{};
     double start_time{0.0};
     double dt_couple{0.0};
+    // C3 D-Flow FM provider contract block. Present only when the river engine
+    // participates. `native_observed` is true when the concrete engine's native
+    // water balance was bound (real mode); the per-epoch `dflowfm_native`
+    // records are then cumulative-since-initialize gross classes validated
+    // against the contract time base before the summary is written.
+    bool dflowfm_enabled{false};
+    std::string dflowfm_provider_id{};
+    std::string dflowfm_capability{};
+    std::string dflowfm_mdu_path{};
+    std::string dflowfm_mdu_hash{};
+    bool dflowfm_native_observed{false};
+    std::vector<DFlowFMBoundaryRecord> dflowfm_boundaries{};
     bool whole_system_mass_audit_enabled{false};
     std::string whole_system_mass_verdict{};
     double final_whole_system_mass_residual{0.0};

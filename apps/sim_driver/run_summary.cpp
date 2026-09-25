@@ -67,6 +67,31 @@ std::string to_json(const RunSummary& summary) {
     out << "  \"swmm_report_hash\": \"" << escape_json_string(summary.swmm_report_hash) << "\",\n";
     out << "  \"start_time\": " << summary.start_time << ",\n";
     out << "  \"dt_couple\": " << summary.dt_couple << ",\n";
+    out << "  \"dflowfm\": ";
+    if (!summary.dflowfm_enabled) {
+        out << "null,\n";
+    } else {
+        out << "{\"provider_id\": \"" << escape_json_string(summary.dflowfm_provider_id)
+            << "\", \"capability\": \"" << escape_json_string(summary.dflowfm_capability)
+            << "\", \"mdu_path\": \"" << escape_json_string(summary.dflowfm_mdu_path)
+            << "\", \"mdu_hash\": \"" << escape_json_string(summary.dflowfm_mdu_hash)
+            << "\", \"native_observed\": " << (summary.dflowfm_native_observed ? "true" : "false")
+            << ", \"flux_convention\": {\"positive_direction\": \"into_river_domain\", "
+               "\"inflow_variable\": \"boundary_in_m3\", \"outflow_variable\": \"boundary_out_m3\", "
+               "\"api_lateral_in_variable\": \"api_lateral_in_m3\", "
+               "\"api_lateral_out_variable\": \"api_lateral_out_m3\"}"
+            << ", \"units\": {\"volume\": \"m3\", \"time\": \"s\"}"
+            << ", \"boundaries\": [";
+        for (std::size_t i = 0U; i < summary.dflowfm_boundaries.size(); ++i) {
+            const auto& b = summary.dflowfm_boundaries[i];
+            out << (i == 0U ? "" : ", ")
+                << "{\"boundary_id\": \"" << escape_json_string(b.boundary_id)
+                << "\", \"provider_object_id\": " << b.provider_object_id
+                << ", \"surface_cell\": " << b.surface_cell
+                << ", \"exchange_kind\": \"" << escape_json_string(b.exchange_kind) << "\"}";
+        }
+        out << "]},\n";
+    }
     out << "  \"whole_system_mass_audit_enabled\": "
         << (summary.whole_system_mass_audit_enabled ? "true" : "false") << ",\n";
     out << "  \"whole_system_mass_verdict\": \""
@@ -148,7 +173,19 @@ std::string to_json(const RunSummary& summary) {
                 << ", \"v_repay\": " << link.v_repay
                 << ", \"v_returned\": " << link.v_returned << "}";
         }
-        out << "]}";
+        out << "], \"dflowfm_native\": ";
+        if (!record.has_dflowfm_native) {
+            out << "null";
+        } else {
+            const auto& n = record.dflowfm_native;
+            out << "{\"storage_m3\": " << n.storage_m3
+                << ", \"boundary_in_m3\": " << n.boundary_in_m3
+                << ", \"boundary_out_m3\": " << n.boundary_out_m3
+                << ", \"api_lateral_in_m3\": " << n.api_lateral_in_m3
+                << ", \"api_lateral_out_m3\": " << n.api_lateral_out_m3
+                << ", \"volume_error_cumulative_m3\": " << n.volume_error_cumulative_m3 << "}";
+        }
+        out << "}";
     }
     out << (summary.epochs.empty() ? "]\n" : "\n  ]\n");
     out << "}\n";
