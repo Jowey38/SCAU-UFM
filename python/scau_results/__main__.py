@@ -231,11 +231,13 @@ def main_link(argv: list[str]) -> int:
     parser.add_argument("--swmm-report", type=Path, default=None, help="SWMM .rpt from the same run")
     parser.add_argument("--result-manifest", type=Path, default=None,
                         help="<run.nc>.manifest.json; binds the view to the surface result by state hash")
+    parser.add_argument("--dflowfm-mdu", type=Path, default=None,
+                        help="D-Flow FM .mdu the run used; bound by the byte hash the run recorded (C3)")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     from scau_results.linked import linked_view
     try:
-        view = linked_view(args.summary, args.swmm_report, args.result_manifest)
+        view = linked_view(args.summary, args.swmm_report, args.result_manifest, args.dflowfm_mdu)
         with args.output.open("x", encoding="utf-8", newline="\n") as stream:
             stream.write(json.dumps(view, sort_keys=True, indent=2, allow_nan=False) + "\n")
     except (OSError, ValueError, KeyError) as error:

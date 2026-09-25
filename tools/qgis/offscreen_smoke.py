@@ -167,6 +167,12 @@ def main() -> int:
                 assert "SwmmReportBound" in codes, codes            # report bytes proven to be this run's
                 assert codes.count("ROUTING_GAP_ATTRIBUTION_INSUFFICIENT") == 2, codes   # J1 and J2, no attribution
                 assert "KNOWN_ROUTING_CONTINUITY_GAP" not in codes, codes
+                # C3: a surface+SWMM run has no river engine; the D-Flow row must
+                # say so rather than pretend a native result was consumed
+                dfl = [dialog._findings.item(r, 2).text() for r in range(dialog._findings.rowCount())
+                       if dialog._findings.item(r, 1).text() == "DFlowNative"]
+                print("SMOKE linked_dflowfm", dfl)
+                assert dfl == ["river engine not part of this run"], dfl
                 assert dialog._results_linked.rowCount() == 2, dialog._results_linked.rowCount()
                 nodes = [dialog._results_linked.item(r, 1).text() for r in range(2)]
                 print("SMOKE linked_nodes", nodes, [(dialog._results_linked.item(r, 6).text(),

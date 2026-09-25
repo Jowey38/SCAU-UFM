@@ -1036,6 +1036,9 @@ class WorkbenchDialog(QDialog):
         b1 = QPushButton("选择"); b1.clicked.connect(lambda: self._browse(self._results_summary, False)); link_grid.addWidget(b1, 0, 2)
         link_grid.addWidget(QLabel("SWMM 报告"), 1, 0); link_grid.addWidget(self._results_rpt, 1, 1)
         b2 = QPushButton("选择"); b2.clicked.connect(lambda: self._browse(self._results_rpt, False)); link_grid.addWidget(b2, 1, 2)
+        self._results_mdu = QLineEdit(); self._results_mdu.setPlaceholderText("D-Flow FM .mdu（可选；按运行记录的字节哈希绑定）")
+        link_grid.addWidget(QLabel("D-Flow MDU"), 2, 0); link_grid.addWidget(self._results_mdu, 2, 1)
+        b3 = QPushButton("选择"); b3.clicked.connect(lambda: self._browse(self._results_mdu, False)); link_grid.addWidget(b3, 2, 2)
         link_btn = QPushButton("1D/2D 联看"); link_btn.clicked.connect(self._run_linked_view)
         self._results_linked = QTableWidget(0, 9)
         self._results_linked.setHorizontalHeaderLabels(["engine", "node", "cell", "ledger in m³", "returned m³", "rpt lateral m³", "signed gap m³", "rel gap", "diagnostic"])
@@ -1123,7 +1126,8 @@ class WorkbenchDialog(QDialog):
         out_dir = Path(summary).parent / "derived"; out_dir.mkdir(exist_ok=True)
         stamp = datetime.now().strftime("%Y%m%dT%H%M%S")
         result = jobio.run_linked_view(summary, self._repo_edit.text().strip(), out_dir / f"linked_{stamp}.json",
-                                       swmm_report=self._results_rpt.text().strip() or None, result_manifest=manifest)
+                                       swmm_report=self._results_rpt.text().strip() or None, result_manifest=manifest,
+                                       dflowfm_mdu=self._results_mdu.text().strip() or None)
         self._results_linked.setRowCount(0)
         for row in jobio.linked_rows(result):
             r = self._results_linked.rowCount(); self._results_linked.insertRow(r)
