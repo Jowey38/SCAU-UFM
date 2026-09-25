@@ -181,3 +181,20 @@ class LinkedViewHelperTests(unittest.TestCase):
             root = Path(__file__).resolve().parents[2]
             self.assertEqual(jobio.run_linked_view("/x.json", tmp, out)["status"], "repo_root_invalid")
             self.assertIn("not found", jobio.run_linked_view(str(Path(tmp) / "x.json"), str(root), out)["stderr"])
+
+    def test_run_linked_view_passes_c3_mdu_to_the_cli(self):
+        """The shell must forward --dflowfm-mdu; a launcher that echoes argv proves it."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(__file__).resolve().parents[2]
+            summary = Path(tmp) / "s.json"; summary.write_text("{}", encoding="utf-8")
+            out = Path(tmp) / "l.json"
+            echo = ["python", "-c",
+                    "import sys,json,pathlib; pathlib.Path(sys.argv[sys.argv.index('--output')+1])"
+                    ".write_text(json.dumps({'argv': sys.argv[1:]}))"]
+            result = jobio.run_linked_view(str(summary), str(root), out, dflowfm_mdu="/case/single_reach.mdu",
+                                           python_launcher=echo)
+            self.assertEqual(result["status"], "ok", result)
+            argv = result["linked"]["argv"]
+            self.assertIn("--dflowfm-mdu", argv)
+            self.assertEqual(argv[argv.index("--dflowfm-mdu") + 1], "/case/single_reach.mdu")
+            self.assertNotIn("--swmm-report", argv)

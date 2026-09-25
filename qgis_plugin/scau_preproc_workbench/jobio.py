@@ -1668,6 +1668,7 @@ def results_raster_paths(derived: dict | None) -> list[tuple[str, str]]:
 
 def run_linked_view(summary_json: str, repo_root: str, output_json: Path, *,
                     swmm_report: str | None = None, result_manifest: str | None = None,
+                    dflowfm_mdu: str | None = None,
                     python_launcher: list[str] | None = None, timeout_s: float = 120.0) -> dict:
     """Runs `python -m scau_results link`; fail-closed outcomes come back as data."""
     if not repo_root_valid(repo_root):
