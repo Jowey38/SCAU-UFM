@@ -24,12 +24,12 @@ The 180 s synthetic surface+SWMM example run has the whole-system audit disabled
 
 Local evidence: writer parity/roundtrip integration passes; actual surface+real SWMM run produced four frames across 180 seconds; Python tests cover analytic arrival/duration and malformed result rejection.
 
-Remaining requirements: runtime config text is not yet hashed into the manifest (only the STCF and the resulting state are); strict CF time-reference decision and independent format interoperability validation; configured variable-set contract; full disabled-mode GoldenSuite comparison; CRS identifier propagation from PreProc into the STCF/result file itself (today CRS is recovered only via a hash-verified sidecar pipeline manifest or `--crs`); compressed/tiled GeoTIFF variants; P9; native 1D result linkage; and release CI. These gaps must remain visible; do not claim full M288 completion from this prototype.
+Remaining requirements: runtime config text is not yet hashed into the manifest (only the STCF and the resulting state are); strict CF time-reference decision and independent format interoperability validation; configured variable-set contract; full disabled-mode GoldenSuite comparison; CRS identifier propagation from PreProc into the STCF/result file itself (today CRS is recovered only via a hash-verified sidecar pipeline manifest or `--crs`); compressed/tiled GeoTIFF variants; P9; SWMM native time series beyond the `.rpt` summaries; native D-Flow `*_his.nc` parsing (the C3 view is the per-epoch native water balance); and release CI. These gaps must remain visible; do not claim full M288 completion from this prototype.
 
 ## 1D/2D linked view (`link` subcommand)
 
 ```sh
-PYTHONPATH=python python -m scau_results link run_summary.json --swmm-report run.rpt --result-manifest run.nc.manifest.json --output linked.json
+PYTHONPATH=python python -m scau_results link run_summary.json --swmm-report run.rpt --result-manifest run.nc.manifest.json --dflowfm-mdu single_reach.mdu --output linked.json
 ```
 
 The driver records, per committed epoch, one `link_exchanges` entry per 2D<->1D link: engine, engine-side node id, config-level `node_name`, surface `cell`, and the CouplingLib ledger volumes `v_granted` / `v_repay` / `v_returned`. These are **gross** ledger movements; the epoch's `drained_volume`/`returned_volume` remain **net** per-cell write-back deltas. The run summary also carries the run's identity: `source_stcf_hash`, `swmm_inp_hash`, `swmm_report_path`/`swmm_report_hash` (hashed after `finalize()` closes the report), `start_time`, `dt_couple`.
@@ -45,8 +45,6 @@ Per-link `gap` is a **diagnostic, never a correction**: `signed_gap_m3 = rpt lat
 
 On the 180 s synthetic surface+SWMM run (bound report, SWMM 5.2.4): J1 +1.76 m³ (+0.46 %), J2 +13.46 m³ (+4.81 %), both `ROUTING_GAP_ATTRIBUTION_INSUFFICIENT`; routing continuity error −6.627 %. An earlier revision of this file attributed the J2 gap to the engine's initially-dry-conduit behaviour (bug-209); that claim is withdrawn as unsupported by the evidence available.
 
-D-Flow FM native results are deliberately **not** consumed (`dflowfm_native: not consumed`) until the C3 provider contract closes; river links still appear from the ledger with `engine_native: null`.
+D-Flow FM native results (C3) are consumed only through the provider contract the driver froze into the summary (`dflowfm` block + per-epoch `dflowfm_native`). `link` re-validates it independently of the C++ validator: provider/capability identity, `boundary_id`/`provider_object_id` uniqueness, every river ledger link must match a frozen boundary triple, `api_lateral` only, native epochs on the pinned time base with non-decreasing cumulative classes. `--dflowfm-mdu` binds the river input by the byte hash the run recorded. Statuses are explicit: `null` (no river engine), `not_observed` (mock river, ledger-only), `series_validated_mdu_unbound`, `provenance_validated`. Accounting states both definitions side by side — native `api_lateral in − out` vs ledger river `granted + repay − returned` — and reports `NO_GAP` or `LATERAL_INTEGRATION_GAP`; nothing is corrected. Any identity, hash or series violation is `LINKAGE_REJECTED`. The native view is the aggregate engine water balance; open boundaries carry no per-object identity in this contract, and river links keep `engine_native: null` per node.
 
-### P9 canvas picking
-
-Canvas coordinates are in the QGIS **project** CRS; the sampler requires the **model** CRS. The page resolves the model CRS the same way GeoTIFF export does (a `case_sha256`-verified pipeline manifest beside the source STCF) and transforms picked points into it; when no governed model CRS exists, canvas picking is **refused** and the operator must type coordinates in the mesh's own CRS. Points are stored at full precision (`repr`), not truncated.
+Recorded real run (2026-09-26, surface + real SWMM + real D-Flow FM, 3 × 60 s): `provenance_validated`, native api-lateral net `1.57317293025994 m³` == ledger river net, `NO_GAP`; a byte-tampered MDU is refused.

@@ -2,6 +2,105 @@
   "version": 1,
   "bugs": [
     {
+      "id": "c3-prototype-validation-20260925",
+      "error_message": "C3 prototype built on the stale feat/m293 branch missed PR #109's linked.py remediation; first manifest reader skipped absent identities.",
+      "root_cause": "Branch base 6 commits behind origin/master; optional checks permitted incomplete provenance.",
+      "fix": "Re-based work onto origin/master as feat/c3-provider-contract and re-implemented against the remediated linker (identity required, byte binding, per-epoch series).",
+      "tags": [
+        "c3",
+        "branch-base",
+        "provenance"
+      ]
+    },
+    {
+      "id": "c3-qgis-shell-signature-20260926",
+      "error_message": "QGIS 4.0.0 smoke: TypeError run_linked_view() got an unexpected keyword argument 'dflowfm_mdu'.",
+      "file": "qgis_plugin/scau_preproc_workbench/jobio.py",
+      "root_cause": "A heredoc-driven patch updated the call site and CLI pass-through but the signature edit did not land; Python unit tests only exercised fail-closed paths before spawning, so the keyword was never reached.",
+      "fix": "Added dflowfm_mdu to the signature and a launcher-echo unit test that asserts --dflowfm-mdu reaches argv; QGIS smoke then passed.",
+      "tags": [
+        "qgis",
+        "p9",
+        "c3",
+        "test-gap"
+      ]
+    },
+    {
+      "id": "c3-real-scau-sim-launch-20260926",
+      "error_message": "scau_sim.exe: netcdf.dll cannot open shared object file (127); then SWMM ERROR 303 cannot open input file for /tmp/... paths.",
+      "file": "apps/sim_driver (real mode launch)",
+      "root_cause": "vcpkg netcdf.dll beside scau_sim lacks the nc_*_chunking_ints exports the D-Flow runtime needs (bug-211 class); SWMM is a native Windows lib and does not understand MSYS /tmp paths.",
+      "fix": "Run from an isolated copy of scau_sim.exe with the runtime's netcdf.dll beside it (never touch the build tree), export PATH to the runtime bin, and write Windows-style paths (cygpath -m) into run.conf.",
+      "tags": [
+        "dflowfm",
+        "netcdf",
+        "windows",
+        "paths",
+        "real-mode"
+      ]
+    },
+    {
+      "id": "c3-heredoc-escape-20260926",
+      "error_message": "offscreen_smoke.py SyntaxError: unterminated string literal after a python-heredoc patch wrote a bytes literal with \\n.",
+      "file": "tools/qgis/offscreen_smoke.py",
+      "root_cause": "Bash heredoc + Python replace turned the escaped newline into literal newlines inside a bytes literal (known cerebrum pitfall).",
+      "fix": "Repaired with the Edit tool; keep using Edit (or a script file) for source patches that contain escape sequences.",
+      "tags": [
+        "tooling",
+        "heredoc",
+        "escapes"
+      ]
+    },
+    {
+      "id": "runner-proxy-checkout-20260924",
+      "error_message": "Self-hosted runner lanes (gpu-cuda-golden, real-dflowfm-golden) failed at Checkout: 'Failed to connect to github.com port 443' / 'RPC failed; curl 28'; hosted lanes unaffected.",
+      "file": "D:/actions-runner service (NT AUTHORITY NETWORK SERVICE)",
+      "root_cause": "github.com is only reachable from this host through the local proxy 127.0.0.1:7897. The Administrator's git had http.proxy set globally, but the runner runs as NETWORK SERVICE with no proxy env and no user-level git config, so its git fetch went direct and timed out. Rerun of the same job is capped by GitHub ('cannot be rerun').",
+      "fix": "Machine-scope HTTP(S)_PROXY was WRONG: the runner listener then routed its broker session through the proxy and got SSL EOF, never creating a session (jobs stuck 'queued'). Correct fix: leave machine env unset and give ONLY git the proxy for github.com via the service account's own gitconfig: C:/WINDOWS/ServiceProfiles/NetworkService/.gitconfig with [http \"https://github.com/\"] proxy = http://127.0.0.1:7897, then Restart-Service actions.runner.*. Verify _diag/Runner_*.log shows 'Session created'.",
+      "tags": [
+        "ci",
+        "self-hosted-runner",
+        "proxy",
+        "checkout",
+        "broker-session"
+      ]
+    },
+    {
+      "id": "dual-mode-closure-20260910",
+      "error_message": "Exported enable_dflowfm=false cases were rejected by the tri-model-only run loop.",
+      "root_cause": "Lifecycle, engine stepping, audit providers and checkpoint requirements assumed both engines participate.",
+      "fix": "Respect disabled river participation in every seam, retain SWMM scope rejection, and add real exported-package execution plus mock conservation/rollback tests. Driver CTest 5/5 passed; PR107 awaits remaining CI.",
+      "tags": [
+        "sim-driver",
+        "dual-model",
+        "checkpoint",
+        "mass-audit"
+      ]
+    },
+    {
+      "id": "closure-build-order-20260910",
+      "error_message": "Concurrent local builds caused PDB C1041; premature CTest reported missing executables; vcpkg configure waited on runner lock.",
+      "root_cause": "Build and test operations overlapped before all target binaries existed; runner shares vcpkg install lock.",
+      "fix": "Stopped overlapping local work, rebuilt serially, reused already installed dependencies with VCPKG_MANIFEST_INSTALL=OFF, and invalidated premature full-suite results. Do not run full CTest before successful complete build.",
+      "tags": [
+        "build",
+        "process",
+        "verification"
+      ]
+    },
+    {
+      "id": "bug-b7-cross-platform-20260910",
+      "error_message": "Ubuntu B7 failed with fake_validate.cmd PermissionError and conditioned DEM SHA256 mismatch.",
+      "root_cause": "The validator test used a Windows-only launcher; terrain writer translated LF to host newlines and the report stored a CRLF hash.",
+      "fix": "Use a native POSIX executable shim on Unix; emit UTF-8 LF rasters, pin the verified LF hash, compare normalized repository fixtures and retain numerical grid hash checks. Windows Python suite: 90/90 pass. Ubuntu G30 artifact 10146309017 is bitwise identical to reference; all nine CI checks passed in 34462940790; PR105 merged as 78f8d12.",
+      "tags": [
+        "b7",
+        "ci",
+        "newlines",
+        "test-portability"
+      ]
+    },
+    {
       "id": "bug-192",
       "timestamp": "2026-08-07T09:00:00Z",
       "error_message": "M272 initial full CTest failed in whole-system mass audit with residual=0.057020 m3 after SWMM API-lateral bridge wiring.",
@@ -368,6 +467,38 @@
       "related_bugs": [],
       "occurrences": 2,
       "last_seen": "2026-08-16T00:00:00"
+    },
+    {
+      "id": "bug-021",
+      "timestamp": "2026-09-10T09:43:41.739Z",
+      "error_message": "Significant refactor of ",
+      "file": "python/tests/test_case_export.py",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 6→14 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "py"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-09-10T09:43:41.739Z"
+    },
+    {
+      "id": "bug-022",
+      "timestamp": "2026-09-10T09:45:19.261Z",
+      "error_message": "Incorrect value in code",
+      "file": "tests/golden/preproc_terrain_condition_case/cases/terrain_condition_report.json",
+      "root_cause": "Had \"aca85073b159d0973d2fb38f9a5680239670fe46d6a67af6d",
+      "fix": "Changed to \"faf7314b709aef1bca99ffc20d3cd27509c523aedf9a34dae",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "json"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-09-10T09:45:19.261Z"
     }
   ]
 }
