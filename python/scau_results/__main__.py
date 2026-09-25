@@ -6,8 +6,22 @@ import hashlib
 import json
 from pathlib import Path
 
-import netCDF4
-import numpy as np
+# The analysis path needs netCDF4/numpy; the `link` subcommand is stdlib-only
+# (it reads run_summary.json, .rpt, .mdu) and must stay runnable on a bare
+# interpreter. Import failure is therefore deferred to first analysis use.
+try:
+    import netCDF4
+    import numpy as np
+    _ANALYSIS_IMPORT_ERROR: Exception | None = None
+except ImportError as _error:   # pragma: no cover - exercised on CI without netCDF4
+    netCDF4 = None
+    np = None
+    _ANALYSIS_IMPORT_ERROR = _error
+
+
+def _require_analysis_stack() -> None:
+    if _ANALYSIS_IMPORT_ERROR is not None:
+        raise ValueError(f"surface result analysis requires netCDF4 and numpy: {_ANALYSIS_IMPORT_ERROR}")
 
 
 SCHEMA_VERSION = "2"
@@ -126,6 +140,7 @@ def summarize(path: Path, threshold: float, cells: list[int] | None = None,
     h/eta/hu/hv series are emitted (point series, or a profile when the
     order follows a transect). Indices are validated against the file.
     """
+    _require_analysis_stack()
     if not np.isfinite(threshold) or threshold <= 0:
         raise ValueError("threshold must be finite and positive")
     if path.name.endswith(".partial"):

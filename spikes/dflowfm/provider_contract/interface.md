@@ -1,7 +1,8 @@
 # D-Flow FM provider contract (C3/B4')
 
 Status: **implemented and locally verified** (2026-09-26). The machine-facing
-contract lives in `libs/coupling/driver/include/coupling/driver/dflowfm_provider_contract.hpp`;
+contract lives in the main repository's coupling driver header
+`dflowfm_provider_contract.hpp` (outside `spikes/`, per spike-spec isolation);
 the run loop freezes it into `run_summary.json`, and `python/scau_results/linked.py`
 re-validates that artefact independently. This page describes the frozen
 semantics and the evidence; it is not itself the source of truth.

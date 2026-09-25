@@ -2,6 +2,20 @@
   "version": 1,
   "bugs": [
     {
+      "id": "c3-ci-first-run-20260926",
+      "error_message": "PR #110 first CI: spike-isolation-check failed (interface.md referenced libs/coupling/... inside spikes/); linux-gcc + golden-suite failed only G39 with ModuleNotFoundError: No module named 'netCDF4' from scau_results/__main__.py.",
+      "file": "spikes/dflowfm/provider_contract/interface.md; python/scau_results/__main__.py",
+      "root_cause": "Spike-spec invariant 1 forbids main-repo path references under spikes/. The results CLI imported netCDF4/numpy at module top, so even the stdlib-only `link` subcommand could not start on hosted runners that lack the analysis stack.",
+      "fix": "Reworded the spike doc to name the header without a repo path; deferred netCDF4/numpy import failure to first analysis use (_require_analysis_stack in summarize) so `link` runs on a bare interpreter. Verified locally with a blocking shim: link exit 0, analysis exit 2 with a clear message.",
+      "tags": [
+        "ci",
+        "spike-isolation",
+        "python-deps",
+        "c3",
+        "g39"
+      ]
+    },
+    {
       "id": "c3-prototype-validation-20260925",
       "error_message": "C3 prototype built on the stale feat/m293 branch missed PR #109's linked.py remediation; first manifest reader skipped absent identities.",
       "root_cause": "Branch base 6 commits behind origin/master; optional checks permitted incomplete provenance.",
