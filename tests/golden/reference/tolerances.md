@@ -18,3 +18,11 @@ Deterministic path requirement (§10.3): CPU double precision, fixed reduction o
   friction (device `pow` ulp difference): `1e-12` absolute. Accumulated volume
   diagnostics (CPU sequential vs fixed-order M280 block tree): `1e-12` absolute.
   Repeated CUDA runs and device snapshot/restore roundtrips are bitwise.
+
+- G39 dflowfm_provider_contract (C3): identity is exact (string/int equality;
+  duplicate `boundary_id` or `provider_object_id` rejected); native epoch times
+  must equal `start + (i+1)*dt_couple` within `1e-9` relative; cumulative gross
+  classes non-decreasing; accounting `native api_lateral (in - out)` vs
+  `ledger river (granted + repay - returned)` is `NO_GAP` only within `1e-9`
+  relative, otherwise reported as `LATERAL_INTEGRATION_GAP` and never corrected;
+  MDU / STCF binding is by byte hash (FNV-1a64), any difference is `LINKAGE_REJECTED`.

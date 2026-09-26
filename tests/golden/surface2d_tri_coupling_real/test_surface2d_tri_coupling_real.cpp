@@ -184,6 +184,11 @@ TEST(GoldenSurface2DTriCouplingReal, RunLoopDrivesRealSolverAndBothRealEngines) 
         }
         return observation.storage_m3;
     };
+    // C3: bind the native water balance so the run records and validates the
+    // per-epoch native series against the frozen provider contract.
+    hooks.dflowfm_native_observation = [&dflowfm]() {
+        return scau::coupling::driver::observe_dflowfm_external_net(dflowfm);
+    };
 
     const sim::RunLoopResult result = sim::run_simulation(driver, swmm, dflowfm, hooks);
 
@@ -230,6 +235,32 @@ TEST(GoldenSurface2DTriCouplingReal, RunLoopDrivesRealSolverAndBothRealEngines) 
         EXPECT_EQ(record.checkpoint_status, "committed");
     }
     EXPECT_TRUE(result.summary.recovery_action.empty());
+
+    // C3 provider contract evidence: identity frozen from the config, MDU
+    // bytes hashed, and every committed epoch carries a native observation
+    // whose cumulative api-lateral inflow tracks the CouplingLib ledger total
+    // (same accounting definition: volume the driver wrote into the engine).
+    EXPECT_TRUE(result.summary.dflowfm_enabled);
+    EXPECT_TRUE(result.summary.dflowfm_native_observed);
+    EXPECT_EQ(result.summary.dflowfm_provider_id, "dflowfm");
+    EXPECT_EQ(result.summary.dflowfm_capability, "dflowfm.external_net.v1");
+    EXPECT_FALSE(result.summary.dflowfm_mdu_hash.empty());
+    ASSERT_EQ(result.summary.dflowfm_boundaries.size(), 1U);
+    EXPECT_EQ(result.summary.dflowfm_boundaries[0].boundary_id, "lat1");
+    EXPECT_EQ(result.summary.dflowfm_boundaries[0].provider_object_id, 0);
+    EXPECT_EQ(result.summary.dflowfm_boundaries[0].surface_cell, 1U);
+    for (const sim::EpochRecord& record : result.summary.epochs) {
+        ASSERT_TRUE(record.has_dflowfm_native);
+    }
+    const auto& native_final = result.summary.epochs.back().dflowfm_native;
+    std::cout << std::setprecision(15)
+              << "[g19-c3] native_api_lateral_in=" << native_final.api_lateral_in_m3
+              << " native_api_lateral_out=" << native_final.api_lateral_out_m3
+              << " ledger_dflowfm_lateral=" << result.summary.total_dflowfm_lateral_volume
+              << " native_boundary_in=" << native_final.boundary_in_m3
+              << " native_boundary_out=" << native_final.boundary_out_m3 << "\n";
+    EXPECT_NEAR(native_final.api_lateral_in_m3 - native_final.api_lateral_out_m3,
+                result.summary.total_dflowfm_lateral_volume, 1.0e-6);
 
     // M272 + M276 completion: both engine external-net scopes are bound, so
     // the whole-system audit is scope-complete and must CONSERVE within the

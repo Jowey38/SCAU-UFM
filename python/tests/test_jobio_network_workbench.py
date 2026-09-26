@@ -103,7 +103,9 @@ class LinkedViewHelperTests(unittest.TestCase):
         linked = {"result_manifest_bound": True, "committed_epochs": 3,
                   "swmm_report": {"routing_continuity_error_pct": -6.627, "swmm_version": "5.2 (Build 5.2.4)",
                                   "volume_precision": "3 significant figures", "scope_note": "NOT evidence about any node"},
-                  "dflowfm_native": "not consumed: C3 provider contract incomplete",
+                  "dflowfm_native": {"status": "not_observed", "note": "run bound no native water balance (mock river)"},
+                  "dflowfm_contract": {"provider_id": "dflowfm", "capability": "dflowfm.external_net.v1", "mdu_bound": False,
+                                       "boundaries": [{"boundary_id": "lat1", "provider_object_id": 5, "surface_cell": 1}]},
                   "links": [{"engine": "drainage", "node_name": "J1", "cell": 379, "granted_m3": 380.0, "repay_m3": 0.24,
                              "returned_m3": 0.0, "gap": gap,
                              "engine_native": {"lateral_inflow_volume_m3": 382.0, "max_depth_m": 3.0}},
@@ -116,7 +118,9 @@ class LinkedViewHelperTests(unittest.TestCase):
         summary = jobio.linked_summary_rows({"status": "ok", "linked": linked})
         self.assertEqual([s[:2] for s in summary],
                          [("pass", "LinkedView"), ("pass", "SwmmReportBound"), ("review", "SwmmRoutingContinuity"),
-                          ("review", "ROUTING_GAP_ATTRIBUTION_INSUFFICIENT"), ("info", "DFlowNative")])
+                          ("review", "ROUTING_GAP_ATTRIBUTION_INSUFFICIENT"), ("pass", "C3Contract"),
+                          ("info", "DFlowNative")])
+        self.assertIn("lat1->obj 5 cell 1", summary[4][2])
         self.assertIn("no reconciliation applied", summary[3][2])
         self.assertIn("NOT evidence", summary[2][2])
         # a gap inside report rounding produces no per-link warning row
@@ -128,6 +132,30 @@ class LinkedViewHelperTests(unittest.TestCase):
         self.assertEqual(jobio.linked_summary_rows({"status": "fatal", "stderr": "results error: x", "linked": None}),
                          [("fatal", "LinkedViewRejected", "results error: x")])
         self.assertEqual(jobio.linked_rows({"status": "fatal", "linked": None}), [])
+
+    def test_c3_native_rows(self):
+        self.assertEqual(jobio.dflowfm_linked_rows({"dflowfm_native": None}),
+                         [("info", "DFlowNative", "river engine not part of this run")])
+        acc = {"storage_final_m3": 5500.75, "boundary_in_m3": 30.0, "boundary_out_m3": 36.0,
+               "native_api_lateral_net_m3": 0.75, "ledger_river_net_m3": 0.75, "signed_gap_m3": 0.0,
+               "diagnostic_code": "NO_GAP", "note": "native and ledger agree to fp precision"}
+        linked = {"dflowfm_contract": {"provider_id": "dflowfm", "capability": "dflowfm.external_net.v1",
+                                       "mdu_bound": True, "boundaries": [{"boundary_id": "lat1", "provider_object_id": 0,
+                                                                          "surface_cell": 1}]},
+                  "dflowfm_native": {"status": "provenance_validated", "series": [{}, {}, {}], "accounting": acc}}
+        rows = jobio.dflowfm_linked_rows(linked)
+        self.assertEqual([r[:2] for r in rows],
+                         [("pass", "C3Contract"), ("pass", "DFlowNative"), ("pass", "DFlowLateralAccounting:NO_GAP")])
+        self.assertIn("bound by bytes", rows[0][2])
+        self.assertIn("3 native epochs", rows[1][2])
+        # weaker provenance and a gap are both surfaced as review, never hidden
+        linked["dflowfm_contract"]["mdu_bound"] = False
+        linked["dflowfm_native"]["status"] = "series_validated_mdu_unbound"
+        acc.update(diagnostic_code="LATERAL_INTEGRATION_GAP", signed_gap_m3=0.1, note="nothing corrected")
+        rows = jobio.dflowfm_linked_rows(linked)
+        self.assertEqual([r[0] for r in rows], ["pass", "review", "review"])
+        self.assertIn("file not given", rows[0][2])
+        self.assertIn("nothing corrected", rows[2][2])
 
     def test_model_crs_for_result_uses_hash_verified_manifest_only(self):
         root = Path(__file__).resolve().parents[2]
@@ -153,3 +181,20 @@ class LinkedViewHelperTests(unittest.TestCase):
             root = Path(__file__).resolve().parents[2]
             self.assertEqual(jobio.run_linked_view("/x.json", tmp, out)["status"], "repo_root_invalid")
             self.assertIn("not found", jobio.run_linked_view(str(Path(tmp) / "x.json"), str(root), out)["stderr"])
+
+    def test_run_linked_view_passes_c3_mdu_to_the_cli(self):
+        """The shell must forward --dflowfm-mdu; a launcher that echoes argv proves it."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(__file__).resolve().parents[2]
+            summary = Path(tmp) / "s.json"; summary.write_text("{}", encoding="utf-8")
+            out = Path(tmp) / "l.json"
+            echo = ["python", "-c",
+                    "import sys,json,pathlib; pathlib.Path(sys.argv[sys.argv.index('--output')+1])"
+                    ".write_text(json.dumps({'argv': sys.argv[1:]}))"]
+            result = jobio.run_linked_view(str(summary), str(root), out, dflowfm_mdu="/case/single_reach.mdu",
+                                           python_launcher=echo)
+            self.assertEqual(result["status"], "ok", result)
+            argv = result["linked"]["argv"]
+            self.assertIn("--dflowfm-mdu", argv)
+            self.assertEqual(argv[argv.index("--dflowfm-mdu") + 1], "/case/single_reach.mdu")
+            self.assertNotIn("--swmm-report", argv)

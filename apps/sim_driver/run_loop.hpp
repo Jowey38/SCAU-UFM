@@ -4,6 +4,8 @@
 #include <string>
 
 #include "coupling/drainage/swmm_boundary.hpp"
+#include "coupling/driver/dflowfm_external_net_provider.hpp"
+#include "coupling/driver/dflowfm_provider_contract.hpp"
 #include "coupling/river/dflowfm_boundary.hpp"
 #include "run_summary.hpp"
 #include "sim_driver.hpp"
@@ -40,6 +42,11 @@ struct RunLoopHooks {
     // Real mode: the report file swmm_open was told to write. Recorded in the
     // summary so a linked view can refuse a report that is not this run's.
     std::function<std::string()> swmm_report_path{};
+    // C3: complete engine-native cumulative water balance (real mode binds
+    // observe_dflowfm_external_net over the concrete engine). When bound, the
+    // loop records one native observation per committed epoch and validates
+    // the series against the frozen provider contract before completing.
+    std::function<coupling::driver::DFlowFMExternalNetObservation()> dflowfm_native_observation{};
 };
 
 struct RunLoopResult {
@@ -47,6 +54,13 @@ struct RunLoopResult {
     std::size_t committed_epochs{0U};
     RunSummary summary{};
 };
+
+// C3: freeze the D-Flow FM provider contract from the runtime config (the
+// sole owner of river boundary identity) and validate it. run_simulation
+// calls this first when the river engine is enabled; exposed so exporters
+// and tests can reject an identity collision without a driver or engines.
+[[nodiscard]] coupling::driver::DFlowFMProviderContractSnapshot
+validate_dflowfm_contract_for_config(const RuntimeConfig& config, bool native_observed);
 
 // Minimal executable tri-model run loop (M268) with the M269 epoch commit
 // protocol. Per dt_couple epoch:

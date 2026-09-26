@@ -1668,6 +1668,7 @@ def results_raster_paths(derived: dict | None) -> list[tuple[str, str]]:
 
 def run_linked_view(summary_json: str, repo_root: str, output_json: Path, *,
                     swmm_report: str | None = None, result_manifest: str | None = None,
+                    dflowfm_mdu: str | None = None,
                     python_launcher: list[str] | None = None, timeout_s: float = 120.0) -> dict:
     """Runs `python -m scau_results link`; fail-closed outcomes come back as data."""
     if not repo_root_valid(repo_root):
@@ -1682,6 +1683,8 @@ def run_linked_view(summary_json: str, repo_root: str, output_json: Path, *,
         command += ["--swmm-report", str(swmm_report)]
     if result_manifest:
         command += ["--result-manifest", str(result_manifest)]
+    if dflowfm_mdu:
+        command += ["--dflowfm-mdu", str(dflowfm_mdu)]
     try:
         completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout_s,
                                    cwd=str(Path(repo_root) / "python"), env=subprocess_env())
@@ -1739,7 +1742,40 @@ def linked_summary_rows(result: dict) -> list[tuple[str, str, str]]:
                      f"{gap['rpt_lateral_m3']:.0f} m3, signed gap {gap['signed_gap_m3']:+.2f} m3 "
                      f"({gap['relative_gap']:+.2%}). Originals preserved; no reconciliation applied. "
                      f"{gap['note']}"))
-    rows.append(("info", "DFlowNative", str(linked.get("dflowfm_native"))))
+    rows.extend(dflowfm_linked_rows(linked))
+    return rows
+
+
+def dflowfm_linked_rows(linked: dict) -> list[tuple[str, str, str]]:
+    """C3 river rows. The native view is the aggregate engine water balance
+    validated through the frozen provider contract; status wording is the
+    linker's own and is never upgraded here."""
+    native = linked.get("dflowfm_native")
+    contract = linked.get("dflowfm_contract")
+    if native is None and contract is None:
+        return [("info", "DFlowNative", "river engine not part of this run")]
+    rows: list[tuple[str, str, str]] = []
+    if contract:
+        ids = ", ".join(f"{b['boundary_id']}->obj {b['provider_object_id']} cell {b['surface_cell']}"
+                        for b in contract.get("boundaries", []))
+        rows.append(("pass", "C3Contract",
+                     f"{contract.get('provider_id')} {contract.get('capability')}; boundaries: {ids}; "
+                     f"MDU {'bound by bytes' if contract.get('mdu_bound') else 'hash recorded, file not given'}"))
+    if not isinstance(native, dict):
+        rows.append(("info", "DFlowNative", str(native)))
+        return rows
+    status = native.get("status")
+    if status == "not_observed":
+        rows.append(("info", "DFlowNative", native.get("note", "not observed")))
+        return rows
+    acc = native.get("accounting") or {}
+    rows.append(("pass" if status == "provenance_validated" else "review", "DFlowNative",
+                 f"{status}; {len(native.get('series') or [])} native epochs; storage {acc.get('storage_final_m3', 0):.3f} m3; "
+                 f"boundary in {acc.get('boundary_in_m3', 0):.3f} / out {acc.get('boundary_out_m3', 0):.3f} m3"))
+    code = acc.get("diagnostic_code", "-")
+    rows.append(("pass" if code == "NO_GAP" else "review", f"DFlowLateralAccounting:{code}",
+                 f"native api-lateral net {acc.get('native_api_lateral_net_m3', 0):.6f} m3 vs ledger river net "
+                 f"{acc.get('ledger_river_net_m3', 0):.6f} m3 (gap {acc.get('signed_gap_m3', 0):+.3e} m3). {acc.get('note', '')}"))
     return rows
 
 

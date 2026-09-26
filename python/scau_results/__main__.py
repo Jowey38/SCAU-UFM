@@ -6,8 +6,22 @@ import hashlib
 import json
 from pathlib import Path
 
-import netCDF4
-import numpy as np
+# The analysis path needs netCDF4/numpy; the `link` subcommand is stdlib-only
+# (it reads run_summary.json, .rpt, .mdu) and must stay runnable on a bare
+# interpreter. Import failure is therefore deferred to first analysis use.
+try:
+    import netCDF4
+    import numpy as np
+    _ANALYSIS_IMPORT_ERROR: Exception | None = None
+except ImportError as _error:   # pragma: no cover - exercised on CI without netCDF4
+    netCDF4 = None
+    np = None
+    _ANALYSIS_IMPORT_ERROR = _error
+
+
+def _require_analysis_stack() -> None:
+    if _ANALYSIS_IMPORT_ERROR is not None:
+        raise ValueError(f"surface result analysis requires netCDF4 and numpy: {_ANALYSIS_IMPORT_ERROR}")
 
 
 SCHEMA_VERSION = "2"
@@ -126,6 +140,7 @@ def summarize(path: Path, threshold: float, cells: list[int] | None = None,
     h/eta/hu/hv series are emitted (point series, or a profile when the
     order follows a transect). Indices are validated against the file.
     """
+    _require_analysis_stack()
     if not np.isfinite(threshold) or threshold <= 0:
         raise ValueError("threshold must be finite and positive")
     if path.name.endswith(".partial"):
@@ -231,11 +246,13 @@ def main_link(argv: list[str]) -> int:
     parser.add_argument("--swmm-report", type=Path, default=None, help="SWMM .rpt from the same run")
     parser.add_argument("--result-manifest", type=Path, default=None,
                         help="<run.nc>.manifest.json; binds the view to the surface result by state hash")
+    parser.add_argument("--dflowfm-mdu", type=Path, default=None,
+                        help="D-Flow FM .mdu the run used; bound by the byte hash the run recorded (C3)")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     from scau_results.linked import linked_view
     try:
-        view = linked_view(args.summary, args.swmm_report, args.result_manifest)
+        view = linked_view(args.summary, args.swmm_report, args.result_manifest, args.dflowfm_mdu)
         with args.output.open("x", encoding="utf-8", newline="\n") as stream:
             stream.write(json.dumps(view, sort_keys=True, indent=2, allow_nan=False) + "\n")
     except (OSError, ValueError, KeyError) as error:

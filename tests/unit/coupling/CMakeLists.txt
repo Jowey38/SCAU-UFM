@@ -557,3 +557,8 @@ add_executable(test_dflowfm_external_net_provider test_dflowfm_external_net_prov
 target_link_libraries(test_dflowfm_external_net_provider
     PRIVATE scau::coupling_driver scau::warnings GTest::gtest_main)
 add_test(NAME test_dflowfm_external_net_provider COMMAND test_dflowfm_external_net_provider)
+
+add_executable(test_dflowfm_provider_contract_unit test_dflowfm_provider_contract_unit.cpp)
+target_link_libraries(test_dflowfm_provider_contract_unit
+    PRIVATE scau::coupling_driver scau::warnings GTest::gtest_main)
+add_test(NAME test_dflowfm_provider_contract_unit COMMAND test_dflowfm_provider_contract_unit)

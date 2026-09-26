@@ -4,12 +4,17 @@ The run summary's `link_exchanges` is the truth of what crossed each 2D<->1D
 interface per committed epoch. SWMM's `.rpt` node tables are the engine's own
 post-hoc view. This module joins them by node name; it never re-derives
 physics and never treats the engine's numbers as a correction to the ledger.
-D-Flow FM native results are not consumed (C3 provider contract incomplete).
+D-Flow FM native results are consumed ONLY through the C3 provider contract the
+driver froze into the summary (`dflowfm` block + per-epoch `dflowfm_native`):
+identity, MDU bytes, time base and cumulative monotonicity are re-validated
+here independently of the C++ validator, and the native api-lateral net is
+compared against the river ledger as a diagnostic, never as a correction.
 
 Every input must prove it belongs to THIS run before it is joined:
   * the surface result manifest is validated by the same code path as
     `scau_results summarize` (bytes, source STCF, state hash, epoch count),
   * the SWMM report must be the file the run produced, by byte hash,
+  * the D-Flow FM MDU must be the file the run hashed, by byte hash,
   * report units must be SI as declared in the table headers, never assumed.
 """
 from __future__ import annotations
@@ -24,6 +29,14 @@ M3_PER_MEGALITRE = 1000.0
 
 REQUIRED_SUMMARY_FIELDS = ("outcome", "committed_epochs", "final_surface_state_hash",
                            "source_stcf_hash", "start_time", "dt_couple", "epochs")
+
+# C3 frozen contract values (mirror libs/coupling/driver/.../dflowfm_provider_contract.hpp).
+C3_PROVIDER_ID = "dflowfm"
+C3_CAPABILITY = "dflowfm.external_net.v1"
+C3_EXCHANGE_KIND = "api_lateral"
+C3_NATIVE_FIELDS = ("storage_m3", "boundary_in_m3", "boundary_out_m3",
+                    "api_lateral_in_m3", "api_lateral_out_m3", "volume_error_cumulative_m3")
+C3_CUMULATIVE_FIELDS = ("boundary_in_m3", "boundary_out_m3", "api_lateral_in_m3", "api_lateral_out_m3")
 
 
 # --- SWMM report -----------------------------------------------------------------
@@ -208,6 +221,11 @@ def load_link_ledger(summary_path: Path) -> dict:
             "swmm_report_hash": summary.get("swmm_report_hash") or None,
             "committed_epochs": declared,
             "time_window_s": [start, previous_t],
+            "start_time": start,
+            "dt_couple": dt,
+            "total_dflowfm_lateral_volume": summary.get("total_dflowfm_lateral_volume"),
+            "dflowfm_contract": summary.get("dflowfm"),
+            "dflowfm_native_series": [(float(e["logical_time"]), e.get("dflowfm_native")) for e in epochs],
             "links": list(ledger.values())}
 
 
@@ -242,6 +260,126 @@ def _bind_swmm_report(ledger: dict, swmm_report: Path) -> dict:
     return report
 
 
+# --- C3 D-Flow FM provider contract ------------------------------------------------
+
+def _c3_reject(what: str) -> ValueError:
+    return ValueError(f"LINKAGE_REJECTED ({what})")
+
+
+def _bind_dflowfm_contract(ledger: dict, contract, mdu_path: Path | None) -> dict:
+    """Re-validate the frozen C3 contract the driver wrote into the summary and
+    bind the river input by bytes. Returns the validated contract view."""
+    if not isinstance(contract, dict):
+        raise _c3_reject("run summary carries no dflowfm contract block: river engine disabled or older driver")
+    if contract.get("provider_id") != C3_PROVIDER_ID:
+        raise _c3_reject(f"dflowfm_contract_provider_mismatch: {contract.get('provider_id')!r}")
+    if contract.get("capability") != C3_CAPABILITY:
+        raise _c3_reject(f"dflowfm_contract_capability_unsupported: {contract.get('capability')!r}")
+    boundaries = contract.get("boundaries")
+    if not isinstance(boundaries, list) or not boundaries:
+        raise _c3_reject("dflowfm_contract_boundary_identity_missing: no boundaries frozen")
+    seen_ids: set[str] = set()
+    seen_objects: set[int] = set()
+    for b in boundaries:
+        bid, obj = b.get("boundary_id"), b.get("provider_object_id")
+        if not bid or not isinstance(obj, int) or isinstance(obj, bool) or obj < 0:
+            raise _c3_reject(f"dflowfm_contract_boundary_identity_invalid: {b!r}")
+        if b.get("exchange_kind") != C3_EXCHANGE_KIND:
+            raise _c3_reject(f"dflowfm_contract_exchange_kind_unsupported: {b.get('exchange_kind')!r}")
+        if bid in seen_ids:
+            raise _c3_reject(f"dflowfm_contract_boundary_id_duplicate: {bid!r}")
+        if obj in seen_objects:
+            raise _c3_reject(f"dflowfm_contract_provider_object_duplicate: {obj}")
+        seen_ids.add(bid)
+        seen_objects.add(obj)
+    # Every river ledger link must be a frozen boundary with the SAME identity
+    # triple (name, object, cell); a link the contract does not know is foreign.
+    by_id = {b["boundary_id"]: b for b in boundaries}
+    for link in ledger["links"]:
+        if link["engine"] != "river":
+            continue
+        b = by_id.get(link["node_name"])
+        if b is None:
+            raise _c3_reject(f"river ledger link {link['node_name']!r} is not a frozen boundary")
+        if b["provider_object_id"] != link["node"] or b.get("surface_cell") != link["cell"]:
+            raise _c3_reject(f"river ledger link {link['node_name']!r} identity (object {link['node']}, cell "
+                             f"{link['cell']}) differs from frozen boundary ({b['provider_object_id']}, {b.get('surface_cell')})")
+    native_observed = bool(contract.get("native_observed"))
+    recorded_hash = contract.get("mdu_hash") or None
+    if native_observed and not recorded_hash:
+        raise _c3_reject("dflowfm_contract_case_identity_missing: native scope bound without MDU hash")
+    mdu_bound = False
+    if mdu_path is not None:
+        if not recorded_hash:
+            raise _c3_reject("run recorded no MDU hash (mock run); the MDU cannot be proven to belong to this run")
+        actual = fnv1a64(mdu_path.read_bytes())
+        if actual != recorded_hash:
+            raise _c3_reject(f"D-Flow FM MDU bytes do not match the hash recorded by this run (summary {recorded_hash}, file {actual})")
+        mdu_bound = True
+    return {"provider_id": contract["provider_id"], "capability": contract["capability"],
+            "mdu_path": contract.get("mdu_path"), "mdu_hash": recorded_hash, "mdu_bound": mdu_bound,
+            "native_observed": native_observed, "boundaries": boundaries,
+            "flux_convention": contract.get("flux_convention"), "units": contract.get("units")}
+
+
+def _validate_native_series(native_rows: list[tuple[float, dict | None]]) -> list[dict]:
+    """Per-epoch native records: present at every committed epoch, finite,
+    non-negative gross classes, cumulative classes non-decreasing. The time base
+    was already pinned by load_link_ledger (t[i] == start + (i+1)*dt)."""
+    series = []
+    previous = None
+    for i, (t, native) in enumerate(native_rows):
+        if not isinstance(native, dict):
+            raise _c3_reject(f"dflowfm_contract_native_observation_missing: epoch {i} has no native record")
+        row = {"t": t}
+        for key in C3_NATIVE_FIELDS:
+            value = native.get(key)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                raise _c3_reject(f"dflowfm_contract_native_observation_invalid: epoch {i} {key}={value!r}")
+            if key != "volume_error_cumulative_m3" and value < 0:
+                raise _c3_reject(f"dflowfm_contract_native_observation_invalid: epoch {i} {key} negative")
+            row[key] = float(value)
+        if previous is not None:
+            for key in C3_CUMULATIVE_FIELDS:
+                if row[key] < previous[key]:
+                    raise _c3_reject(f"dflowfm_contract_native_monotonicity_violated: epoch {i} {key} decreased")
+        series.append(row)
+        previous = row
+    return series
+
+
+def dflowfm_accounting(ledger: dict, series: list[dict]) -> dict:
+    """C3-08: state the accounting definitions side by side and report the
+    difference. Native api-lateral net = what the engine integrated from the
+    lateral discharge the driver wrote; ledger river in-out = CouplingLib
+    granted+repay minus returned over all river links. Same intended quantity,
+    two integrators; a gap is reported, never reconciled."""
+    ledger_in = sum(l["granted_m3"] + l["repay_m3"] for l in ledger["links"] if l["engine"] == "river")
+    ledger_out = sum(l["returned_m3"] for l in ledger["links"] if l["engine"] == "river")
+    final = series[-1]
+    native_net = final["api_lateral_in_m3"] - final["api_lateral_out_m3"]
+    ledger_net = ledger_in - ledger_out
+    gap = native_net - ledger_net
+    scale = max(1.0, abs(ledger_net))
+    return {"definitions": {
+                "native_api_lateral_net_m3": "cumulative engine-integrated api lateral in - out since initialize",
+                "ledger_river_net_m3": "sum over river links of (v_granted + v_repay) - v_returned, per committed epoch",
+                "boundary_net_m3": "cumulative open-boundary in - out (external to both ledger and surface)"},
+            "native_api_lateral_in_m3": final["api_lateral_in_m3"],
+            "native_api_lateral_out_m3": final["api_lateral_out_m3"],
+            "native_api_lateral_net_m3": native_net,
+            "ledger_river_in_m3": ledger_in, "ledger_river_out_m3": ledger_out, "ledger_river_net_m3": ledger_net,
+            "summary_total_dflowfm_lateral_volume_m3": ledger.get("total_dflowfm_lateral_volume"),
+            "boundary_in_m3": final["boundary_in_m3"], "boundary_out_m3": final["boundary_out_m3"],
+            "boundary_net_m3": final["boundary_in_m3"] - final["boundary_out_m3"],
+            "storage_final_m3": final["storage_m3"],
+            "volume_error_cumulative_m3": final["volume_error_cumulative_m3"],
+            "signed_gap_m3": gap,
+            "diagnostic_code": "NO_GAP" if abs(gap) <= 1e-9 * scale else "LATERAL_INTEGRATION_GAP",
+            "note": ("native and ledger agree to fp precision" if abs(gap) <= 1e-9 * scale else
+                     "native lateral integration differs from the ledger; original values preserved, nothing corrected")}
+
+
 def gap_diagnostics(link: dict, node: dict) -> dict:
     """Signed/relative gap plus a conservative attribution verdict. Diagnostics
     explain a discrepancy; they never reconcile, correct or hide it."""
@@ -262,7 +400,8 @@ def gap_diagnostics(link: dict, node: dict) -> dict:
                      "definitions have not been reconciled. Original values preserved; nothing corrected.")}
 
 
-def linked_view(summary_path: Path, swmm_report: Path | None, result_manifest: Path | None) -> dict:
+def linked_view(summary_path: Path, swmm_report: Path | None, result_manifest: Path | None,
+                dflowfm_mdu: Path | None = None) -> dict:
     ledger = load_link_ledger(summary_path)
     ledger["result_manifest_bound"] = False
     if result_manifest is not None:
@@ -285,5 +424,28 @@ def linked_view(summary_path: Path, swmm_report: Path | None, result_manifest: P
         "routing_continuity_error_pct": report["routing_continuity_error_pct"],
         "volume_precision": report["volume_precision"],
         "scope_note": "global model continuity error is NOT evidence about any single node's gap"}
-    ledger["dflowfm_native"] = "not consumed: C3 provider contract incomplete"
+
+    # C3: consume the native river result only through the frozen contract.
+    contract_block = ledger.pop("dflowfm_contract")
+    native_rows = ledger.pop("dflowfm_native_series")
+    has_river_links = any(l["engine"] == "river" for l in ledger["links"])
+    if contract_block is None and dflowfm_mdu is None and not has_river_links:
+        ledger["dflowfm_native"] = None                     # river engine not part of this run
+    else:
+        ledger["dflowfm_contract_bound"] = False
+        contract = _bind_dflowfm_contract(ledger, contract_block, dflowfm_mdu)
+        ledger["dflowfm_contract_bound"] = True
+        ledger["dflowfm_contract"] = contract
+        if not contract["native_observed"]:
+            ledger["dflowfm_native"] = {"status": "not_observed",
+                                        "note": "run bound no native water balance (mock river); ledger-only river links"}
+        else:
+            series = _validate_native_series(native_rows)
+            ledger["dflowfm_native"] = {"status": "provenance_validated" if contract["mdu_bound"] else
+                                                  "series_validated_mdu_unbound",
+                                        "series": series,
+                                        "accounting": dflowfm_accounting(ledger, series),
+                                        "scope_note": "aggregate native water balance; open boundaries carry no "
+                                                      "per-object identity in this contract"}
+    ledger.pop("total_dflowfm_lateral_volume", None)
     return ledger

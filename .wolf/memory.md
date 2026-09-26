@@ -2,6 +2,12 @@
 
 > Chronological action log. Hooks and AI append to this file automatically.
 
+| 2026-09-26 | PR #110 CI 9/9 green on 6830ce7 after two fixes (spike-isolation doc reference; scau_results link must not import netCDF4 at module top). real-dflowfm-golden log shows [g19-c3] native_api_lateral_in=1.57317293025994 == ledger. | 开发收口任务清单.md, closure evidence | | ~3000 |
+| 2026-09-26 | C3 provider contract delivered on `feat/c3-provider-contract` (rebased on origin/master 01c54f9; the earlier prototype on the stale packaging branch was discarded): contract lib + run-loop/commit-gate wiring + summary provenance block + Python linker consumption + QGIS P9 rows + G39 golden. Local: CTest 167/167, real D-Flow gateway 8/8 (G19 native api-lateral 1.57317293025994 == ledger), real scau_sim tri-model run linked three ways to provenance_validated, QGIS 4.0.0 smoke c3_linked_view ok incl. tampered-MDU refusal. Docs: interface.md -> implemented, README, task list, closure evidence, smoke checklist. PR/CI not yet run. | libs/coupling/driver, apps/sim_driver, tests/golden/dflowfm_provider_contract, python/scau_results, qgis_plugin, tools/qgis, spikes/dflowfm/provider_contract | Scope narrowed on purpose: api_lateral identity only, open boundaries aggregate. Real scau_sim needed an isolated exe copy with the runtime netcdf.dll and Windows-style paths in run.conf. | ~120000 |
+
+| 2026-09-24 | PR #109 squash-merged as 01c54f9 (pinned to verified head 3335b19); master CI on 01c54f9 completed success (9 check-runs); task list + closure evidence updated; sync worktree branch deleted | 开发收口任务清单.md, superpowers/specs/2026-09-10-project-closure-evidence.md | M288 A/B/C line now on master; remaining: C3 boundary contract, M287-D (M281), QGIS 3.40, GoldenSuite registration for results | ~3000 |
+| 2026-09-24 | PR #109 remediation verified: 9/9 CI on 3335b19 after fixing self-hosted runner git proxy (service-account gitconfig, NOT machine env); PR comment posted; closure evidence updated | superpowers/specs/2026-09-10-project-closure-evidence.md, .wolf/buglog.json | CUDA 20m53s pass, real D-Flow 22m45s pass | ~6000 |
+| 2026-09-23 | PR #109 review remediation (Request changes -> b82499f): run identity in summary, full-validation result binding, byte-hash report binding, SI-declared units + section-scoped continuity, strict 2-D metre CRS, model-CRS canvas transform, artifact-set publish protocol, ledger integrity, UGRID bounds, all-or-nothing GeoTIFF, bug-209 attribution withdrawn | apps/sim_driver/*, libs/coupling/drainage/swmm_engine.*, python/scau_results/*, qgis_plugin/*, tests | Python 121/121; CTest 6/6 incl real SWMM; QGIS 4.0.0 smoke ok; awaiting CI on b82499f | ~30000 |
 | 2026-09-22 | M288 step 5 1D/2D linked view: driver emits per-link gross ledger records (engine/node/node_name/cell/v_granted/v_repay/v_returned) per committed epoch; scau_results link joins SWMM .rpt by node name (gap = diagnostic only), binds to surface result by state hash; P9 linked table; synced to PR #109 head c7d47fe | apps/sim_driver/run_summary.*, run_loop.cpp, python/scau_results/linked.py, jobio.py, workbench_dialog.py, offscreen_smoke.py | CTest driver 5/5; Python 109/109; QGIS 4.0.0 smoke ok incl. wrong-run rejection; real run shows J2 gap +13.5 m3 vs SWMM -6.6% continuity error (bug-209 class, surfaced not absorbed) | ~14000 |
 | 2026-09-18 | M288 step 4 P9 results page: thin QGIS shell over scau_results subprocess (validate/sample/GeoTIFF/load layers/canvas pick); offscreen QGIS 4.0.0 smoke ok incl. byte-tamper rejection; synced to PR #109 head 3ed2955 | qgis_plugin/.../jobio.py, workbench_dialog.py, tools/qgis/offscreen_smoke.py, python/tests/test_jobio_network_workbench.py | Python 104/104; smoke first surfaced CLI omitting source_stcf_hash from output (fixed) and a tamper test that hit the wrong check (fixed) | ~10000 |
 | 2026-09-18 | M288 step 3 GeoTIFF: dependency-free baseline writer + hash-verified CRS resolution; GDAL 3.12.2 read-back confirmed EPSG:3395/geotransform/NaN nodata; synced to PR #109 head 0b3abf6 | python/scau_results/geotiff.py, __main__.py, tests/test_results_geotiff.py | Python 101/101; found+fixed TIFF inline-value rule for 4-byte GDAL_NODATA (GDAL warned on offset form) | ~11000 |
@@ -3744,3 +3750,83 @@
 | 07:32 | Edited tools/qgis/offscreen_smoke.py | modified is_file() | ~485 |
 | 07:33 | Edited tools/qgis/offscreen_smoke.py | expanded (+8 lines) | ~249 |
 | 08:25 | Edited superpowers/specs/2026-09-10-project-closure-evidence.md | "ab28aae" → "c7d47fe" | ~299 |
+| 08:28 | Session end: 9 writes across 7 files (linked.py, test_sim_driver_run_loop.cpp, __main__.py, test_results_linked.py, workbench_dialog.py) | 1 reads | ~8889 tok |
+| 09:37 | Session end: 9 writes across 7 files (linked.py, test_sim_driver_run_loop.cpp, __main__.py, test_results_linked.py, workbench_dialog.py) | 17 reads | ~26461 tok |
+| 15:36 | Edited ../../scau-b7-close-20260910/apps/sim_driver/run_summary.hpp | expanded (+9 lines) | ~127 |
+| 16:15 | Edited ../../scau-b7-close-20260910/apps/sim_driver/run_summary.cpp | expanded (+6 lines) | ~172 |
+| 19:51 | Edited ../../scau-b7-close-20260910/libs/coupling/drainage/include/coupling/drainage/swmm_engine.hpp | 1→5 lines | ~87 |
+| 20:06 | Edited ../../scau-b7-close-20260910/libs/coupling/drainage/include/coupling/drainage/swmm_engine.hpp | 4→6 lines | ~43 |
+| 21:58 | Edited ../../scau-b7-close-20260910/libs/coupling/drainage/src/swmm_adapter/swmm_engine.cpp | 4→6 lines | ~38 |
+| 22:06 | Edited ../../scau-b7-close-20260910/apps/sim_driver/run_loop.hpp | 3→6 lines | ~87 |
+| 22:08 | Edited ../../scau-b7-close-20260910/apps/sim_driver/run_loop.cpp | modified hash_file_bytes() | ~134 |
+| 22:08 | Edited ../../scau-b7-close-20260910/apps/sim_driver/run_loop.cpp | 4→5 lines | ~27 |
+| 23:10 | Edited ../../scau-b7-close-20260910/apps/sim_driver/main.cpp | added 2 condition(s) | ~265 |
+| 00:01 | Edited ../../scau-b7-close-20260910/apps/sim_driver/main.cpp | 5→2 lines | ~27 |
+| 00:03 | Edited ../../scau-b7-close-20260910/apps/sim_driver/main.cpp | finalize() → report_path() | ~59 |
+| 07:38 | Edited ../../scau-b7-close-20260910/apps/sim_driver/main.cpp | 10→12 lines | ~86 |
+| 07:41 | Edited ../../scau-b7-close-20260910/apps/sim_driver/surface_timeseries.cpp | modified SurfaceTimeseries() | ~242 |
+| 07:41 | Edited ../../scau-b7-close-20260910/apps/sim_driver/surface_timeseries.cpp | added error handling | ~803 |
+| 08:02 | Edited ../../scau-b7-close-20260910/apps/sim_driver/surface_timeseries.cpp | 3→4 lines | ~21 |
+| 08:21 | Edited ../../scau-b7-close-20260910/tests/integration/sim_driver/test_sim_driver_run_loop.cpp | expanded (+13 lines) | ~311 |
+| 17:51 | Created ../../scau-b7-close-20260910/python/scau_results/linked.py | — | ~4346 |
+| 19:43 | Created ../../scau-b7-close-20260910/python/tests/test_results_linked.py | — | ~3074 |
+| 19:46 | Edited ../../scau-b7-close-20260910/python/scau_results/linked.py | 3→5 lines | ~91 |
+| 19:47 | Edited ../../scau-b7-close-20260910/python/scau_results/linked.py | expanded (+7 lines) | ~195 |
+| 19:47 | Edited ../../scau-b7-close-20260910/python/scau_results/linked.py | modified search() | ~108 |
+| 19:48 | Edited ../../scau-b7-close-20260910/python/scau_results/linked.py | modified search() | ~102 |
+| 19:48 | Edited ../../scau-b7-close-20260910/python/scau_results/linked.py | 2→5 lines | ~88 |
+| 19:49 | Edited ../../scau-b7-close-20260910/python/scau_results/linked.py | modified match() | ~192 |
+| 19:49 | Edited ../../scau-b7-close-20260910/python/tests/test_results_linked.py | inline fix | ~23 |
+| 19:50 | Edited ../../scau-b7-close-20260910/python/scau_results/geotiff.py | modified epsg_code() | ~390 |
+| 19:50 | Edited ../../scau-b7-close-20260910/python/scau_results/geotiff.py | modified export_maps() | ~630 |
+| 19:51 | Edited ../../scau-b7-close-20260910/python/scau_results/__main__.py | modified in() | ~552 |
+| 19:51 | Edited ../../scau-b7-close-20260910/python/scau_results/__main__.py | reduced (-7 lines) | ~128 |
+| 19:51 | Edited ../../scau-b7-close-20260910/python/scau_results/__main__.py | expanded (+11 lines) | ~285 |
+| 19:52 | Edited ../../scau-b7-close-20260910/python/tests/test_results_geotiff.py | modified test_export_is_all_or_nothing() | ~530 |
+| 19:53 | Edited ../../scau-b7-close-20260910/python/tests/test_results.py | modified test_illegal_ugrid_connectivity_fails_closed() | ~931 |
+| 19:53 | Edited ../../scau-b7-close-20260910/python/tests/test_results_geotiff.py | 3→4 lines | ~79 |
+| 19:55 | Edited ../../scau-b7-close-20260910/qgis_plugin/scau_preproc_workbench/jobio.py | modified linked_rows() | ~1097 |
+| 19:56 | Edited ../../scau-b7-close-20260910/qgis_plugin/scau_preproc_workbench/jobio.py | modified model_crs_for_result() | ~516 |
+| 19:56 | Edited ../../scau-b7-close-20260910/qgis_plugin/scau_preproc_workbench/workbench_dialog.py | modified _pick_result_point() | ~603 |
+| 19:57 | Edited ../../scau-b7-close-20260910/python/tests/test_jobio_network_workbench.py | modified test_rows_and_lamps() | ~695 |
+| 19:58 | Edited ../../scau-b7-close-20260910/python/tests/test_jobio_network_workbench.py | modified test_model_crs_for_result_uses_hash_verified_manifest_only() | ~404 |
+| 20:00 | Edited ../../scau-b7-close-20260910/tools/qgis/offscreen_smoke.py | expanded (+9 lines) | ~363 |
+| 20:03 | Edited ../../scau-b7-close-20260910/tools/qgis/offscreen_smoke.py | 1→4 lines | ~96 |
+| 20:07 | Edited ../../scau-b7-close-20260910/python/scau_results/README.md | modified run() | ~1077 |
+| 10:14 | Created ../../scau-b7-close-20260910/runner-net-diag.ps1 | — | ~292 |
+| 15:17 | Created ../../scau-b7-close-20260910/runner-git-proxy.ps1 | — | ~159 |
+| 18:02 | Session end: 52 writes across 23 files (linked.py, test_sim_driver_run_loop.cpp, __main__.py, test_results_linked.py, workbench_dialog.py) | 24 reads | ~49117 tok |
+| 00:01 | Session end: 52 writes across 23 files (linked.py, test_sim_driver_run_loop.cpp, __main__.py, test_results_linked.py, workbench_dialog.py) | 24 reads | ~49117 tok |
+
+## Session: 2026-09-25 10:10
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-09-25 10:52
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 10:54 | Created libs/coupling/driver/include/coupling/driver/dflowfm_provider_contract.hpp | — | ~256 |
+| 10:55 | Created libs/coupling/driver/src/dflowfm_provider_contract.cpp | — | ~1023 |
+| 10:55 | Edited libs/coupling/driver/CMakeLists.txt | 3→4 lines | ~31 |
+| 10:56 | Created tests/unit/coupling/test_dflowfm_provider_contract.cpp | — | ~619 |
+| 10:56 | Edited tests/unit/coupling/CMakeLists.txt | 5→10 lines | ~160 |
+| 10:58 | Edited python/scau_results/linked.py | 2→2 lines | ~26 |
+| 10:59 | Edited python/scau_results/linked.py | modified _load_dflowfm_native_manifest() | ~372 |
+| 10:59 | Edited python/scau_results/linked.py | expanded (+8 lines) | ~113 |
+| 10:59 | Edited python/scau_results/__main__.py | 4→6 lines | ~122 |
+| 10:59 | Edited python/scau_results/__main__.py | 2→3 lines | ~40 |
+| 11:00 | Edited python/tests/test_results_linked.py | assertIn() → assertIsNone() | ~16 |
+| 11:00 | Edited python/tests/test_results_linked.py | modified test_dflowfm_manifest_binds_identity_and_bytes() | ~379 |
+| 11:00 | Edited python/scau_results/README.md | 4→4 lines | ~56 |
+| 11:00 | Edited python/scau_results/README.md | 2→2 lines | ~91 |
+| 11:04 | Edited python/scau_results/linked.py | inline fix | ~16 |
+| 11:04 | Edited python/scau_results/linked.py | modified get() | ~242 |
+| 11:05 | Edited python/scau_results/linked.py | 4→2 lines | ~22 |
+| 11:05 | Edited python/tests/test_results_linked.py | added 1 import(s) | ~8 |
+| 11:05 | Edited python/tests/test_results_linked.py | 6→9 lines | ~192 |
+| 11:06 | Edited python/tests/test_results_linked.py | modified assertRaisesRegex() | ~223 |
+| 11:06 | Edited libs/coupling/driver/src/dflowfm_provider_contract.cpp | added 1 condition(s) | ~105 |
+| 11:07 | Edited python/scau_results/README.md | inline fix | ~175 |
+| 11:09 | Session end: 22 writes across 8 files (dflowfm_provider_contract.hpp, dflowfm_provider_contract.cpp, CMakeLists.txt, test_dflowfm_provider_contract.cpp, linked.py) | 9 reads | ~13475 tok |

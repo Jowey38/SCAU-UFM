@@ -33,6 +33,9 @@ def main() -> int:
     parser.add_argument("--terrain-policy", default=None, help="B3 policy path for the job page field")
     parser.add_argument("--exercise-edits", action="store_true",
                         help="P5/P3: edit a cell and save versioned rule/soil/mapping files (use on a COPY of the package)")
+    parser.add_argument("--c3-summary", default=None,
+                        help="run_summary.json of a REAL surface+SWMM+D-Flow run (C3 linked view)")
+    parser.add_argument("--c3-mdu", default=None, help="the D-Flow FM .mdu that run hashed")
     parser.add_argument("--results-nc", default=None,
                         help="P9: a completed surface timeseries (with sidecar manifest) to validate, sample and rasterize")
     args = parser.parse_args()
@@ -167,6 +170,12 @@ def main() -> int:
                 assert "SwmmReportBound" in codes, codes            # report bytes proven to be this run's
                 assert codes.count("ROUTING_GAP_ATTRIBUTION_INSUFFICIENT") == 2, codes   # J1 and J2, no attribution
                 assert "KNOWN_ROUTING_CONTINUITY_GAP" not in codes, codes
+                # C3: a surface+SWMM run has no river engine; the D-Flow row must
+                # say so rather than pretend a native result was consumed
+                dfl = [dialog._findings.item(r, 2).text() for r in range(dialog._findings.rowCount())
+                       if dialog._findings.item(r, 1).text() == "DFlowNative"]
+                print("SMOKE linked_dflowfm", dfl)
+                assert dfl == ["river engine not part of this run"], dfl
                 assert dialog._results_linked.rowCount() == 2, dialog._results_linked.rowCount()
                 nodes = [dialog._results_linked.item(r, 1).text() for r in range(2)]
                 print("SMOKE linked_nodes", nodes, [(dialog._results_linked.item(r, 6).text(),
@@ -197,6 +206,47 @@ def main() -> int:
                 print("SMOKE linked_view skipped (no summary/rpt beside results)")
             shutil.rmtree(tdir)
         step("results_page", results)
+    if args.c3_summary and hasattr(dialog, "_run_linked_view"):
+        def c3():
+            import shutil, tempfile as _tf
+            summary = Path(args.c3_summary)
+            nc = summary.with_name("surface.nc")
+            dialog._results_nc.setText(str(nc) if Path(str(nc) + ".manifest.json").is_file() else "")
+            dialog._results_summary.setText(str(summary))
+            dialog._results_rpt.setText("")
+            dialog._results_mdu.setText(args.c3_mdu or "")
+            dialog._run_linked_view()
+            rows = [(dialog._findings.item(r, 0).text(), dialog._findings.item(r, 1).text(),
+                     dialog._findings.item(r, 2).text()[:200]) for r in range(dialog._findings.rowCount())]
+            print("SMOKE c3_findings", rows)
+            codes = [c for _, c, _ in rows]
+            lamps = {c: l for l, c, _ in rows}
+            assert codes[0] == "LinkedView" and lamps["LinkedView"] == "pass", rows
+            assert lamps.get("C3Contract") == "pass", rows
+            assert lamps.get("DFlowNative") == "pass", rows          # provenance_validated (MDU bound)
+            assert "DFlowLateralAccounting:NO_GAP" in codes, codes
+            assert any("provenance_validated" in d for _, c, d in rows if c == "DFlowNative"), rows
+            assert any("bound by bytes" in d for _, c, d in rows if c == "C3Contract"), rows
+            engines = [dialog._results_linked.item(r, 0).text() for r in range(dialog._results_linked.rowCount())]
+            print("SMOKE c3_link_engines", engines)
+            assert "river" in engines and "drainage" in engines, engines
+            # a byte-tampered MDU is not this run's river input -> the whole view is refused
+            if args.c3_mdu:
+                tdir = Path(_tf.mkdtemp(prefix="scau_c3_tamper_"))
+                bad = tdir / Path(args.c3_mdu).name
+                shutil.copyfile(args.c3_mdu, bad)
+                with open(bad, "ab") as fh:
+                    fh.write(b"\n# tampered\n")
+                dialog._results_mdu.setText(str(bad))
+                dialog._run_linked_view()
+                codes = [dialog._findings.item(r, 1).text() for r in range(dialog._findings.rowCount())]
+                detail = dialog._findings.item(0, 2).text()
+                print("SMOKE c3_tampered_mdu", codes, detail[:120])
+                assert codes == ["LinkedViewRejected"], codes
+                assert "MDU bytes do not match" in detail, detail
+                assert dialog._results_linked.rowCount() == 0
+                shutil.rmtree(tdir)
+        step("c3_linked_view", c3)
     if args.run:
         def run():
             dialog._run()

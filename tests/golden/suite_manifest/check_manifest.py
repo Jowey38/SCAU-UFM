@@ -71,6 +71,11 @@ REQUIRED = {
     # G38 locks the M287-B3 terrain conditioning stage (authorized stream burn +
     # Priority-Flood fill on a committed twin fixture; disabled policy = G30 bytes).
     "G38": ("preproc_terrain_condition_case", "implemented", True),
+    # G39 locks the C3 D-Flow FM provider contract on one shared artefact: the
+    # driver freezes identity + native series into run_summary.json, and the
+    # independent Python linker must reach provenance_validated / NO_GAP and
+    # refuse a tampered MDU (real-engine evidence: G19 gateway + scau_sim run).
+    "G39": ("dflowfm_provider_contract", "implemented", True),
 }
 
 

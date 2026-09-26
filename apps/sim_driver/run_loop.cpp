@@ -15,6 +15,7 @@
 #include "coupling/driver/checkpoint_coordinator.hpp"
 #include "coupling/driver/checkpoint_payloads.hpp"
 #include "coupling/driver/dflowfm_checkpoint.hpp"
+#include "coupling/driver/dflowfm_provider_contract.hpp"
 #include "coupling/driver/dflowfm_volume_provider.hpp"
 #include "coupling/driver/surface2d_coupling_map.hpp"
 #include "coupling/driver/tri_coupling.hpp"
@@ -104,6 +105,51 @@ const char* rollback_action_name(driver_ns::DFlowFMRollbackAction action) {
     return "unknown";
 }
 
+// C3: the frozen provider contract for this run, derived from the runtime
+// config only (the config is the sole owner of boundary identity).
+driver_ns::DFlowFMProviderContractSnapshot make_dflowfm_contract(
+    const RuntimeConfig& config, bool native_observed) {
+    driver_ns::DFlowFMProviderContractSnapshot contract{};
+    contract.provider_id = driver_ns::kDFlowFMProviderId;
+    contract.capability_schema_version = driver_ns::kDFlowFMCapabilityExternalNetV1;
+    contract.source_stcf_hash = hash_file_bytes(config.stcf_case_path);
+    contract.native_observed = native_observed;
+    if (std::filesystem::is_regular_file(config.dflowfm_mdu_path)) {
+        contract.dflowfm_mdu_hash = hash_file_bytes(config.dflowfm_mdu_path);
+    }
+    contract.start_time_seconds = config.start_time;
+    contract.dt_couple_seconds = config.dt_couple;
+    for (const auto& link : config.surface_river) {
+        contract.boundaries.push_back({link.native_lateral_id, link.location_id, link.cell,
+                                       driver_ns::kDFlowFMExchangeKindApiLateral});
+    }
+    return contract;
+}
+
+driver_ns::DFlowFMNativeEpochObservation to_native_epoch(
+    double logical_time, const driver_ns::DFlowFMExternalNetObservation& o) {
+    driver_ns::DFlowFMNativeEpochObservation e{};
+    e.logical_time = logical_time;
+    e.storage_m3 = o.storage_m3;
+    e.boundary_in_m3 = o.boundary_in_m3;
+    e.boundary_out_m3 = o.boundary_out_m3;
+    e.api_lateral_in_m3 = o.api_lateral_in_m3;
+    e.api_lateral_out_m3 = o.api_lateral_out_m3;
+    e.volume_error_cumulative_m3 = o.volume_error_cumulative_m3;
+    return e;
+}
+
+DFlowFMNativeEpochRecord to_native_record(const driver_ns::DFlowFMNativeEpochObservation& e) {
+    DFlowFMNativeEpochRecord r{};
+    r.storage_m3 = e.storage_m3;
+    r.boundary_in_m3 = e.boundary_in_m3;
+    r.boundary_out_m3 = e.boundary_out_m3;
+    r.api_lateral_in_m3 = e.api_lateral_in_m3;
+    r.api_lateral_out_m3 = e.api_lateral_out_m3;
+    r.volume_error_cumulative_m3 = e.volume_error_cumulative_m3;
+    return r;
+}
+
 // The rolling in-memory window: exactly the last committed epoch boundary.
 struct LastCommit {
     s2d::SurfaceState state{};
@@ -122,6 +168,13 @@ struct LastCommit {
 
 }  // namespace
 
+driver_ns::DFlowFMProviderContractSnapshot validate_dflowfm_contract_for_config(
+    const RuntimeConfig& config, bool native_observed) {
+    auto contract = make_dflowfm_contract(config, native_observed);
+    driver_ns::validate_dflowfm_provider_contract(contract);
+    return contract;
+}
+
 RunLoopResult run_simulation(
     SimDriver& driver,
     coupling::drainage::ISwmmEngine& swmm,
@@ -130,6 +183,13 @@ RunLoopResult run_simulation(
     const RuntimeConfig& config = driver.config();
     if (!config.enable_swmm) {
         throw std::invalid_argument("run_simulation requires SWMM to be enabled");
+    }
+    // C3 contract: boundary identity is validated from the config alone,
+    // before any case load, map validation or engine call.
+    std::optional<driver_ns::DFlowFMProviderContractSnapshot> dflowfm_contract{};
+    if (config.enable_dflowfm) {
+        dflowfm_contract = validate_dflowfm_contract_for_config(
+            config, static_cast<bool>(hooks.dflowfm_native_observation));
     }
 
     // Case loading and surface initialization (strict CF/UGRID path).
@@ -181,6 +241,27 @@ RunLoopResult run_simulation(
     summary.swmm_report_path = hooks.swmm_report_path ? hooks.swmm_report_path() : std::string{};
     summary.start_time = config.start_time;
     summary.dt_couple = config.dt_couple;
+    // C3: the baseline native observation anchors the per-epoch series at the
+    // contract start time; the summary carries the frozen identity.
+    std::optional<driver_ns::DFlowFMNativeEpochObservation> dflowfm_native_baseline{};
+    std::vector<driver_ns::DFlowFMNativeEpochObservation> dflowfm_native_series{};
+    if (dflowfm_contract.has_value()) {
+        summary.dflowfm_enabled = true;
+        summary.dflowfm_provider_id = dflowfm_contract->provider_id;
+        summary.dflowfm_capability = dflowfm_contract->capability_schema_version;
+        summary.dflowfm_mdu_path = config.dflowfm_mdu_path;
+        summary.dflowfm_mdu_hash = dflowfm_contract->dflowfm_mdu_hash;
+        summary.dflowfm_native_observed = dflowfm_contract->native_observed;
+        for (const auto& b : dflowfm_contract->boundaries) {
+            summary.dflowfm_boundaries.push_back(
+                {b.boundary_id, b.provider_object_id, b.surface_cell, b.exchange_kind});
+        }
+        if (hooks.dflowfm_native_observation) {
+            dflowfm_native_baseline =
+                to_native_epoch(config.start_time, hooks.dflowfm_native_observation());
+            driver_ns::validate_dflowfm_native_series(*dflowfm_contract, *dflowfm_native_baseline, {});
+        }
+    }
     const std::size_t n_epochs = epoch_count(config);
     const std::size_t n_surface = surface_substep_count(config);
     std::optional<core::CouplingState> previous_coupling{};
@@ -527,6 +608,27 @@ RunLoopResult run_simulation(
             return result;
         }
 
+        // C3 commit gate: the native observation for this epoch must extend a
+        // contract-valid series. The engine has advanced, so a violation is a
+        // refused-rollback review; the epoch is NOT counted as committed.
+        std::optional<driver_ns::DFlowFMNativeEpochObservation> dflowfm_native_epoch{};
+        if (dflowfm_native_baseline.has_value()) {
+            dflowfm_native_epoch =
+                to_native_epoch(logical_time, hooks.dflowfm_native_observation());
+            dflowfm_native_series.push_back(*dflowfm_native_epoch);
+            try {
+                driver_ns::validate_dflowfm_native_series(
+                    *dflowfm_contract, *dflowfm_native_baseline, dflowfm_native_series);
+            } catch (const coupling::river::DFlowFMEngineError& error) {
+                refuse_engine_rollback();
+                driver.require_review();
+                finish("review_required",
+                       "C3 provider contract violated at epoch " + std::to_string(epoch) +
+                           " (" + error.error_code() + "): " + error.what());
+                return result;
+            }
+        }
+
         const core::SystemMassAudit audit_after = coupling.compute_system_mass(config.h_wet);
 
         // M270 physical whole-system storage audit at the post-replay,
@@ -726,6 +828,10 @@ RunLoopResult run_simulation(
                 }
             }
             record.link_exchanges.push_back(std::move(link));
+        }
+        if (dflowfm_native_epoch.has_value()) {
+            record.has_dflowfm_native = true;
+            record.dflowfm_native = to_native_record(*dflowfm_native_epoch);
         }
         record.writeoff_event_count = writeoff_report.event_count;
         record.writeoff_volume_total = writeoff_report.volume_written_off_total;
