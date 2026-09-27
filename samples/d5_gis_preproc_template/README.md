@@ -2,6 +2,8 @@
 
 This directory is a **synthetic input template** for the SCAU-UFM D-5 real-city-data importer. It is intended for a data owner or project operator to copy, replace with an authorized city sample, and complete with the source-specific metadata and mapping decisions.
 
+A plain-language Chinese guide for data owners is in `validation/数据提交指南.md`; this README and `validation/*.md` remain the technical authority.
+
 The committed geometries, coordinates, IDs, and SWMM case are authored fixtures. They are not real city data, are not an external-data contract, and do not unblock D-5 by themselves.
 
 ## What a real provider must replace

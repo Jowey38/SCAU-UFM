@@ -1,5 +1,9 @@
 # anatomy.md
 
+## D-5 data owner guide (2026-09-27)
+
+- `samples/d5_gis_preproc_template/validation/数据提交指南.md` — plain-language Chinese submission guide for data owners; under `validation/` so `package_selfcheck` does not flag it.
+
 > M272/M273 merged additions, 2026-08-11.
 
 ## .wolf/
